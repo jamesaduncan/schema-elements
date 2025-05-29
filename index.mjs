@@ -1,12 +1,5 @@
-Object.defineProperty( window.URL.prototype, 'selector', {
-    get: function() {
-        const [,selector] = this.hash.match(/^#\(selector=(.*)\)$/);
-        return selector;
-    },
-    set: function( value ) {
-        this.hash = `#(selector=${value})`;
-    }
-});
+import { SelectorRequest } from "https://jamesaduncan.github.io/selector-request/index.mjs";
+
 
 class SchemaItem {
     constructor( id, properties ) {
@@ -105,33 +98,6 @@ class SchemaItems {
     }
 }
 
-class SelectorRequest {
-
-    static async fetch( urlString ) {
-        const request = new Request( urlString );
-        const url = URL.parse( request.url );
-        if ( !url.selector ) {
-            throw new Error("Selector not specified in the URL.");
-        }
-
-        const comparatorURL = URL.parse( request.url );
-        comparatorURL.hash = "";
-
-        if ( window.location.href === comparatorURL.toString() ) {
-            // no need to go to the network if its the same thing.
-            return document.querySelectorAll(url.selector);
-        } else {
-            const response = await fetch( request );
-            if (!response.ok) {
-                throw new Error(`Failed to fetch data from ${url.toString()}`);
-            }
-            const page = await response.text();
-            const parsed = (new DOMParser()).parseFromString(page, 'text/html');
-            return parsed.querySelectorAll(url.selector);
-        }
-    }
-
-}
 
 document.querySelectorAll('[data-source]').forEach( async ( element ) => {
     const items = await SelectorRequest.fetch( element.getAttribute('data-source') );
