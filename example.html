@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script type="module" src="/index.mjs" defer></script>
+    <title>Document</title>
+</head>
+<body>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        h1, h2, h3, h4, h5, h6 { font-weight: normal; }
+
+        ul.books li h1 {
+            font-size: 1em;
+            display: inline;
+        }
+
+        ul.books li h2:before {
+            content:" by ";
+        }
+
+        ul.books li h2 {            
+            font-size: 1em;
+            display: inline;
+        }
+    </style>
+
+
+    <template class="book-row">
+        <tr itemscope itemtype="http://schema.org/Book">
+            <td itemprop="title" contenteditable="plaintext-only"></td>
+            <td itemprop="author" contenteditable="plaintext-only"></td>
+        </tr>
+    </template>
+
+    <header>
+        <h1>SchemaItems</h1>
+    </header>
+    <main>
+        <p>
+            HTML has a really interesting set of attributes that seem to be underused, namely, the <code>itemscope</code>, <code>itemtype</code>, and <code>itemprop</code> attributes.
+            These attributes are part of the Microdata specification, which allows you to embed machine-readable data within HTML documents. This is particularly useful for search engines
+            and other applications that need to understand the content of a web page.
+        </p>
+        <p>
+            We should be able to use them in other ways though. For example, we can use them to synchronize data between different parts of a web page. Or to act as template data for a
+            webpage. The <code>SchemaItems</code> module lets you do example that.
+        </p>
+        <section>
+            <h1>Example</h1>
+            <h2>List of Books (master)</h2>
+            <ul class="books">
+                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141182636">
+                    <h1 itemprop="title" contenteditable="plaintext-only">The Great Gatsby</h1>
+                    <h2 itemprop="author" contenteditable="plaintext-only">F. Scott Fitzgerald</h2>
+                </li>
+                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780582782013">
+                    <h1 itemprop="title" contenteditable="plaintext-only">To Kill a Mockingbird</h1>
+                    <h2 itemprop="author" contenteditable="plaintext-only">Harper Lee</h2>
+                </li>
+                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141036137">
+                    <h1 itemprop="title" contenteditable="plaintext-only">1984</h1>
+                    <h2 itemprop="author" contenteditable="plaintext-only">George Orwell</h2>
+                </li>
+                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141040349">
+                    <h1 itemprop="title" contenteditable="plaintext-only">Pride and Prejudice</h1>
+                    <h2 itemprop="author" contenteditable="plaintext-only">Jane Austen</h2>
+                </li>
+                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141182674">
+                    <h1 itemprop="title" contenteditable="plaintext-only">The Catcher in the Rye</h1>
+                    <h2 itemprop="author" contenteditable="plaintext-only">J.D. Salinger</h2>
+                </li>
+                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780261102385">
+                    <h1 itemprop="title" contenteditable="plaintext-only">The Lord of the Rings</h1>
+                    <h2 itemprop="author" contenteditable="plaintext-only">J.R.R. Tolkien</h2>
+                </li>
+            </ul>
+        
+            <h2>Table of Books</h2>
+            <table>
+                <caption>Books</caption>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Author</th>
+                    </tr>
+                </thead>
+                <tbody data-source="#(selector=[itemtype='http://schema.org/Book'])" data-template="#(selector=template.book-row)"></tbody>
+            </table>
+            </section>
+
+    </main>
+
+    <footer>
+        <p>&copy; 2025</p>
+    </footer>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            SchemaItems.synchronize();
+        });
+    </script>
+</body>
+</html>
