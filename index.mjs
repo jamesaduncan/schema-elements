@@ -15,8 +15,8 @@ class SchemaElement {
             holdingObject[ propname ] = propval;
         });
         const itemtype = element.getAttribute('itemtype');
-        if ( this.types[ itemtype ] ) {
-            return new this.types[ itemtype ]( element.getAttribute('itemid'), holdingObject );
+        if ( SchemaElements.types[ itemtype ] ) {
+            return new SchemaElements.types[ itemtype ]( element.getAttribute('itemid'), holdingObject );
         }
         return new this( element.getAttribute('itemid'), holdingObject );
     }
