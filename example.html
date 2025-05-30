@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <script type="module" src="https://jamesaduncan.github.io/dom-inline-example/index.mjs"></script>
     <script type="module" src="/index.mjs" defer></script>
-    <title>Document</title>
+    <title>Schema Elements</title>
 </head>
 <body>
     <style>
@@ -46,7 +46,7 @@
              document.
         </p>
         <inline-example include="true">            
-            <script type="module" src="http://jamesaduncan.github.io/schema-elements/index.mjs" defer></script>
+            <script type="module" src="https://jamesaduncan.github.io/schema-elements/index.mjs" defer></script>
         </inline-example>
 
         <section>
@@ -102,7 +102,8 @@
             </p>
             <p>
                 The syntax of both the <code>data-source</code> and <code>data-template</code> attributes is uses the URL selector syntax, which is a way
-                to <a href="https://jamesaduncan.github.io/selector-request/">specify elements in a DOM on the URL</a>. 
+                to <a href="https://jamesaduncan.github.io/selector-request/">specify elements in a DOM on the URL</a>. This means you could source both the data and 
+                the template from inside a document located at another URL.
             </p>
             <inline-example include="true" after="#table-next">
                 <table>
@@ -136,15 +137,29 @@
                 do that, we import the module and call the <code>synchronize</code> method. This will ensure that all microdata elements are synchronized throughout the
                 document.
             </p>
-            <inline-example include="true">
+            <p>
+                Each element in this document where there is a microdata element, has a <code>contenteditable</code> attribute, so you can click on it, edit it, and have
+                it update in both places where the item is used.
+            </p>
+            <inline-example include="false">
                 <script type="module">
-                    import { SchemaElements } from 'http://jamesaduncan.github.io/schema-elements/index.mjs';
+                    import { SchemaElements } from 'https://jamesaduncan.github.io/schema-elements/index.mjs';
             
                     window.addEventListener('DOMContentLoaded', () => {
                         SchemaElements.synchronize();
                     });
                 </script>            
             </inline-example>
+
+
+            <script type="module">
+                import { SchemaElements } from './index.mjs';
+        
+                window.addEventListener('DOMContentLoaded', () => {
+                    SchemaElements.synchronize();
+                });
+            </script>            
+
         </section>
 
     </main>
