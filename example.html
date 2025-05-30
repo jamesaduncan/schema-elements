@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script type="module" src="https://jamesaduncan.github.io/dom-inline-example/index.mjs"></script>
     <script type="module" src="/index.mjs" defer></script>
     <title>Document</title>
 </head>
@@ -30,16 +31,8 @@
         }
     </style>
 
-
-    <template class="book-row">
-        <tr itemscope itemtype="http://schema.org/Book">
-            <td itemprop="title" contenteditable="plaintext-only"></td>
-            <td itemprop="author" contenteditable="plaintext-only"></td>
-        </tr>
-    </template>
-
     <header>
-        <h1>SchemaItems</h1>
+        <h1>SchemaElements</h1>
     </header>
     <main>
         <p>
@@ -48,62 +41,123 @@
             and other applications that need to understand the content of a web page.
         </p>
         <p>
-            We should be able to use them in other ways though. For example, we can use them to synchronize data between different parts of a web page. Or to act as template data for a
-            webpage. The <code>SchemaItems</code> module lets you do example that.
+            We should be able to use them in other ways though. One use explored here is to synchronize data between different parts of a web page. Or to act as template data for a
+            webpage. The <code>SchemaElements</code> module lets you do just that. First of all however, you'll need to include the SchemaElements module inside the head of your HTML
+             document.
         </p>
+        <inline-example include="true">            
+            <script type="module" src="http://jamesaduncan.github.io/schema-elements/index.mjs" defer></script>
+        </inline-example>
+
         <section>
             <h1>Example</h1>
+            <p>
+                The example below shows how to use the <code>itemscope</code>, <code>itemtype</code>, and <code>itemprop</code> attributes to define a list of books.
+                Each book is a <code>li</code> (list item) element with the <code>itemscope</code> attribute, which indicates that it is a Microdata item. The <code>itemtype</code>
+                attribute specifies the type of item, which in this case is a <code>Book</code> from the Schema.org vocabulary. The <code>itemid</code> attribute provides a unique
+                identifier for the item, which can be used to reference it later.
+            </p>
+            <p>
+                Inside each list item, is a book title and a book author. These are the <code>h1</code> and <code>h2</code> elements respectively. Each has a <code>itemprop</code>
+                attribute that specifies the type of information it contains.
+            </p>
             <h2>List of Books (master)</h2>
-            <ul class="books">
-                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141182636">
-                    <h1 itemprop="title" contenteditable="plaintext-only">The Great Gatsby</h1>
-                    <h2 itemprop="author" contenteditable="plaintext-only">F. Scott Fitzgerald</h2>
-                </li>
-                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780582782013">
-                    <h1 itemprop="title" contenteditable="plaintext-only">To Kill a Mockingbird</h1>
-                    <h2 itemprop="author" contenteditable="plaintext-only">Harper Lee</h2>
-                </li>
-                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141036137">
-                    <h1 itemprop="title" contenteditable="plaintext-only">1984</h1>
-                    <h2 itemprop="author" contenteditable="plaintext-only">George Orwell</h2>
-                </li>
-                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141040349">
-                    <h1 itemprop="title" contenteditable="plaintext-only">Pride and Prejudice</h1>
-                    <h2 itemprop="author" contenteditable="plaintext-only">Jane Austen</h2>
-                </li>
-                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141182674">
-                    <h1 itemprop="title" contenteditable="plaintext-only">The Catcher in the Rye</h1>
-                    <h2 itemprop="author" contenteditable="plaintext-only">J.D. Salinger</h2>
-                </li>
-                <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780261102385">
-                    <h1 itemprop="title" contenteditable="plaintext-only">The Lord of the Rings</h1>
-                    <h2 itemprop="author" contenteditable="plaintext-only">J.R.R. Tolkien</h2>
-                </li>
-            </ul>
-        
-            <h2>Table of Books</h2>
-            <table>
-                <caption>Books</caption>
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Author</th>
+            <inline-example include="true" after="#example-next">
+                <ul class="books">
+                    <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141182636">
+                        <h1 itemprop="title" contenteditable="plaintext-only">The Great Gatsby</h1>
+                        <h2 itemprop="author" contenteditable="plaintext-only">F. Scott Fitzgerald</h2>                        
+                    </li>
+                    <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780582782013">
+                        <h1 itemprop="title" contenteditable="plaintext-only">To Kill a Mockingbird</h1>
+                        <h2 itemprop="author" contenteditable="plaintext-only">Harper Lee</h2>
+                    </li>
+                    <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141036137">
+                        <h1 itemprop="title" contenteditable="plaintext-only">1984</h1>
+                        <h2 itemprop="author" contenteditable="plaintext-only">George Orwell</h2>
+                    </li>
+                    <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141040349">
+                        <h1 itemprop="title" contenteditable="plaintext-only">Pride and Prejudice</h1>
+                        <h2 itemprop="author" contenteditable="plaintext-only">Jane Austen</h2>
+                    </li>
+                    <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780141182674">
+                        <h1 itemprop="title" contenteditable="plaintext-only">The Catcher in the Rye</h1>
+                        <h2 itemprop="author" contenteditable="plaintext-only">J.D. Salinger</h2>
+                    </li>
+                    <li itemscope itemtype="http://schema.org/Book" itemid="urn:ISBN:9780261102385">
+                        <h1 itemprop="title" contenteditable="plaintext-only">The Lord of the Rings</h1>
+                        <h2 itemprop="author" contenteditable="plaintext-only">J.R.R. Tolkien</h2>
+                    </li>
+                </ul>
+            </inline-example>
+            
+            <p id="example-next">
+                We could render this as a list, or we could use it as a data source for other parts of the document. SchemaElements lets you do both, because it is simply
+                a list. First of all, lets make sure it's rendered as a list, so we can see the data in a more readable format.
+            </p>
+            <p>
+                Next, we're going to use the list of books as a data source for a table. The first thing we're going to do to achieve that, is specify our table,
+                including the <code>data-source</code> and <code>data-template</code> attributes where we want our data. 
+                The <code>data-source</code> attribute specifies the source of the data, and the <code>data-template</code> attribute specifies the template to use for rendering the data.
+            </p>
+            <p>
+                The syntax of both the <code>data-source</code> and <code>data-template</code> attributes is uses the URL selector syntax, which is a way
+                to <a href="https://jamesaduncan.github.io/selector-request/">specify elements in a DOM on the URL</a>. 
+            </p>
+            <inline-example include="true" after="#table-next">
+                <table>
+                    <caption>Books</caption>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Author</th>
+                        </tr>
+                    </thead>
+                    <tbody data-source="#(selector=[itemtype='http://schema.org/Book'])" data-template="#(selector=template.book-row)"></tbody>
+                </table>    
+            </inline-example>
+            <p>
+                We also need to specify the template for the table rows. This is done using a <code>template</code> HTML element. You'll notice that
+                we include the properties that we want to render in the table rows using the <code>itemprop</code> attribute.
+            </p>
+            <inline-example include="true">
+                <template class="book-row">
+                    <tr itemscope itemtype="http://schema.org/Book">
+                        <td itemprop="title" contenteditable="plaintext-only"></td>
+                        <td itemprop="author" contenteditable="plaintext-only"></td>
                     </tr>
-                </thead>
-                <tbody data-source="#(selector=[itemtype='http://schema.org/Book'])" data-template="#(selector=template.book-row)"></tbody>
-            </table>
-            </section>
+                </template>
+            </inline-example>
+            
+            <h2 id="table-next">Table of Books (Data Source example)</h2>
+            <h2>Synchronization</h2>
+            <p>
+                Finally, we might want to make sure that whenever any property of any microdata element changes, it gets updated everywhere in the document. If we need
+                do that, we import the module and call the <code>synchronize</code> method. This will ensure that all microdata elements are synchronized throughout the
+                document.
+            </p>
+            <inline-example include="true">
+                <script type="module">
+                    import { SchemaElements } from 'http://jamesaduncan.github.io/schema-elements/index.mjs';
+            
+                    window.addEventListener('DOMContentLoaded', () => {
+                        SchemaElements.synchronize();
+                    });
+                </script>            
+            </inline-example>
+        </section>
 
     </main>
 
     <footer>
-        <p>&copy; 2025</p>
+        <hr>
+        <p>
+            Copyright &copy; 2025 <a href="mailto:jamesaduncan@me.com">James A. Duncan</a>
+        </p>
+        <p>
+            SchemaElements is licensed under the GNU General Public License v3.0.
+        </p>
     </footer>
 
-    <script>
-        window.addEventListener('DOMContentLoaded', () => {
-            SchemaItems.synchronize();
-        });
-    </script>
 </body>
 </html>

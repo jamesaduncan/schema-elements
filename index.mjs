@@ -1,7 +1,6 @@
 import { SelectorRequest } from "https://jamesaduncan.github.io/selector-request/index.mjs";
 
-
-class SchemaItem {
+class SchemaElement {
     constructor( id, properties ) {
         this.id = id;
         Object.assign(this, properties);
@@ -19,7 +18,7 @@ class SchemaItem {
 
     render( aDestination ) {
         if ( !aDestination ) {
-            throw new Error("No destination provided for rendering SchemaItem.");
+            throw new Error("No destination provided for rendering SchemaElement.");
         }
         Object.keys(this).forEach( (key) => {
             const elements = aDestination.querySelectorAll(`[itemprop="${key}"]`);
@@ -38,7 +37,7 @@ class SchemaItem {
     }
 }
 
-class SchemaItems {
+class SchemaElements {
     static types = {};
 
     static registerType( url, constructorFunction ) {
@@ -57,7 +56,7 @@ class SchemaItems {
                     if ( mutation.type === 'characterData') {
                         const node = mutation.target.parentNode.closest('[itemscope]');
                         const type = node.getAttribute('itemtype');
-                        const typeConstructor = SchemaItems.types[ type ] || SchemaItem;
+                        const typeConstructor = SchemaElements.types[ type ] || SchemaElement;
                         const item = typeConstructor.extract(node);
 
                         document.querySelectorAll(`[itemscope][itemtype="${type}"][itemid="${item.id}"]`).forEach( (destination) => {
@@ -91,7 +90,7 @@ class SchemaItems {
                 const object = new this.types[ itemType ]( item.getAttribute('itemid'), holdingObject );                
                 items.push(object);
             } else {
-                items.push(new SchemaItem( item.getAttribute('itemid'), holdingObject ));
+                items.push(new SchemaElement( item.getAttribute('itemid'), holdingObject ));
             }            
         });
         return items;
@@ -99,20 +98,17 @@ class SchemaItems {
 }
 
 
-document.querySelectorAll('[data-source]').forEach( async ( element ) => {
+document.querySelectorAll('[data-source][data-template]').forEach( async ( element ) => {
     const items = await SelectorRequest.fetch( element.getAttribute('data-source') );
     if ( element.hasAttribute('data-template') ) {
         const templateElement = (await SelectorRequest.fetch( element.getAttribute('data-template') ))[0];
         items.forEach( (item) => {
-            element.append( SchemaItem.extract( item ).render( templateElement.content.cloneNode(true) ) );
+            element.append( SchemaElement.extract( item ).render( templateElement.content.cloneNode(true) ) );
         });
     } else {
         element.append(...items);
     }
-
 })
 
-window.SchemaItems = SchemaItems
-
-export { SchemaItems };
+export { SchemaElements, SchemaElement };
 
