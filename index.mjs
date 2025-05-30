@@ -1,3 +1,4 @@
+import SelectorSubscriber from "https://jamesaduncan.github.io/selector-subscriber/index.mjs";
 import { SelectorRequest } from "https://jamesaduncan.github.io/selector-request/index.mjs";
 
 class SchemaElement {
@@ -98,7 +99,7 @@ class SchemaElements {
 }
 
 
-document.querySelectorAll('[data-source][data-template]').forEach( async ( element ) => {
+SelectorSubscriber.subscribe('[data-source][data-template]', async ( element ) => {
     const items = await SelectorRequest.fetch( element.getAttribute('data-source') );
     if ( element.hasAttribute('data-template') ) {
         const templateElement = (await SelectorRequest.fetch( element.getAttribute('data-template') ))[0];
