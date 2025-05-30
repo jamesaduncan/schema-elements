@@ -14,6 +14,10 @@ class SchemaElement {
             const propval  = prop.innerHTML || prop.value || prop.getAttribute('value') || "";
             holdingObject[ propname ] = propval;
         });
+        const itemtype = element.getAttribute('itemtype');
+        if ( this.types[ itemtype ] ) {
+            return new this.types[ itemtype ]( element.getAttribute('itemid'), holdingObject );
+        }
         return new this( element.getAttribute('itemid'), holdingObject );
     }
 
@@ -45,7 +49,7 @@ class SchemaElements {
         if (!url || !constructorFunction ) {
             throw new Error("URL and constructor function are required to register a type.");
         }
-        types[ url ] = constructorFunction;
+        this.types[ url ] = constructorFunction;
     }
 
     static synchronize() {
