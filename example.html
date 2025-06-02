@@ -131,6 +131,19 @@
             </inline-example>
             
             <h2 id="table-next">Table of Books (Data Source example)</h2>
+
+            <h2>Using a single item elsewhere as a data source</h2>
+            <p>
+                We can also use a single item as a data source. This is done by specifying the <code>data-source</code> attribute on an element, <em>without</em> the <code>data-template</code>
+                attribute. The contents of the element will then be used to render the data in the same way that a template would be used, but only for the single item specified by the
+                <code>data-source</code> attribute.
+            </p>
+            <inline-example include="true">
+                <ul>
+                    <li data-source="#(selector=[itemid='urn:ISBN:9780141182636'])"><span itemprop="title"></span></li>
+                </ul>
+            </inline-example>
+
             <h2>Synchronization</h2>
             <p>
                 Finally, we might want to make sure that whenever any property of any microdata element changes, it gets updated everywhere in the document. If we need

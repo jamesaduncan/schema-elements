@@ -2,9 +2,14 @@ import SelectorSubscriber from "https://jamesaduncan.github.io/selector-subscrib
 import { SelectorRequest } from "https://jamesaduncan.github.io/selector-request/index.mjs";
 
 class SchemaElement {
-    constructor( id, properties ) {
+    constructor( id, properties, element ) {
         this.id = id;
         Object.assign(this, properties);
+        Object.defineProperty(this,'source', {
+            enumerable: false,
+            writable: false,
+            value: element || null
+        })
     }
 
     static extract( element ) {
@@ -16,15 +21,16 @@ class SchemaElement {
         });
         const itemtype = element.getAttribute('itemtype');
         if ( SchemaElements.types[ itemtype ] ) {
-            return new SchemaElements.types[ itemtype ]( element.getAttribute('itemid'), holdingObject );
+            return new SchemaElements.types[ itemtype ]( element.getAttribute('itemid'), holdingObject, element);
         }
-        return new this( element.getAttribute('itemid'), holdingObject );
+        return new this( element.getAttribute('itemid'), holdingObject, element );
     }
 
     render( aDestination ) {
         if ( !aDestination ) {
             throw new Error("No destination provided for rendering SchemaElement.");
         }
+
         Object.keys(this).forEach( (key) => {
             const elements = aDestination.querySelectorAll(`[itemprop="${key}"]`);
             elements.forEach( (element) => {
@@ -33,6 +39,8 @@ class SchemaElement {
         });
         if ( aDestination.hasAttribute ) {
             if ( !aDestination.hasAttribute('itemid') ) { aDestination.setAttribute('itemid', this.id )}
+            if ( !aDestination.hasAttribute('itemscope') ) { aDestination.setAttribute('itemscope', '') }
+            if ( !aDestination.hasAttribute('itemtype') && this.source ) { aDestination.setAttribute('itemtype', this.source.getAttribute('itemtype') ) }
         } else {
             aDestination.querySelector('[itemscope]').setAttribute('itemid', this.id);
             aDestination = aDestination.querySelector('[itemscope]');
@@ -103,17 +111,25 @@ class SchemaElements {
 }
 
 
-SelectorSubscriber.subscribe('[data-source][data-template]', async ( element ) => {
-    const items = await SelectorRequest.fetch( element.getAttribute('data-source') );
+SelectorSubscriber.subscribe('[data-source]', async ( element ) => {
     if ( element.hasAttribute('data-template') ) {
-        const templateElement = (await SelectorRequest.fetch( element.getAttribute('data-template') ))[0];
-        items.forEach( (item) => {
-            element.append( SchemaElement.extract( item ).render( templateElement.content.cloneNode(true) ) );
-        });
+        const items = await SelectorRequest.fetch( element.getAttribute('data-source') );
+        if ( element.hasAttribute('data-template') ) {
+            const templateElement = (await SelectorRequest.fetch( element.getAttribute('data-template') ))[0];
+            items.forEach( (item) => {
+                element.append( SchemaElement.extract( item ).render( templateElement.content.cloneNode(true) ) );
+            });
+        } else {
+            element.append(...items);
+        }
     } else {
-        element.append(...items);
+        // we have no template, so we are going to look inside here. It's also only going to be ONE.
+        const items = await SelectorRequest.fetch( element.getAttribute('data-source') );
+        console.log( items, element )
+        SchemaElement.extract( items[0] ).render( element );
     }
-})
+});
+
 
 export { SchemaElements, SchemaElement };
 
