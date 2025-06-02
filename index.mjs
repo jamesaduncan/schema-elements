@@ -1,5 +1,5 @@
-import SelectorSubscriber from "https://jamesaduncan.github.io/selector-subscriber/index.mjs";
-import { SelectorRequest } from "https://jamesaduncan.github.io/selector-request/index.mjs";
+import { SelectorSubscriber } from "https://jamesaduncan.github.io/selector-subscriber/index.mjs";
+import { SelectorRequest }    from "https://jamesaduncan.github.io/selector-request/index.mjs";
 
 class SchemaElement {
     constructor( id, properties, element ) {
@@ -26,11 +26,14 @@ class SchemaElement {
         return new this( element.getAttribute('itemid'), holdingObject, element );
     }
 
+    interpolate(t) {
+        return t.replace(/\${([^}]+)}/g,(m,p)=>p.split('.').reduce((a,f)=>a?a[f]:undefined,this)??m);
+    }
+
     render( aDestination ) {
         if ( !aDestination ) {
             throw new Error("No destination provided for rendering SchemaElement.");
         }
-
         Object.keys(this).forEach( (key) => {
             const elements = aDestination.querySelectorAll(`[itemprop="${key}"]`);
             elements.forEach( (element) => {
@@ -46,6 +49,8 @@ class SchemaElement {
             aDestination = aDestination.querySelector('[itemscope]');
         }
 
+        aDestination.innerHTML = this.interpolate(aDestination.innerHTML);
+        //aDestination.setAttribute('renderId', id);
         return aDestination;
     }
 }
@@ -119,13 +124,10 @@ SelectorSubscriber.subscribe('[data-source]', async ( element ) => {
             items.forEach( (item) => {
                 element.append( SchemaElement.extract( item ).render( templateElement.content.cloneNode(true) ) );
             });
-        } else {
-            element.append(...items);
         }
     } else {
         // we have no template, so we are going to look inside here. It's also only going to be ONE.
         const items = await SelectorRequest.fetch( element.getAttribute('data-source') );
-        console.log( items, element )
         SchemaElement.extract( items[0] ).render( element );
     }
 });
