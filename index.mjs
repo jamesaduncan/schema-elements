@@ -49,8 +49,13 @@ class SchemaElement {
             aDestination = aDestination.querySelector('[itemscope]');
         }
 
+        // make sure we check all the attributes for interpolation
+        aDestination.getAttributeNames().forEach( (attrname) => {
+            if (aDestination.getAttribute(attrname).startsWith('${')) {
+                aDestination.setAttribute(attrname, this.interpolate(aDestination.getAttribute(attrname)));
+            }
+        });
         aDestination.innerHTML = this.interpolate(aDestination.innerHTML);
-        //aDestination.setAttribute('renderId', id);
         return aDestination;
     }
 }
