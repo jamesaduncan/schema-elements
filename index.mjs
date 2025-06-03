@@ -23,6 +23,17 @@ class SchemaElement {
         if (!element) return;
         element.querySelectorAll('[itemprop]').forEach((prop) => {
             const propname = prop.getAttribute('itemprop');
+            if (prop.hasAttribute('itemtype')) {
+                // if the property has an itemtype, we need to extract it as a SchemaElement
+                const itemtype = prop.getAttribute('itemtype');
+                if (SchemaElements.types[itemtype]) {
+                    holdingObject[propname] = SchemaElements.types[itemtype].extract(prop);
+                } else {
+                    holdingObject[propname] = SchemaElement.extract(prop);
+                }
+                return; // skip to the next property
+            }
+
             const propval = prop.innerHTML || prop.value || prop.getAttribute('value') || "";
             if (holdingObject[propname]) {
                 if (Array.isArray(holdingObject[propname])) holdingObject[propname].push(propval);
