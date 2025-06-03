@@ -133,8 +133,18 @@ class holdingPen extends HTMLElement {}
 customElements.define('temporary-holding-pen', holdingPen);
 
 SelectorSubscriber.subscribe('[itemscope][itemtype]', async(element) => {
-    if (element.children.length == 0) {
+    if (element.children.length == 0 && window.expandEmptySchemaElements) {
         logger(`No children found for SchemaElement ${element.tagName.toLowerCase()} in element with itemtype: ${element.getAttribute('itemtype')}`);
+        const items = await SelectorRequest.fetch(element.getAttribute('itemtype'));
+        if (items && items.length > 0) {
+            items.forEach((item) => {
+                item = document.importNode(item, true);
+                element.append(item);
+            });
+            logger(`SchemaElement items added`, items);
+        } else {
+            console.warn("No items found for SchemaElement extraction.");
+        }
     }
 });
 
