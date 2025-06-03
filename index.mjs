@@ -1,6 +1,12 @@
 import { SelectorSubscriber } from "https://jamesaduncan.github.io/selector-subscriber/index.mjs";
 import { SelectorRequest } from "https://jamesaduncan.github.io/selector-request/index.mjs";
 
+function logger(message, ...args) {
+    if (window.debug && window.debug.enabled) {
+        console.debug(message, ...args);
+    }
+}
+
 class SchemaElement {
     constructor(id, properties, element) {
         this.id = id;
@@ -154,6 +160,7 @@ SelectorSubscriber.subscribe('[data-source]', async(element) => {
                 SchemaElement.extract(item).render(element);
             });
         }
+        logger(`SelectorElements added`, holdingPen);
         holdingPen.remove();
     } catch (e) {
         console.error("Error in SchemaElement extraction:", e);
