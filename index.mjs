@@ -134,7 +134,7 @@ customElements.define('temporary-holding-pen', holdingPen);
 
 SelectorSubscriber.subscribe('[itemscope][itemtype]', async(element) => {
     if (element.children.length == 0) {
-        logger(`No children found for SchemaElement in element with itemtype: ${element.getAttribute('itemtype')}`);
+        logger(`No children found for SchemaElement ${element.tagName.toLowerCase()} in element with itemtype: ${element.getAttribute('itemtype')}`);
     }
 });
 
