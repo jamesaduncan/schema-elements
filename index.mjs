@@ -24,7 +24,12 @@ class SchemaElement {
         element.querySelectorAll('[itemprop]').forEach((prop) => {
             const propname = prop.getAttribute('itemprop');
             const propval = prop.innerHTML || prop.value || prop.getAttribute('value') || "";
-            holdingObject[propname] = propval;
+            if (holdingObject[propname]) {
+                if (Array.isArray(holdingObject[propname])) holdingObject[propname].push(propval);
+                else holdingObject[propname] = [holdingObject[propname], propval];
+            } else {
+                holdingObject[propname] = propval;
+            }
         });
         const itemtype = element.getAttribute('itemtype');
         if (SchemaElements.types[itemtype]) {
