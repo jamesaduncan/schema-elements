@@ -51,7 +51,8 @@ class SchemaElement {
 
         // make sure we check all the attributes for interpolation
         aDestination.getAttributeNames().forEach( (attrname) => {
-            if (aDestination.getAttribute(attrname).startsWith('${')) {
+            const attrvalue = aDestination.getAttribute(attrname);
+            if (attrvalue && attrvalue.match(/${/)) {
                 aDestination.setAttribute(attrname, this.interpolate(aDestination.getAttribute(attrname)));
             }
         });
