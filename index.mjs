@@ -64,6 +64,8 @@ class SchemaElement {
             }
         });
         aDestination.innerHTML = this.interpolate(aDestination.innerHTML);
+
+        aDestination.schemaElement = this;
         return aDestination;
     }
 }
