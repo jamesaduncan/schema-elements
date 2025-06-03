@@ -132,6 +132,12 @@ class holdingPen extends HTMLElement {}
 
 customElements.define('temporary-holding-pen', holdingPen);
 
+SelectorSubscriber.subscribe('[itemscope][itemtype]', async(element) => {
+    if (element.children.length == 0) {
+        logger(`No children found for SchemaElement in element with itemtype: ${element.getAttribute('itemtype')}`);
+    }
+});
+
 SelectorSubscriber.subscribe('[data-source]', async(element) => {
     try {
         const holdingPen = document.createElement('temporary-holding-pen');
