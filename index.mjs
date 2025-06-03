@@ -128,9 +128,9 @@ customElements.define('temporary-holding-pen', holdingPen);
 
 SelectorSubscriber.subscribe('[data-source]', async(element) => {
     try {
+        const holdingPen = document.createElement('temporary-holding-pen');
+        document.body.append(holdingPen);
         if (element.hasAttribute('data-template')) {
-            const holdingPen = document.createElement('temporary-holding-pen');
-            document.body.append(holdingPen);
             const items = await SelectorRequest.fetch(element.getAttribute('data-source'));
             if (element.hasAttribute('data-template')) {
                 const templateElement = (await SelectorRequest.fetch(element.getAttribute('data-template')))[0];
@@ -141,7 +141,6 @@ SelectorSubscriber.subscribe('[data-source]', async(element) => {
                     element.append(extractedItem.render(templateElement.content.cloneNode(true)));
                 });
             }
-            document.body.removeChild(holdingPen);
         } else {
             // we have no template, so we are going to look inside here. It's also only going to be ONE.
             const items = await SelectorRequest.fetch(element.getAttribute('data-source'));
@@ -149,8 +148,13 @@ SelectorSubscriber.subscribe('[data-source]', async(element) => {
                 console.warn("No items found for SchemaElement extraction.");
                 return;
             }
-            SchemaElement.extract(items[0]).render(element);
+            items.forEach((item) => {
+                item = document.importNode(item, true);
+                holdingPen.append(item);
+                SchemaElement.extract(item).render(element);
+            });
         }
+        holdingPen.remove();
     } catch (e) {
         console.error("Error in SchemaElement extraction:", e);
     }
