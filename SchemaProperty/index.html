@@ -1,0 +1,87 @@
+<html lang="en">
+
+<head>
+    <title>Schema for the properties of a Schema</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <script type="module" src="httpss://jamesaduncan.github.io/dom-inline-example/index.mjs"></script>
+    <script type="module" src="./index.mjs"></script>
+</head>
+
+<body>
+
+    <h1>A schema for Schema Properties</h1>
+
+
+    <p itemref="schema" itemprop="description">
+        This schema defines the structure of a schema property. It includes properties for the name of the property, its type, whether it is required, its cardinality, and a description of the property.
+    </p>
+
+    <table id="schema" itemscope itemtype="https://schema.org/Thing">
+        <caption itemprop="name">Schema</caption>
+        <thead>
+            <tr>
+                <th>Property</th>
+                <th>Type</th>
+                <th>Required</th>
+                <th>Cardinality</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr itemprop="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
+                <td itemprop="name">name</td>
+                <td itemprop="type">https://schema.org/Text</td>
+                <td itemprop="required">True</td>
+                <td itemprop="cardinality">One</td>
+                <td>
+                    The name of the property in the schema
+                </td>
+            </tr>
+
+            <tr itemprop="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
+                <td itemprop="name">type</td>
+                <td itemprop="type">https://schema.org/URL</td>
+                <td itemprop="required">True</td>
+                <td itemprop="cardinality">One</td>
+                <td>
+                    The type of the property, which can be a URL to a schema or a primitive type.
+                </td>
+            </tr>
+
+            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" itemscope itemprop="property">
+                <td itemprop="name">required</td>
+                <td itemprop="type">https://schema.org/Boolean</td>
+                <td itemprop="required">True</td>
+                <td itemprop="cardinality">One</td>
+                <td>
+                    Indicates whether the property is required in the schema.
+                </td>
+            </tr>
+
+            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" itemscope itemprop="property">
+                <td itemprop="name">cardinality</td>
+                <td itemprop="type">https://schema.org/Text</td>
+                <td itemprop="required">True</td>
+                <td itemprop="cardinality">One</td>
+                <td>
+                    The cardinality of the property, which can be "One", or "Many".
+                </td>
+            </tr>
+
+            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" itemscope itemprop="property">
+                <td itemprop="name">description</td>
+                <td itemprop="type">https://schema.org/Text</td>
+                <td itemprop="required">False</td>
+                <td itemprop="cardinality">One</td>
+                <td>
+                    A description of the property, explaining its purpose and usage in the schema.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+
+</html>
