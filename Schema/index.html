@@ -4,14 +4,12 @@
     <title>Schema for a Schema</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <script type="module" src="httpss://jamesaduncan.github.io/dom-inline-example/index.mjs"></script>
     <script type="module" src="/2.0/index.mjs"></script>
 </head>
 
 <body>
 
     <h1>A schema for Schemas</h1>
-
 
     <p itemref="schema" itemprop="description">
         This schema defines the structure of a schema. It includes properties for the name of the schema, its parent schema, and the properties that it defines.
@@ -30,7 +28,7 @@
         </thead>
 
         <tbody>
-            <tr itemprop="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
+            <tr itemprop="property" id="name" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
                 <td itemprop="name">name</td>
                 <td itemprop="type">https://schema.org/Text</td>
                 <td itemprop="required">True</td>
@@ -40,7 +38,7 @@
                 </td>
             </tr>
 
-            <tr itemprop="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
+            <tr itemprop="property" id="parent" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
                 <td itemprop="name">parent</td>
                 <td itemprop="type">https://schema.org/URL</td>
                 <td itemprop="required">False</td>
@@ -50,7 +48,7 @@
                 </td>
             </tr>
 
-            <tr itemprop="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
+            <tr itemprop="property" id="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
                 <td itemprop="name">property</td>
                 <td itemprop="type">https://schema.org/SchemaProperty</td>
                 <td itemprop="required">False</td>
