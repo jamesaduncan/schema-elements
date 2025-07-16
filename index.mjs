@@ -30,70 +30,59 @@ class SchemaRegistry {
         });
     }
 
+    getBuiltInSchema(url) {
+        const type = url.split('/').pop();
+        const schemas = {
+            'Organization': {
+                id: url,
+                name: 'Organization',
+                properties: [
+                    { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
+                    { name: 'description', type: 'https://schema.org/Text', cardinality: '0..1' },
+                    { name: 'employee', type: 'https://schema.org/Person', cardinality: '0..n' },
+                    { name: 'url', type: 'https://schema.org/URL', cardinality: '0..1' }
+                ]
+            },
+            'Person': {
+                id: url,
+                name: 'Person',
+                properties: [
+                    { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
+                    { name: 'email', type: 'https://schema.org/Text', cardinality: '0..1' },
+                    { name: 'contact', type: 'https://schema.org/Person', cardinality: '0..n' }
+                ]
+            },
+            'Book': {
+                id: url,
+                name: 'Book',
+                properties: [
+                    { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
+                    { name: 'author', type: 'https://schema.org/Person', cardinality: '0..1' }
+                ]
+            },
+            'Credential': {
+                id: url,
+                name: 'Credential',
+                properties: [
+                    { name: 'username', type: 'https://schema.org/Text', cardinality: '0..1' },
+                    { name: 'role', type: 'https://schema.org/Text', cardinality: '0..1' }
+                ]
+            }
+        };
+        return schemas[type] || null;
+    }
+
     async loadSchema(url) {
         if (this.schemas.has(url)) {
             return this.schemas.get(url);
         }
 
-        // Handle schema.org URLs specially
-        if (url.includes('schema.org')) {
-            // For schema.org, we'll use built-in definitions
-            const type = url.split('/').pop();
-            const builtInSchema = {
-                'Organization': {
-                    id: url,
-                    name: 'Organization',
-                    properties: [
-                        { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
-                        { name: 'description', type: 'https://schema.org/Text', cardinality: '0..1' },
-                        { name: 'employee', type: 'https://schema.org/Person', cardinality: '0..n' },
-                        { name: 'url', type: 'https://schema.org/URL', cardinality: '0..1' }
-                    ]
-                },
-                'Person': {
-                    id: url,
-                    name: 'Person',
-                    properties: [
-                        { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
-                        { name: 'email', type: 'https://schema.org/Text', cardinality: '0..1' },
-                        { name: 'contact', type: 'https://schema.org/Person', cardinality: '0..n' }
-                    ]
-                },
-                'Book': {
-                    id: url,
-                    name: 'Book',
-                    properties: [
-                        { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
-                        { name: 'author', type: 'https://schema.org/Person', cardinality: '0..1' }
-                    ]
-                }
-            };
-            
-            if (builtInSchema[type]) {
-                this.schemas.set(url, builtInSchema[type]);
-                return builtInSchema[type];
-            }
-        }
-        
-        // Handle organised.team URLs specially
-        if (url.includes('organised.team')) {
-            const type = url.split('/').pop();
-            const builtInSchema = {
-                'Organization': {
-                    id: url,
-                    name: 'Organization',
-                    properties: [
-                        { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
-                        { name: 'description', type: 'https://schema.org/Text', cardinality: '0..1' },
-                        { name: 'employee', type: 'https://schema.org/Person', cardinality: '0..n' },
-                        { name: 'url', type: 'https://schema.org/URL', cardinality: '0..1' }
-                    ]
-                }
-            };
-            
-            if (builtInSchema[type]) {
-                this.schemas.set(url, builtInSchema[type]);
-                return builtInSchema[type];
+        // Check built-in schemas first
+        if (url.includes('schema.org') || url.includes('organised.team')) {
+            const builtInSchema = this.getBuiltInSchema(url);
+            if (builtInSchema) {
+                this.schemas.set(url, builtInSchema);
+                return builtInSchema;
             }
         }
 
@@ -111,7 +100,6 @@ class SchemaRegistry {
             
             return schema;
         } catch (error) {
-            console.error(`Failed to load schema ${url}:`, error);
             return null;
         }
     }
@@ -129,72 +117,61 @@ class SchemaRegistry {
             parent: this.extractProperty(schemaElement, 'parent')
         };
 
-        // Extract properties
-        const propertyElements = schemaElement.querySelectorAll('[itemprop="property"][itemscope]');
+        // Find all properties
+        const propertyElements = doc.querySelectorAll('[itemscope][itemtype*="Property"]');
         propertyElements.forEach(propElement => {
             const property = {
                 name: this.extractProperty(propElement, 'name'),
-                type: this.extractProperty(propElement, 'type') || propElement.getAttribute('itemtype'),
-                cardinality: this.extractProperty(propElement, 'cardinality') || '1',
+                type: this.extractProperty(propElement, 'type'),
+                cardinality: this.extractProperty(propElement, 'cardinality') || '0..1',
                 required: this.extractProperty(propElement, 'required') === 'true',
                 description: this.extractProperty(propElement, 'description')
             };
-            schema.properties.push(property);
+            if (property.name) {
+                schema.properties.push(property);
+            }
         });
-
-        // Handle enumerated types
-        const enumeratorElements = schemaElement.querySelectorAll('[itemprop="enumerator"]');
-        if (enumeratorElements.length > 0) {
-            schema.enumerators = Array.from(enumeratorElements).map(el => el.textContent.trim());
-            // Register enumerated type validator
-            this.typeValidators.set(url, (value) => schema.enumerators.includes(value));
-        }
 
         return schema;
     }
 
     extractProperty(element, propName) {
         const propElement = element.querySelector(`[itemprop="${propName}"]`);
-        return propElement ? propElement.textContent.trim() : null;
+        if (!propElement) return null;
+        
+        if (propElement.hasAttribute('content')) {
+            return propElement.getAttribute('content');
+        }
+        return propElement.textContent.trim();
     }
 
-    async validate(value, schemaUrl) {
+    async validate(data, schemaUrl) {
         const schema = await this.loadSchema(schemaUrl);
-        if (!schema) return { valid: false, errors: [`Schema ${schemaUrl} not found`] };
+        if (!schema) {
+            return { valid: false, errors: [`Schema ${schemaUrl} not found`], warnings: [] };
+        }
 
         const errors = [];
         const warnings = [];
 
-        // Get all properties including inherited ones
-        const allProperties = await this.getAllProperties(schema);
-
         // Check required properties
-        for (const prop of allProperties) {
-            const cardinality = prop.cardinality || '1';
-            const propValue = value[prop.name];
-            
-            if (cardinality === '1' || cardinality === '1..n') {
-                if (!propValue || (Array.isArray(propValue) && propValue.length === 0)) {
-                    errors.push(`Required property '${prop.name}' is missing`);
-                }
+        schema.properties.forEach(property => {
+            if (property.required && !(property.name in data)) {
+                errors.push(`Missing required property: ${property.name}`);
+            }
+        });
+
+        // Validate existing properties
+        for (const [key, value] of Object.entries(data)) {
+            const property = schema.properties.find(p => p.name === key);
+            if (!property) {
+                warnings.push(`Unknown property: ${key}`);
+                continue;
             }
 
-            // Validate cardinality
-            if (propValue !== undefined) {
-                const isArray = Array.isArray(propValue);
-                if ((cardinality === '1' || cardinality === '0..1') && isArray) {
-                    errors.push(`Property '${prop.name}' should not be an array`);
-                } else if ((cardinality === '0..n' || cardinality === '1..n') && !isArray && propValue !== null) {
-                    warnings.push(`Property '${prop.name}' should be an array`);
-                }
-
-                // Validate type
-                const valuesToValidate = isArray ? propValue : [propValue];
-                for (const val of valuesToValidate) {
-                    if (!await this.validateType(val, prop.type)) {
-                        errors.push(`Property '${prop.name}' value '${val}' is not valid for type ${prop.type}`);
-                    }
-                }
+            // Type validation
+            if (property.type && !await this.validateType(value, property.type)) {
+                errors.push(`Property ${key} has invalid type. Expected ${property.type}`);
             }
         }
 
@@ -207,156 +184,90 @@ class SchemaRegistry {
             return this.typeValidators.get(typeUrl)(value);
         }
 
-        // Try to load the schema for complex types
-        const schema = await this.loadSchema(typeUrl);
-        if (schema) {
-            // For complex types, validate as an object
-            if (typeof value === 'object' && value !== null) {
-                const result = await this.validate(value, typeUrl);
-                return result.valid;
-            }
-        }
-
-        // Default: accept any value
-        return true;
+        // If it's a complex type, just check if it's an object
+        return typeof value === 'object' && value !== null;
     }
 
-    async getAllProperties(schema) {
-        const properties = [...schema.properties];
-        
-        // Add parent properties
-        if (schema.parent) {
-            const parentSchema = await this.loadSchema(schema.parent);
+    async inferItemType(propName, parentType) {
+        // First, try to get it from the parent schema
+        if (parentType) {
+            const parentSchema = await this.loadSchema(parentType);
             if (parentSchema) {
-                const parentProps = await this.getAllProperties(parentSchema);
-                // Parent properties come first, can be overridden
-                properties.unshift(...parentProps.filter(pp => 
-                    !properties.some(p => p.name === pp.name)
-                ));
+                const property = parentSchema.properties.find(p => p.name === propName);
+                if (property) {
+                    return property.type;
+                }
             }
         }
-        
-        return properties;
+
+        // If not found in schema, try to infer from templates
+        const templates = document.querySelectorAll('template[itemtype]');
+        for (const template of templates) {
+            const templateItem = template.content.querySelector('[itemscope]');
+            if (templateItem) {
+                const props = Array.from(templateItem.querySelectorAll('[itemprop]'));
+                const hasProp = props.some(p => p.getAttribute('itemprop') === propName);
+                if (hasProp) {
+                    return template.getAttribute('itemtype');
+                }
+            }
+        }
+
+        return null;
     }
 }
 
 class MicrodataExtractor {
-    constructor(schemaRegistry) {
-        this.schemaRegistry = schemaRegistry;
-        this.items = new Map();
-        this.observers = new Map();
+    constructor(registry) {
+        this.registry = registry;
     }
 
     async extractFromElement(element) {
-        const itemscope = element.hasAttribute('itemscope');
-        if (!itemscope) return null;
+        if (!element.hasAttribute('itemscope')) {
+            return null;
+        }
+
+        const type = element.getAttribute('itemtype');
+        const id = element.getAttribute('itemid') || 
+                   (element.id ? `#${element.id}` : null);
 
         const item = {
             element,
-            type: element.getAttribute('itemtype'),
-            id: element.getAttribute('itemid') || element.id,
+            type: this.normalizeSchemaUrl(type),
+            id,
             properties: {}
         };
 
-        // Load schema to understand property cardinalities
-        const schema = await this.schemaRegistry.loadSchema(item.type);
-        
-        // Extract direct child properties only
-        const allProps = element.querySelectorAll('[itemprop]');
-        const directProps = Array.from(allProps).filter(prop => {
-            // Check if this prop belongs directly to this item
-            let parent = prop.parentElement;
-            while (parent && parent !== element) {
-                if (parent.hasAttribute('itemscope') && parent !== prop) {
-                    return false; // This prop belongs to a nested item
-                }
-                parent = parent.parentElement;
-            }
-            return true; // Include if we reached the element
-        });
+        // Load schema if available
+        const schema = type ? await this.registry.loadSchema(type) : null;
 
-        // Group properties by name first, but only take the first occurrence of each property
+        // Extract properties
+        const props = element.querySelectorAll('[itemprop]');
         const propGroups = {};
-        directProps.forEach(prop => {
+
+        // Group properties by name
+        props.forEach(prop => {
             const propName = prop.getAttribute('itemprop');
             if (!propGroups[propName]) {
                 propGroups[propName] = [];
             }
             propGroups[propName].push(prop);
         });
-        
-        // For each property group, if it contains itemscope elements, only keep the first container
+
+        // Handle deduplication for array properties
         for (const [propName, props] of Object.entries(propGroups)) {
             const itemscopeProps = props.filter(p => p.hasAttribute('itemscope'));
-            console.log(`Property ${propName}: found ${itemscopeProps.length} itemscope elements`);
             
-            if (itemscopeProps.length > 1) {
-                // Find the first parent container that contains these items
-                const containers = new Set();
-                itemscopeProps.forEach(prop => {
-                    let container = prop.parentElement;
-                    while (container && container !== element) {
-                        if (container.tagName === 'UL' || container.tagName === 'TBODY' || container.tagName === 'DIV') {
-                            containers.add(container);
-                            console.log(`Found container: ${container.tagName}.${container.className}`);
-                            break;
-                        }
-                        container = container.parentElement;
-                    }
-                });
-                
-                console.log(`Found ${containers.size} containers for property ${propName}`);
-                
-                // Only keep items from the first container found
-                if (containers.size > 1) {
-                    const firstContainer = Array.from(containers)[0];
-                    console.log(`Using first container: ${firstContainer.tagName}.${firstContainer.className}`);
-                    
-                    const originalCount = propGroups[propName].length;
-                    propGroups[propName] = props.filter(p => {
-                        if (!p.hasAttribute('itemscope')) return true;
-                        let container = p.parentElement;
-                        while (container && container !== element) {
-                            if (container === firstContainer) return true;
-                            if (container.tagName === 'UL' || container.tagName === 'TBODY' || container.tagName === 'DIV') {
-                                return false;
-                            }
-                            container = container.parentElement;
-                        }
-                        return true;
-                    });
-                    
-                    console.log(`Filtered ${propName} from ${originalCount} to ${propGroups[propName].length} elements`);
-                }
+            if (itemscopeProps.length > 1 && this.shouldDeduplicate(props)) {
+                propGroups[propName] = this.deduplicateProperties(propName, props, element);
             }
         }
 
         // Process each property group
         for (const [propName, propElements] of Object.entries(propGroups)) {
-            // Check schema cardinality for this property
-            let shouldBeArray = false;
-            if (schema) {
-                const property = schema.properties.find(p => p.name === propName);
-                if (property) {
-                    const cardinality = property.cardinality || '1';
-                    shouldBeArray = cardinality === '0..n' || cardinality === '1..n';
-                }
-            }
+            const shouldBeArray = this.shouldPropertyBeArray(propName, schema);
+            const values = await this.extractPropertyValues(propElements);
             
-            const values = [];
-            for (const prop of propElements) {
-                if (prop.hasAttribute('itemscope')) {
-                    // This is a nested item
-                    const nestedItem = await this.extractFromElement(prop);
-                    values.push(nestedItem);
-                } else {
-                    // This is a simple property
-                    const value = this.extractPropertyValue(prop);
-                    values.push(value);
-                }
-            }
-            
-            // Set the property based on schema cardinality
             if (shouldBeArray) {
                 item.properties[propName] = values;
             } else {
@@ -365,6 +276,85 @@ class MicrodataExtractor {
         }
 
         return item;
+    }
+
+    shouldDeduplicate(props) {
+        // Check if properties are in different container types
+        const containers = new Set();
+        props.forEach(prop => {
+            if (prop.hasAttribute('itemscope')) {
+                let container = prop.parentElement;
+                while (container && container.tagName !== 'BODY') {
+                    if (['UL', 'TBODY', 'DIV'].includes(container.tagName)) {
+                        containers.add(container);
+                        break;
+                    }
+                    container = container.parentElement;
+                }
+            }
+        });
+        return containers.size > 1;
+    }
+
+    deduplicateProperties(propName, props, element) {
+        // Find all unique containers
+        const containers = new Set();
+        props.forEach(prop => {
+            if (prop.hasAttribute('itemscope')) {
+                let container = prop.parentElement;
+                while (container && container !== element) {
+                    if (['UL', 'TBODY', 'DIV'].includes(container.tagName)) {
+                        containers.add(container);
+                        break;
+                    }
+                    container = container.parentElement;
+                }
+            }
+        });
+
+        // Only keep items from the first container found
+        if (containers.size > 1) {
+            const firstContainer = Array.from(containers)[0];
+            return props.filter(p => {
+                if (!p.hasAttribute('itemscope')) return true;
+                let container = p.parentElement;
+                while (container && container !== element) {
+                    if (container === firstContainer) return true;
+                    if (container.tagName === 'UL' || container.tagName === 'TBODY' || container.tagName === 'DIV') {
+                        return false;
+                    }
+                    container = container.parentElement;
+                }
+                return true;
+            });
+        }
+        
+        return props;
+    }
+
+    shouldPropertyBeArray(propName, schema) {
+        if (schema) {
+            const property = schema.properties.find(p => p.name === propName);
+            if (property) {
+                const cardinality = property.cardinality || '1';
+                return cardinality === '0..n' || cardinality === '1..n';
+            }
+        }
+        return false;
+    }
+
+    async extractPropertyValues(propElements) {
+        const values = [];
+        for (const prop of propElements) {
+            if (prop.hasAttribute('itemscope')) {
+                const nestedItem = await this.extractFromElement(prop);
+                values.push(nestedItem);
+            } else {
+                const value = this.extractPropertyValue(prop);
+                values.push(value);
+            }
+        }
+        return values;
     }
 
     extractPropertyValue(element) {
@@ -383,6 +373,13 @@ class MicrodataExtractor {
         }
         
         return element.textContent.trim();
+    }
+
+    normalizeSchemaUrl(url) {
+        if (url && url.startsWith('http://schema.org/')) {
+            return url.replace('http://', 'https://');
+        }
+        return url;
     }
 
     createProxy(item) {
@@ -423,28 +420,24 @@ class MicrodataAPI {
         this.items = new Map();
         this.itemsWithoutId = [];
         this.templates = new Map();
-        this.isUpdatingFromDOM = false; // Flag to prevent infinite loops
+        this.isUpdatingFromDOM = false;
         this.initialize();
     }
 
     initialize() {
         const setup = async () => {
-            console.log('MicrodataAPI: Initializing...');
             await this.refresh();
             this.observeChanges();
-            console.log('MicrodataAPI: Found items:', Array.from(this.items.keys()));
         };
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', setup);
         } else {
-            // DOM is already loaded, but we should still wait a tick for everything to be ready
             setTimeout(setup, 0);
         }
     }
 
     normalizeSchemaUrl(url) {
-        // Convert http to https for schema.org URLs
         if (url && url.startsWith('http://schema.org/')) {
             return url.replace('http://', 'https://');
         }
@@ -457,6 +450,13 @@ class MicrodataAPI {
         this.templates.clear();
 
         // Find all templates
+        this.collectTemplates();
+
+        // Extract all items
+        await this.extractAllItems();
+    }
+
+    collectTemplates() {
         document.querySelectorAll('template[itemtype]').forEach(template => {
             const type = template.getAttribute('itemtype');
             const normalizedType = this.normalizeSchemaUrl(type);
@@ -474,183 +474,70 @@ class MicrodataAPI {
                 this.templates.get(type).push(template);
             }
         });
-        console.log('MicrodataAPI: Found templates:', Array.from(this.templates.keys()));
+    }
 
-        // Extract all items
+    async extractAllItems() {
         const itemElements = document.querySelectorAll('[itemscope]');
-        console.log('MicrodataAPI: Found itemscope elements:', itemElements.length);
-        
-        // Track top-level items without IDs
         const topLevelItemsWithoutId = [];
         
         for (const element of itemElements) {
-            // Skip if this element is nested within another itemscope
-            let parent = element.parentElement;
-            let isNested = false;
-            while (parent) {
-                if (parent.hasAttribute('itemscope')) {
-                    isNested = true;
-                    break;
-                }
-                parent = parent.parentElement;
-            }
+            if (this.isNestedItem(element)) continue;
             
             const item = await this.extractor.extractFromElement(element);
-            console.log('MicrodataAPI: Extracted item:', JSON.stringify(item, (key, value) => {
-                if (key === 'element') return `[Element ${value.tagName}#${value.id}]`;
-                return value;
-            }, 2));
             
             if (item) {
                 const proxy = this.createLiveProxy(item);
                 if (item.id) {
                     this.items.set(item.id, proxy);
-                } else if (!isNested) {
-                    // Only add top-level items without IDs to the numeric index
+                } else {
                     topLevelItemsWithoutId.push(proxy);
                 }
             }
         }
         
-        // Store items without IDs with numeric indices
         this.itemsWithoutId = topLevelItemsWithoutId;
-        console.log(`MicrodataAPI: Found ${this.itemsWithoutId.length} top-level items without IDs`);
+    }
+
+    isNestedItem(element) {
+        let parent = element.parentElement;
+        while (parent) {
+            if (parent.hasAttribute('itemscope')) {
+                return true;
+            }
+            parent = parent.parentElement;
+        }
+        return false;
     }
 
     createLiveProxy(item) {
         const self = this;
         
-        // Handle arrays of items (like employees)
         const createArrayProxy = (items, propName, parentElement) => {
             return new Proxy(items, {
                 get(target, prop) {
                     // Handle toJSON for serialization
                     if (prop === 'toJSON') {
-                        return () => {
-                            return target.map(item => {
-                                if (item && typeof item === 'object' && item.toJSON) {
-                                    return item.toJSON();
-                                } else if (item && typeof item === 'object' && item.properties) {
-                                    // Create JSON-LD for items that don't have toJSON
-                                    const result = {
-                                        "@context": "https://schema.org"
-                                    };
-                                    if (item.type) {
-                                        result["@type"] = item.type.split('/').pop();
-                                    }
-                                    if (item.id) {
-                                        result["@id"] = item.id;
-                                    }
-                                    Object.assign(result, item.properties);
-                                    return result;
-                                }
-                                return item;
-                            });
-                        };
+                        return () => self.serializeArray(target);
                     }
                     
+                    // Array methods
                     if (prop === 'push') {
-                        return (...args) => {
-                            console.log(`Array push called for ${propName} with data:`, args);
-                            args.forEach(data => {
-                                self.addItemFromData(data, item.type, propName, parentElement);
-                            });
-                            // Don't refresh immediately - let the next access trigger it
-                            return target.length;
-                        };
+                        return (...args) => self.handleArrayPush(target, args, item, propName, parentElement);
                     }
                     if (prop === 'pop') {
-                        return () => {
-                            // Find the last item in the array to determine its type
-                            if (target.length === 0) return undefined;
-                            
-                            const lastItem = target[target.length - 1];
-                            const itemType = lastItem._type || lastItem.type;
-                            
-                            console.log(`Pop called for ${propName}, item type: ${itemType}`);
-                            console.log('Last item:', lastItem);
-                            
-                            if (itemType) {
-                                // Find all templates with this type and remove last element from each location
-                                const normalizedType = self.normalizeSchemaUrl(itemType);
-                                const templates = self.templates.get(normalizedType) || self.templates.get(itemType) || [];
-                                
-                                console.log(`Found ${templates.length} templates for type ${itemType}`);
-                                
-                                templates.forEach(template => {
-                                    const parent = template.parentElement;
-                                    const elements = parent.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
-                                    console.log(`Found ${elements.length} elements in ${parent.tagName}.${parent.className}`);
-                                    if (elements.length > 0) {
-                                        console.log('Removing element:', elements[elements.length - 1]);
-                                        elements[elements.length - 1].remove();
-                                    }
-                                });
-                            }
-                            
-                            // Remove from the array and return the removed item
-                            const removedItem = target.pop();
-                            return removedItem;
-                        };
+                        return () => self.handleArrayPop(target, propName, item);
                     }
                     if (prop === 'splice') {
-                        return async (start, deleteCount, ...items) => {
-                            // Get the item type from existing items or infer from property schema
-                            let itemType;
-                            if (target.length > 0) {
-                                itemType = target[0]._type || target[0].type;
-                            }
-                            
-                            // If we can't get it from existing items, try to get it from schema
-                            if (!itemType) {
-                                const parentSchema = await self.registry.loadSchema(item.type);
-                                if (parentSchema) {
-                                    const property = parentSchema.properties.find(p => p.name === propName);
-                                    if (property) {
-                                        itemType = property.type;
-                                    }
-                                }
-                            }
-                            
-                            if (itemType) {
-                                // Find all templates with this type and perform splice on each location
-                                const normalizedType = self.normalizeSchemaUrl(itemType);
-                                const templates = self.templates.get(normalizedType) || self.templates.get(itemType) || [];
-                                
-                                templates.forEach(template => {
-                                    const parent = template.parentElement;
-                                    const elements = Array.from(parent.querySelectorAll(`[itemprop="${propName}"][itemscope]`));
-                                    
-                                    // Remove elements
-                                    for (let i = start; i < start + deleteCount && i < elements.length; i++) {
-                                        elements[i].remove();
-                                    }
-                                    
-                                    // Add new items
-                                    if (items.length > 0) {
-                                        const insertBefore = elements[start + deleteCount] || null;
-                                        items.forEach(data => {
-                                            self.addItemFromData(data, item.type, propName, parent, insertBefore);
-                                        });
-                                    }
-                                });
-                            }
-                            
-                            // Don't refresh immediately - let the next access trigger it
-                            return target.splice(start, deleteCount, ...items);
-                        };
+                        return async (start, deleteCount, ...items) => 
+                            self.handleArraySplice(target, start, deleteCount, items, propName, item, parentElement);
                     }
                     
                     // Create live proxies for array items
-                    if (typeof prop === 'number' && target[prop]) {
-                        console.log(`Array access [${prop}]:`, target[prop]);
-                        return self.createLiveProxy(target[prop]);
-                    }
-                    
-                    // Handle numeric string indices
-                    if (typeof prop === 'string' && /^\d+$/.test(prop) && target[prop]) {
-                        console.log(`Array access ["${prop}"]:`, target[prop]);
-                        return self.createLiveProxy(target[prop]);
+                    if (typeof prop === 'number' || (typeof prop === 'string' && /^\d+$/.test(prop))) {
+                        const index = Number(prop);
+                        if (target[index]) {
+                            return self.createLiveProxy(target[index]);
+                        }
                     }
                     
                     return target[prop];
@@ -667,61 +554,10 @@ class MicrodataAPI {
                 
                 // Handle toJSON for serialization
                 if (prop === 'toJSON') {
-                    return () => {
-                        const result = {
-                            "@context": "https://schema.org"
-                        };
-                        
-                        // Add @type from itemtype
-                        if (target.type) {
-                            // Extract the type name from the URL
-                            const typeName = target.type.split('/').pop();
-                            result["@type"] = typeName;
-                        }
-                        
-                        // Add @id if present
-                        if (target.id) {
-                            result["@id"] = target.id;
-                        }
-                        
-                        // Add all properties
-                        for (const key in target.properties) {
-                            const value = target.properties[key];
-                            if (Array.isArray(value)) {
-                                result[key] = value.map(item => {
-                                    if (item && typeof item === 'object' && item.toJSON) {
-                                        return item.toJSON();
-                                    } else if (item && typeof item === 'object' && item.properties) {
-                                        // Manually create JSON-LD for nested items
-                                        const nestedResult = {
-                                            "@type": item.type ? item.type.split('/').pop() : undefined
-                                        };
-                                        if (item.id) nestedResult["@id"] = item.id;
-                                        Object.assign(nestedResult, item.properties);
-                                        return nestedResult;
-                                    }
-                                    return item;
-                                });
-                            } else if (value && typeof value === 'object' && value.toJSON) {
-                                result[key] = value.toJSON();
-                            } else if (value && typeof value === 'object' && value.properties) {
-                                // Manually create JSON-LD for nested items
-                                const nestedResult = {
-                                    "@type": value.type ? value.type.split('/').pop() : undefined
-                                };
-                                if (value.id) nestedResult["@id"] = value.id;
-                                Object.assign(nestedResult, value.properties);
-                                result[key] = nestedResult;
-                            } else {
-                                result[key] = value;
-                            }
-                        }
-                        return result;
-                    };
+                    return () => self.serializeItem(target);
                 }
                 
                 const value = target.properties[prop];
-                console.log(`Getting property ${prop} from item:`, value);
                 
                 // If it's an array, wrap in array proxy
                 if (Array.isArray(value)) {
@@ -739,48 +575,9 @@ class MicrodataAPI {
             set(target, prop, value) {
                 target.properties[prop] = value;
                 
-                console.log(`Setting property ${prop} to ${value} for item ${target.id}`);
-                
-                // Skip DOM updates if we're already updating from DOM (prevents infinite loop)
-                if (self.isUpdatingFromDOM) {
-                    console.log('Skipping DOM update - already updating from DOM');
-                    return true;
-                }
-                
-                // Update DOM for simple properties
-                // For items without itemid, we need to update based on array position
-                const itemId = target.id;
-                if (itemId) {
-                    // Find all elements with the same itemid or id
-                    const sameItems = document.querySelectorAll(`[itemid="${itemId}"], [id="${itemId.replace('#', '')}"]`);
-                    console.log(`Found ${sameItems.length} elements with itemid/id ${itemId}`);
-                    
-                    sameItems.forEach(itemElement => {
-                        const propElements = itemElement.querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-                        console.log(`Found ${propElements.length} property elements for ${prop} in`, itemElement);
-                        propElements.forEach(el => {
-                            if (el.hasAttribute('content')) {
-                                el.setAttribute('content', value);
-                            } else {
-                                el.textContent = value;
-                            }
-                        });
-                    });
-                } else {
-                    // For items without ID, update the original element
-                    const propElements = target.element.querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-                    console.log(`Found ${propElements.length} property elements for ${prop} in original element`);
-                    propElements.forEach(el => {
-                        if (el.hasAttribute('content')) {
-                            el.setAttribute('content', value);
-                        } else {
-                            el.textContent = value;
-                        }
-                    });
-                    
-                    // Also try to find and update corresponding elements in other views
-                    // by looking for the parent container and finding the same array index
-                    self.updateCorrespondingElements(target, prop, value);
+                // Skip DOM updates if we're already updating from DOM
+                if (!self.isUpdatingFromDOM) {
+                    self.updateDOMProperty(target, prop, value);
                 }
                 
                 return true;
@@ -796,48 +593,172 @@ class MicrodataAPI {
         });
     }
 
-    async addItemFromData(data, parentType, propName, parentElement, insertBefore = null) {
-        // Determine the expected type for this property
-        const parentSchema = await this.registry.loadSchema(parentType);
+    serializeArray(items) {
+        return items.map(item => {
+            if (item && typeof item === 'object' && item.toJSON) {
+                return item.toJSON();
+            } else if (item && typeof item === 'object' && item.properties) {
+                return this.createJsonLd(item);
+            }
+            return item;
+        });
+    }
+
+    serializeItem(item) {
+        return this.createJsonLd(item);
+    }
+
+    createJsonLd(item) {
+        const result = {
+            "@context": "https://schema.org"
+        };
         
-        let itemType;
-        if (parentSchema) {
-            const property = parentSchema.properties.find(p => p.name === propName);
-            if (property) {
-                itemType = property.type;
+        if (item.type) {
+            const typeName = item.type.split('/').pop();
+            result["@type"] = typeName;
+        }
+        
+        if (item.id) {
+            result["@id"] = item.id;
+        }
+        
+        // Add all properties
+        for (const [key, value] of Object.entries(item.properties)) {
+            if (Array.isArray(value)) {
+                result[key] = this.serializeArray(value);
+            } else if (value && typeof value === 'object' && value.toJSON) {
+                result[key] = value.toJSON();
+            } else if (value && typeof value === 'object' && value.properties) {
+                result[key] = this.createJsonLd(value);
+            } else {
+                result[key] = value;
             }
         }
         
-        // If we couldn't determine the type from schema, try to infer from templates
+        return result;
+    }
+
+    handleArrayPush(target, args, item, propName, parentElement) {
+        args.forEach(data => {
+            this.addItemFromData(data, item.type, propName, parentElement);
+        });
+        return target.length;
+    }
+
+    handleArrayPop(target, propName, item) {
+        if (target.length === 0) return undefined;
+        
+        const lastItem = target[target.length - 1];
+        const itemType = lastItem._type || lastItem.type;
+        
+        if (itemType) {
+            this.removeLastItemFromDOM(itemType, propName);
+        }
+        
+        return target.pop();
+    }
+
+    async handleArraySplice(target, start, deleteCount, items, propName, parentItem, parentElement) {
+        let itemType = this.getItemTypeForArray(target, propName, parentItem);
+        
         if (!itemType) {
-            console.warn(`Could not determine type for ${propName} in ${parentType}, inferring from templates`);
-            // Look for templates that are children of similar parent elements
-            const templates = Array.from(this.templates.values()).flat();
-            for (const template of templates) {
-                const templateItem = template.content.querySelector('[itemscope]');
-                if (templateItem && templateItem.getAttribute('itemprop') === propName) {
-                    itemType = templateItem.getAttribute('itemtype');
-                    break;
+            const parentSchema = await this.registry.loadSchema(parentItem.type);
+            if (parentSchema) {
+                const property = parentSchema.properties.find(p => p.name === propName);
+                if (property) {
+                    itemType = property.type;
                 }
             }
         }
         
-        if (!itemType) {
-            console.error(`Could not determine item type for property ${propName}`);
-            return;
+        if (itemType) {
+            this.updateDOMForSplice(itemType, propName, start, deleteCount, items, parentElement);
         }
         
-        // Find all templates with this type (try both normalized and original)
+        return target.splice(start, deleteCount, ...items);
+    }
+
+    getItemTypeForArray(array, propName, parentItem) {
+        if (array.length > 0) {
+            return array[0]._type || array[0].type;
+        }
+        return null;
+    }
+
+    removeLastItemFromDOM(itemType, propName) {
         const normalizedType = this.normalizeSchemaUrl(itemType);
-        let templates = this.templates.get(normalizedType) || this.templates.get(itemType) || [];
+        const templates = this.templates.get(normalizedType) || this.templates.get(itemType) || [];
         
-        console.log(`Looking for templates with type ${itemType} (normalized: ${normalizedType}), found:`, templates.length);
-        console.log('All available template types:', Array.from(this.templates.keys()));
+        templates.forEach(template => {
+            const parent = template.parentElement;
+            const elements = parent.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
+            if (elements.length > 0) {
+                elements[elements.length - 1].remove();
+            }
+        });
+    }
+
+    updateDOMForSplice(itemType, propName, start, deleteCount, items, parentElement) {
+        const normalizedType = this.normalizeSchemaUrl(itemType);
+        const templates = this.templates.get(normalizedType) || this.templates.get(itemType) || [];
         
-        if (templates.length === 0) {
-            console.error(`No template found for type ${itemType}`);
-            return;
+        templates.forEach(template => {
+            const parent = template.parentElement;
+            const elements = Array.from(parent.querySelectorAll(`[itemprop="${propName}"][itemscope]`));
+            
+            // Remove elements
+            for (let i = start; i < start + deleteCount && i < elements.length; i++) {
+                elements[i].remove();
+            }
+            
+            // Add new items
+            if (items.length > 0) {
+                const insertBefore = elements[start + deleteCount] || null;
+                items.forEach(data => {
+                    this.addItemFromData(data, parentElement.type, propName, parent, insertBefore);
+                });
+            }
+        });
+    }
+
+    updateDOMProperty(target, prop, value) {
+        const itemId = target.id;
+        
+        if (itemId) {
+            // Find all elements with the same itemid or id
+            const sameItems = document.querySelectorAll(`[itemid="${itemId}"], [id="${itemId.replace('#', '')}"]`);
+            
+            sameItems.forEach(itemElement => {
+                this.updatePropertyElements(itemElement, prop, value);
+            });
+        } else {
+            // For items without ID, update the original element
+            this.updatePropertyElements(target.element, prop, value);
+            
+            // Also try to find and update corresponding elements in other views
+            this.updateCorrespondingElements(target, prop, value);
         }
+    }
+
+    updatePropertyElements(container, prop, value) {
+        const propElements = container.querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
+        propElements.forEach(el => {
+            if (el.hasAttribute('content')) {
+                el.setAttribute('content', value);
+            } else {
+                el.textContent = value;
+            }
+        });
+    }
+
+    async addItemFromData(data, parentType, propName, parentElement, insertBefore = null) {
+        const itemType = await this.determineItemType(parentType, propName);
+        
+        if (!itemType) return;
+        
+        const templates = this.getTemplatesForType(itemType);
+        
+        if (templates.length === 0) return;
 
         // Clone and populate template for each location
         templates.forEach(template => {
@@ -845,24 +766,9 @@ class MicrodataAPI {
             const itemElement = clone.querySelector('[itemscope]');
             
             if (itemElement) {
-                console.log('Populating template element with data:', data);
+                this.populateElement(itemElement, data);
                 
-                // Populate the clone with data
-                Object.entries(data).forEach(([key, value]) => {
-                    const propElements = itemElement.querySelectorAll(`[itemprop="${key}"]`);
-                    console.log(`Found ${propElements.length} elements with itemprop="${key}"`);
-                    propElements.forEach(el => {
-                        if (el.hasAttribute('content')) {
-                            el.setAttribute('content', value);
-                        } else {
-                            el.textContent = value;
-                        }
-                    });
-                });
-                
-                // Insert into DOM
                 const parent = template.parentElement;
-                console.log('Inserting into parent:', parent.tagName, parent.className);
                 if (insertBefore) {
                     parent.insertBefore(clone, insertBefore);
                 } else {
@@ -872,74 +778,57 @@ class MicrodataAPI {
         });
     }
 
-    observeChanges() {
-        const self = this;
-        const observer = new MutationObserver((mutations) => {
-            let shouldRefresh = false;
-            let shouldUpdateProperties = false;
-            const propertiesToUpdate = new Map(); // Map of element -> property name
-            
-            mutations.forEach(mutation => {
-                // Check if microdata elements were added/removed
-                if (mutation.type === 'childList') {
-                    // Check if any added/removed nodes affect itemprop elements
-                    const checkNodes = (nodes) => {
-                        nodes.forEach(node => {
-                            if (node.nodeType === 1) {
-                                if (node.hasAttribute('itemscope') || node.querySelector?.('[itemscope]')) {
-                                    shouldRefresh = true;
-                                } else if (node.hasAttribute('itemprop')) {
-                                    // An itemprop element was added/removed
-                                    propertiesToUpdate.set(node, node.getAttribute('itemprop'));
-                                    shouldUpdateProperties = true;
-                                }
-                            }
-                        });
-                    };
-                    
-                    checkNodes(mutation.addedNodes);
-                    checkNodes(mutation.removedNodes);
-                    
-                    // Also check if the target has itemprop (for contenteditable)
-                    if (mutation.target.hasAttribute('itemprop')) {
-                        console.log('Content changed in itemprop element:', mutation.target);
-                        propertiesToUpdate.set(mutation.target, mutation.target.getAttribute('itemprop'));
-                        shouldUpdateProperties = true;
-                    }
-                }
-                
-                // Check for attribute changes
-                if (mutation.type === 'attributes') {
-                    if (['itemscope', 'itemtype', 'itemprop', 'itemid'].includes(mutation.attributeName)) {
-                        shouldRefresh = true;
-                    } else if (mutation.attributeName === 'content' && mutation.target.hasAttribute('itemprop')) {
-                        // Content attribute changed on an itemprop element
-                        propertiesToUpdate.set(mutation.target, mutation.target.getAttribute('itemprop'));
-                        shouldUpdateProperties = true;
-                    }
-                }
-                
-                // Check for text content changes on itemprop elements
-                if (mutation.type === 'characterData') {
-                    let element = mutation.target.parentElement;
-                    // Walk up to find the itemprop element
-                    while (element && !element.hasAttribute('itemprop')) {
-                        element = element.parentElement;
-                    }
-                    if (element) {
-                        console.log('Text changed in itemprop element:', element);
-                        propertiesToUpdate.set(element, element.getAttribute('itemprop'));
-                        shouldUpdateProperties = true;
-                    }
+    async determineItemType(parentType, propName) {
+        const parentSchema = await this.registry.loadSchema(parentType);
+        
+        if (parentSchema) {
+            const property = parentSchema.properties.find(p => p.name === propName);
+            if (property) {
+                return property.type;
+            }
+        }
+        
+        // Try to infer from templates
+        return this.inferItemTypeFromTemplates(propName);
+    }
+
+    inferItemTypeFromTemplates(propName) {
+        const templates = Array.from(this.templates.values()).flat();
+        for (const template of templates) {
+            const templateItem = template.content.querySelector('[itemscope]');
+            if (templateItem && templateItem.getAttribute('itemprop') === propName) {
+                return templateItem.getAttribute('itemtype');
+            }
+        }
+        return null;
+    }
+
+    getTemplatesForType(itemType) {
+        const normalizedType = this.normalizeSchemaUrl(itemType);
+        return this.templates.get(normalizedType) || this.templates.get(itemType) || [];
+    }
+
+    populateElement(element, data) {
+        Object.entries(data).forEach(([key, value]) => {
+            const propElements = element.querySelectorAll(`[itemprop="${key}"]`);
+            propElements.forEach(el => {
+                if (el.hasAttribute('content')) {
+                    el.setAttribute('content', value);
+                } else {
+                    el.textContent = value;
                 }
             });
+        });
+    }
+
+    observeChanges() {
+        const observer = new MutationObserver((mutations) => {
+            const changes = this.analyzeMutations(mutations);
             
-            if (shouldRefresh) {
+            if (changes.shouldRefresh) {
                 this.refresh();
-            } else if (shouldUpdateProperties) {
-                // Update specific properties without full refresh
-                console.log('Updating properties from DOM:', propertiesToUpdate);
-                this.updatePropertiesFromDOM(propertiesToUpdate);
+            } else if (changes.propertiesToUpdate.size > 0) {
+                this.updatePropertiesFromDOM(changes.propertiesToUpdate);
             }
         });
         
@@ -948,174 +837,173 @@ class MicrodataAPI {
             subtree: true,
             attributes: true,
             attributeFilter: ['itemscope', 'itemtype', 'itemprop', 'itemid', 'content'],
-            characterData: true, // Watch for text content changes
+            characterData: true,
             characterDataOldValue: true
         });
     }
 
-    updatePropertiesFromDOM(propertiesToUpdate) {
-        console.log('updatePropertiesFromDOM called with:', propertiesToUpdate);
+    analyzeMutations(mutations) {
+        let shouldRefresh = false;
+        const propertiesToUpdate = new Map();
         
-        // Set flag to prevent infinite loop
+        mutations.forEach(mutation => {
+            if (mutation.type === 'childList') {
+                const result = this.analyzeChildListMutation(mutation);
+                shouldRefresh = shouldRefresh || result.shouldRefresh;
+                result.propertiesToUpdate.forEach((prop, el) => propertiesToUpdate.set(el, prop));
+            } else if (mutation.type === 'attributes') {
+                shouldRefresh = shouldRefresh || this.analyzeAttributeMutation(mutation, propertiesToUpdate);
+            } else if (mutation.type === 'characterData') {
+                this.analyzeCharacterDataMutation(mutation, propertiesToUpdate);
+            }
+        });
+        
+        return { shouldRefresh, propertiesToUpdate };
+    }
+
+    analyzeChildListMutation(mutation) {
+        let shouldRefresh = false;
+        const propertiesToUpdate = new Map();
+        
+        const checkNodes = (nodes) => {
+            nodes.forEach(node => {
+                if (node.nodeType === 1) {
+                    if (node.hasAttribute('itemscope') || node.querySelector?.('[itemscope]')) {
+                        shouldRefresh = true;
+                    } else if (node.hasAttribute('itemprop')) {
+                        propertiesToUpdate.set(node, node.getAttribute('itemprop'));
+                    }
+                }
+            });
+        };
+        
+        checkNodes(mutation.addedNodes);
+        checkNodes(mutation.removedNodes);
+        
+        if (mutation.target.hasAttribute('itemprop')) {
+            propertiesToUpdate.set(mutation.target, mutation.target.getAttribute('itemprop'));
+        }
+        
+        return { shouldRefresh, propertiesToUpdate };
+    }
+
+    analyzeAttributeMutation(mutation, propertiesToUpdate) {
+        if (['itemscope', 'itemtype', 'itemprop', 'itemid'].includes(mutation.attributeName)) {
+            return true;
+        } else if (mutation.attributeName === 'content' && mutation.target.hasAttribute('itemprop')) {
+            propertiesToUpdate.set(mutation.target, mutation.target.getAttribute('itemprop'));
+        }
+        return false;
+    }
+
+    analyzeCharacterDataMutation(mutation, propertiesToUpdate) {
+        let element = mutation.target.parentElement;
+        while (element && !element.hasAttribute('itemprop')) {
+            element = element.parentElement;
+        }
+        if (element) {
+            propertiesToUpdate.set(element, element.getAttribute('itemprop'));
+        }
+    }
+
+    updatePropertiesFromDOM(propertiesToUpdate) {
         this.isUpdatingFromDOM = true;
         
         try {
-            // Find which items need updating based on the changed elements
-            const itemsToUpdate = new Map(); // Map of item proxy -> properties to update
+            const itemsToUpdate = this.findItemsToUpdate(propertiesToUpdate);
             
-            for (const [element, propName] of propertiesToUpdate) {
-                console.log(`Processing element for property ${propName}:`, element);
-                
-                // Find the parent itemscope element
-                let itemElement = element;
-                while (itemElement && !itemElement.hasAttribute('itemscope')) {
-                    itemElement = itemElement.parentElement;
-                }
-                
-                console.log('Found parent itemscope element:', itemElement);
-                
-                if (itemElement) {
-                    // Find the corresponding item in our data structures
-                    let foundItem = null;
-                    
-                    // Check items with IDs
-                    console.log('Checking items with IDs:', this.items.size);
-                    for (const [id, itemProxy] of this.items) {
-                        // The proxy exposes _element as a getter
-                        if (itemProxy._element === itemElement) {
-                            foundItem = itemProxy;
-                            console.log('Found item with ID:', id);
-                            break;
-                        }
-                    }
-                    
-                    // Check items without IDs
-                    if (!foundItem) {
-                        console.log('Checking items without IDs:', this.itemsWithoutId.length);
-                        for (let i = 0; i < this.itemsWithoutId.length; i++) {
-                            const itemProxy = this.itemsWithoutId[i];
-                            if (itemProxy._element === itemElement) {
-                                foundItem = itemProxy;
-                                console.log('Found item without ID at index', i);
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (foundItem) {
-                        if (!itemsToUpdate.has(foundItem)) {
-                            itemsToUpdate.set(foundItem, new Set());
-                        }
-                        itemsToUpdate.get(foundItem).add(propName);
-                        console.log('Added to items to update');
-                    } else {
-                        console.log('Could not find item for element');
-                    }
-                }
-            }
-            
-            console.log('Items to update:', itemsToUpdate.size);
-            
-            // Update the properties
             for (const [itemProxy, propNames] of itemsToUpdate) {
-                console.log('Updating item with properties:', propNames);
                 const itemElement = itemProxy._element;
                 
                 for (const propName of propNames) {
-                    // Extract the new value from DOM
                     const propElements = itemElement.querySelectorAll(`[itemprop="${propName}"]:not([itemscope])`);
-                    console.log(`Found ${propElements.length} property elements for ${propName}`);
                     if (propElements.length > 0) {
                         const newValue = this.extractor.extractPropertyValue(propElements[0]);
-                        console.log(`Extracted new value: "${newValue}"`);
-                        // Update the property value through the proxy
-                        // This will trigger the proxy's set trap
-                        try {
-                            itemProxy[propName] = newValue;
-                            console.log(`Updated property ${propName} to "${newValue}" from DOM change`);
-                        } catch (e) {
-                            console.error('Failed to update property:', e);
-                        }
+                        itemProxy[propName] = newValue;
                     }
                 }
             }
         } finally {
-            // Always reset the flag
             this.isUpdatingFromDOM = false;
         }
     }
 
-    updateCorrespondingElements(target, prop, value) {
-        // Find the parent element that contains this item
-        let parentElement = target.element.parentElement;
-        while (parentElement && !parentElement.hasAttribute('itemscope')) {
-            parentElement = parentElement.parentElement;
+    findItemsToUpdate(propertiesToUpdate) {
+        const itemsToUpdate = new Map();
+        
+        for (const [element, propName] of propertiesToUpdate) {
+            const itemElement = this.findParentItemElement(element);
+            
+            if (itemElement) {
+                const foundItem = this.findItemByElement(itemElement);
+                
+                if (foundItem) {
+                    if (!itemsToUpdate.has(foundItem)) {
+                        itemsToUpdate.set(foundItem, new Set());
+                    }
+                    itemsToUpdate.get(foundItem).add(propName);
+                }
+            }
         }
+        
+        return itemsToUpdate;
+    }
+
+    findParentItemElement(element) {
+        let current = element;
+        while (current && !current.hasAttribute('itemscope')) {
+            current = current.parentElement;
+        }
+        return current;
+    }
+
+    findItemByElement(itemElement) {
+        // Check items with IDs
+        for (const [id, itemProxy] of this.items) {
+            if (itemProxy._element === itemElement) {
+                return itemProxy;
+            }
+        }
+        
+        // Check items without IDs
+        for (const itemProxy of this.itemsWithoutId) {
+            if (itemProxy._element === itemElement) {
+                return itemProxy;
+            }
+        }
+        
+        return null;
+    }
+
+    updateCorrespondingElements(target, prop, value) {
+        const parentElement = this.findParentWithItemscope(target.element);
         
         if (!parentElement) return;
         
-        // Find all sibling elements with the same itemprop and itemscope
         const siblings = Array.from(parentElement.querySelectorAll(`[itemprop][itemscope][itemtype="${target.type}"]`));
         const elementIndex = siblings.indexOf(target.element);
         
-        if (elementIndex === -1) {
-            console.log('Element not found in siblings, trying different approach');
-            // Try to find by position within the parent's employee items
-            const allEmployees = Array.from(parentElement.querySelectorAll('[itemprop="employee"][itemscope]'));
-            const employeeIndex = allEmployees.indexOf(target.element);
-            if (employeeIndex !== -1) {
-                console.log(`Found employee at index ${employeeIndex}`);
-                this.updateAllEmployeeViews(employeeIndex, prop, value);
-            }
-            return;
-        }
+        if (elementIndex === -1) return;
         
-        console.log(`Updating corresponding elements at index ${elementIndex}`);
+        // Find all other containers with similar structure
+        const allContainers = document.querySelectorAll(`[itemscope][itemtype="${parentElement.getAttribute('itemtype')}"]`);
         
-        // Find all templates with the same type
-        const normalizedType = this.normalizeSchemaUrl(target.type);
-        const templates = this.templates.get(normalizedType) || this.templates.get(target.type) || [];
-        
-        templates.forEach(template => {
-            const parent = template.parentElement;
-            const elements = parent.querySelectorAll(`[itemprop][itemscope][itemtype="${target.type}"]`);
+        allContainers.forEach(container => {
+            if (container === parentElement) return;
             
-            if (elements[elementIndex]) {
-                const propElements = elements[elementIndex].querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-                propElements.forEach(el => {
-                    if (el.hasAttribute('content')) {
-                        el.setAttribute('content', value);
-                    } else {
-                        el.textContent = value;
-                    }
-                });
+            const correspondingSiblings = container.querySelectorAll(`[itemprop][itemscope][itemtype="${target.type}"]`);
+            if (correspondingSiblings[elementIndex]) {
+                this.updatePropertyElements(correspondingSiblings[elementIndex], prop, value);
             }
         });
     }
 
-    updateAllEmployeeViews(employeeIndex, prop, value) {
-        console.log(`Updating employee ${employeeIndex} property ${prop} to ${value} in all views`);
-        
-        // Find all templates that create employee elements
-        const personTemplates = this.templates.get('https://schema.org/Person') || this.templates.get('http://schema.org/Person') || [];
-        
-        personTemplates.forEach(template => {
-            const parent = template.parentElement;
-            const employees = parent.querySelectorAll('[itemprop="employee"][itemscope]');
-            
-            if (employees[employeeIndex]) {
-                const propElements = employees[employeeIndex].querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-                console.log(`Found ${propElements.length} elements with itemprop="${prop}" in view`);
-                propElements.forEach(el => {
-                    console.log('Updating element:', el);
-                    if (el.hasAttribute('content')) {
-                        el.setAttribute('content', value);
-                    } else {
-                        el.textContent = value;
-                    }
-                });
-            }
-        });
+    findParentWithItemscope(element) {
+        let parent = element.parentElement;
+        while (parent && !parent.hasAttribute('itemscope')) {
+            parent = parent.parentElement;
+        }
+        return parent;
     }
 
     get microdata() {
@@ -1124,39 +1012,7 @@ class MicrodataAPI {
             get(target, prop) {
                 // Handle toJSON for serialization
                 if (prop === 'toJSON') {
-                    return () => {
-                        // If we only have items without IDs, return an array
-                        if (self.items.size === 0 && self.itemsWithoutId.length > 0) {
-                            return self.itemsWithoutId.map(item => {
-                                if (item && typeof item.toJSON === 'function') {
-                                    return item.toJSON();
-                                }
-                                return item;
-                            });
-                        }
-                        
-                        // Otherwise return an object
-                        const result = {};
-                        
-                        // Add items with IDs as properties
-                        for (const [key, item] of self.items) {
-                            if (item && typeof item.toJSON === 'function') {
-                                // Use the key (without #) as the property name
-                                const propKey = key.startsWith('#') ? key.substring(1) : key;
-                                result[propKey] = item.toJSON();
-                            }
-                        }
-                        
-                        // Add items without IDs with numeric indices
-                        for (let i = 0; i < self.itemsWithoutId.length; i++) {
-                            const item = self.itemsWithoutId[i];
-                            if (item && typeof item.toJSON === 'function') {
-                                result[i] = item.toJSON();
-                            }
-                        }
-                        
-                        return result;
-                    };
+                    return () => self.serializeAll();
                 }
                 
                 // Handle numeric indices for items without IDs
@@ -1170,11 +1026,9 @@ class MicrodataAPI {
                 // Handle Symbol.iterator to make it iterable
                 if (prop === Symbol.iterator) {
                     return function* () {
-                        // First yield all items without IDs
                         for (const item of self.itemsWithoutId) {
                             yield item;
                         }
-                        // Then yield all items with IDs
                         for (const [, item] of self.items) {
                             yield item;
                         }
@@ -1185,11 +1039,9 @@ class MicrodataAPI {
                 if (prop === 'forEach') {
                     return function(callback, thisArg) {
                         let index = 0;
-                        // First iterate items without IDs
                         for (const item of self.itemsWithoutId) {
                             callback.call(thisArg, item, index++, this);
                         }
-                        // Then iterate items with IDs
                         for (const [key, item] of self.items) {
                             callback.call(thisArg, item, key, this);
                         }
@@ -1211,12 +1063,10 @@ class MicrodataAPI {
                     return self.items.get('#' + prop);
                 }
                 
-                // Return undefined if not found
                 return undefined;
             },
             
             ownKeys() {
-                // Return numeric indices first, then string keys
                 const keys = [];
                 for (let i = 0; i < self.itemsWithoutId.length; i++) {
                     keys.push(String(i));
@@ -1226,7 +1076,6 @@ class MicrodataAPI {
             },
             
             has(target, prop) {
-                // Check numeric indices
                 if (typeof prop === 'string' && /^\d+$/.test(prop)) {
                     const index = parseInt(prop, 10);
                     return index >= 0 && index < self.itemsWithoutId.length;
@@ -1234,6 +1083,39 @@ class MicrodataAPI {
                 return self.items.has(prop) || self.items.has('#' + prop);
             }
         });
+    }
+
+    serializeAll() {
+        // If we only have items without IDs, return an array
+        if (this.items.size === 0 && this.itemsWithoutId.length > 0) {
+            return this.itemsWithoutId.map(item => {
+                if (item && typeof item.toJSON === 'function') {
+                    return item.toJSON();
+                }
+                return item;
+            });
+        }
+        
+        // Otherwise return an object
+        const result = {};
+        
+        // Add items with IDs as properties
+        for (const [key, item] of this.items) {
+            if (item && typeof item.toJSON === 'function') {
+                const propKey = key.startsWith('#') ? key.substring(1) : key;
+                result[propKey] = item.toJSON();
+            }
+        }
+        
+        // Add items without IDs with numeric indices
+        for (let i = 0; i < this.itemsWithoutId.length; i++) {
+            const item = this.itemsWithoutId[i];
+            if (item && typeof item.toJSON === 'function') {
+                result[i] = item.toJSON();
+            }
+        }
+        
+        return result;
     }
 }
 
@@ -1243,10 +1125,7 @@ const api = new MicrodataAPI();
 // Create getter for window.microdata that returns the proxy
 Object.defineProperty(window, 'microdata', {
     get() {
-        const proxy = api.microdata;
-        console.log('window.microdata accessed, items available:', Array.from(api.items.keys()));
-        console.log('Full items map:', api.items);
-        return proxy;
+        return api.microdata;
     },
     configurable: true
 });

@@ -5,22 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schema Elements Test Suite</title>
     <script type="module" src="./index.mjs"></script>
-    <script>
-        window.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                console.log('Testing microdata access...');
-                console.log('window.microdata:', window.microdata);
-                console.log('Available items:', Object.keys(window.microdata));
-                
-                // Check what elements are found
-                const itemscopeElements = document.querySelectorAll('[itemscope]');
-                console.log('Found itemscope elements:', itemscopeElements.length);
-                itemscopeElements.forEach((el, i) => {
-                    console.log(`Element ${i}:`, el.tagName, el.getAttribute('itemtype'), el.id);
-                });
-            }, 500);
-        });
-    </script>
 </head>
 <body>
     <table>

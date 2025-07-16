@@ -548,7 +548,8 @@
             
             try {
                 const newName = 'Francis Scott Key Fitzgerald';
-                window.microdata.fitzgerald.name = newName;
+                // Access the author through the book since it's a nested item
+                window.microdata.book1.author.name = newName;
                 
                 log.textContent = `Modified author name to: ${newName}\n\n`;
                 log.textContent += `Book 1 author: ${window.microdata.book1.author.name}\n`;
