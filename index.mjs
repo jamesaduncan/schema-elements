@@ -275,6 +275,20 @@ class MicrodataExtractor {
             }
         }
 
+        // Ensure all schema-defined properties exist, even if empty
+        if (schema) {
+            for (const schemaProp of schema.properties) {
+                if (!(schemaProp.name in item.properties)) {
+                    const cardinality = schemaProp.cardinality || '0..1';
+                    if (cardinality === '0..n' || cardinality === '1..n') {
+                        item.properties[schemaProp.name] = [];
+                    } else {
+                        item.properties[schemaProp.name] = null;
+                    }
+                }
+            }
+        }
+
         return item;
     }
 
