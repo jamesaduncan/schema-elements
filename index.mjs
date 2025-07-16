@@ -1,3 +1,43 @@
+/**
+ * Schema Elements - Live Microdata API
+ * 
+ * A vanilla JavaScript library that provides a live, reactive API for HTML microdata.
+ * Treats microdata embedded in HTML as a live data layer with automatic DOM synchronization.
+ * 
+ * Key features:
+ * - Live data binding through window.microdata
+ * - Array operations (push, pop, splice) with DOM updates
+ * - Multi-view synchronization across templates
+ * - Schema validation with Schema.org and organised.team support
+ * - JSON-LD serialization
+ * - Iterator protocol support
+ * - DOM-to-microdata synchronization
+ * 
+ * @example
+ * // Access microdata
+ * const company = window.microdata.company;
+ * 
+ * // Modify data (DOM updates automatically)
+ * company.name = "New Company Name";
+ * 
+ * // Array operations
+ * company.employee.push({ name: "John Doe", email: "john@example.com" });
+ * 
+ * // Iterate over items
+ * for (const item of window.microdata) {
+ *   console.log(item);
+ * }
+ * 
+ * // JSON-LD serialization
+ * const jsonLD = JSON.stringify(window.microdata);
+ */
+
+/**
+ * SchemaRegistry - Manages schema definitions and type validation
+ * 
+ * Handles loading schemas from URLs, validating data against schemas,
+ * and providing type validators for basic data types.
+ */
 class SchemaRegistry {
     constructor() {
         this.schemas = new Map();
@@ -5,6 +45,9 @@ class SchemaRegistry {
         this.initializeBasicTypes();
     }
 
+    /**
+     * Initialize validators for basic schema.org and organised.team types
+     */
     initializeBasicTypes() {
         // Basic schema.org types
         this.typeValidators.set('https://schema.org/Text', (value) => typeof value === 'string');
@@ -30,6 +73,11 @@ class SchemaRegistry {
         });
     }
 
+    /**
+     * Get built-in schema definitions for common types
+     * @param {string} url - The schema URL
+     * @returns {Object|null} The schema definition or null if not found
+     */
     getBuiltInSchema(url) {
         const type = url.split('/').pop();
         const schemas = {
@@ -72,6 +120,11 @@ class SchemaRegistry {
         return schemas[type] || null;
     }
 
+    /**
+     * Load a schema from a URL or return a built-in definition
+     * @param {string} url - The schema URL to load
+     * @returns {Promise<Object|null>} The schema definition or null if not found
+     */
     async loadSchema(url) {
         if (this.schemas.has(url)) {
             return this.schemas.get(url);
@@ -104,6 +157,12 @@ class SchemaRegistry {
         }
     }
 
+    /**
+     * Parse schema definition from an HTML document
+     * @param {Document} doc - The HTML document containing schema definition
+     * @param {string} url - The URL of the schema
+     * @returns {Object} The parsed schema object
+     */
     parseSchemaFromDocument(doc, url) {
         const schemaElements = doc.querySelectorAll('[itemscope][itemtype*="Schema"]');
         if (schemaElements.length === 0) return null;
@@ -135,6 +194,12 @@ class SchemaRegistry {
         return schema;
     }
 
+    /**
+     * Extract a property value from an element
+     * @param {Element} element - The element to extract from
+     * @param {string} propName - The property name to extract
+     * @returns {string|null} The property value or null
+     */
     extractProperty(element, propName) {
         const propElement = element.querySelector(`[itemprop="${propName}"]`);
         if (!propElement) return null;
@@ -145,6 +210,12 @@ class SchemaRegistry {
         return propElement.textContent.trim();
     }
 
+    /**
+     * Validate data against a schema
+     * @param {Object} data - The data to validate
+     * @param {string} schemaUrl - The URL of the schema to validate against
+     * @returns {Promise<Object>} Validation result with valid, errors, and warnings
+     */
     async validate(data, schemaUrl) {
         const schema = await this.loadSchema(schemaUrl);
         if (!schema) {
@@ -178,6 +249,12 @@ class SchemaRegistry {
         return { valid: errors.length === 0, errors, warnings };
     }
 
+    /**
+     * Validate a value against a type
+     * @param {*} value - The value to validate
+     * @param {string} typeUrl - The URL of the type to validate against
+     * @returns {Promise<boolean>} True if valid, false otherwise
+     */
     async validateType(value, typeUrl) {
         // Check if we have a validator for this type
         if (this.typeValidators.has(typeUrl)) {
@@ -188,6 +265,12 @@ class SchemaRegistry {
         return typeof value === 'object' && value !== null;
     }
 
+    /**
+     * Infer the item type for a property from schema or templates
+     * @param {string} propName - The property name
+     * @param {string} parentType - The parent item type URL
+     * @returns {Promise<string|null>} The inferred type URL or null
+     */
     async inferItemType(propName, parentType) {
         // First, try to get it from the parent schema
         if (parentType) {
@@ -427,17 +510,29 @@ class MicrodataExtractor {
     }
 }
 
+/**
+ * MicrodataAPI - Main API class for live microdata functionality
+ * 
+ * Provides the window.microdata interface with live data binding,
+ * DOM synchronization, and reactive array operations.
+ */
 class MicrodataAPI {
+    /**
+     * Initialize the microdata API
+     */
     constructor() {
         this.registry = new SchemaRegistry();
         this.extractor = new MicrodataExtractor(this.registry);
-        this.items = new Map();
-        this.itemsWithoutId = [];
-        this.templates = new Map();
-        this.isUpdatingFromDOM = false;
+        this.items = new Map(); // Items with IDs
+        this.itemsWithoutId = []; // Items without IDs (accessed by numeric index)
+        this.templates = new Map(); // Templates for rendering new items
+        this.isUpdatingFromDOM = false; // Flag to prevent infinite loops
         this.initialize();
     }
 
+    /**
+     * Initialize the API by setting up DOM observation and extraction
+     */
     initialize() {
         const setup = async () => {
             await this.refresh();
@@ -458,6 +553,9 @@ class MicrodataAPI {
         return url;
     }
 
+    /**
+     * Refresh the microdata by re-extracting all items from the DOM
+     */
     async refresh() {
         this.items.clear();
         this.itemsWithoutId = [];
@@ -523,6 +621,11 @@ class MicrodataAPI {
         return false;
     }
 
+    /**
+     * Create a live proxy object for an item with reactive behavior
+     * @param {Object} item - The item to create a proxy for
+     * @returns {Proxy} A proxy with live DOM synchronization
+     */
     createLiveProxy(item) {
         const self = this;
         
@@ -835,6 +938,9 @@ class MicrodataAPI {
         });
     }
 
+    /**
+     * Set up DOM observation to detect changes and update microdata
+     */
     observeChanges() {
         const observer = new MutationObserver((mutations) => {
             const changes = this.analyzeMutations(mutations);
@@ -1020,6 +1126,10 @@ class MicrodataAPI {
         return parent;
     }
 
+    /**
+     * Get the main microdata proxy object that provides access to all items
+     * @returns {Proxy} The window.microdata proxy object
+     */
     get microdata() {
         const self = this;
         return new Proxy({}, {
@@ -1136,7 +1246,16 @@ class MicrodataAPI {
 // Initialize the API
 const api = new MicrodataAPI();
 
-// Create getter for window.microdata that returns the proxy
+/**
+ * Define window.microdata as a getter that returns the live microdata proxy
+ * 
+ * This provides the main entry point for accessing microdata:
+ * - window.microdata.itemId - Access items by ID
+ * - window.microdata[0] - Access items without ID by index
+ * - window.microdata.forEach() - Iterate over all items
+ * - for (const item of window.microdata) - Use iterator protocol
+ * - JSON.stringify(window.microdata) - Serialize to JSON-LD
+ */
 Object.defineProperty(window, 'microdata', {
     get() {
         return api.microdata;
