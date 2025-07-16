@@ -340,6 +340,14 @@ class SchemaElementData {
 
     add(aProperty, aValue) {
         if (!this[aProperty]) {
+            Object.defineProperty(this, aProperty, {
+                get: () => {
+                    return aValue;
+                },
+                set: (newValue) => {
+
+                }
+            });
             this[aProperty] = aValue;
         } else if (Array.isArray(this[aProperty])) {
             this[aProperty].push(aValue);

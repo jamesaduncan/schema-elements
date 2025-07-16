@@ -4,7 +4,7 @@
     <title>Schema for the properties of a Schema</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <script type="module" src="/2.0/index.mjs"></script>
+    <script type="module" src="/3.0/index.mjs"></script>
 </head>
 
 <body>
@@ -29,7 +29,7 @@
         </thead>
 
         <tbody>
-            <tr itemprop="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
+            <tr itemprop="property" id="name" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
                 <td itemprop="name">name</td>
                 <td itemprop="type">https://schema.org/Text</td>
                 <td itemprop="required">True</td>
@@ -39,7 +39,7 @@
                 </td>
             </tr>
 
-            <tr itemprop="property" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
+            <tr itemprop="property" id="type" itemscope itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty">
                 <td itemprop="name">type</td>
                 <td itemprop="type">https://schema.org/URL</td>
                 <td itemprop="required">True</td>
@@ -49,7 +49,7 @@
                 </td>
             </tr>
 
-            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" itemscope itemprop="property">
+            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" id="required" itemscope itemprop="property">
                 <td itemprop="name">required</td>
                 <td itemprop="type">https://schema.org/Boolean</td>
                 <td itemprop="required">True</td>
@@ -59,7 +59,7 @@
                 </td>
             </tr>
 
-            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" itemscope itemprop="property">
+            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" itemscope id="cardinality" itemprop="property">
                 <td itemprop="name">cardinality</td>
                 <td itemprop="type">https://schema.org/Text</td>
                 <td itemprop="required">True</td>
@@ -69,7 +69,7 @@
                 </td>
             </tr>
 
-            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" itemscope itemprop="property">
+            <tr itemtype="https://jamesaduncan.github.io/schema-elements/SchemaProperty" id="description" itemscope itemprop="property">
                 <td itemprop="name">description</td>
                 <td itemprop="type">https://schema.org/Text</td>
                 <td itemprop="required">False</td>
