@@ -37,8 +37,8 @@ SchemaElements is a vanilla JavaScript library for working with HTML Microdata (
     </ul>
 </body>
 
-console.log( window.microdata.example.employee[0].name );
-window.microdata.example.employee.push( { name: "Elizabeth Doe", email: "elizabeth@example.com" });
+console.log( document.microdata.example.employee[0].name );
+document.microdata.example.employee.push( { name: "Elizabeth Doe", email: "elizabeth@example.com" });
 
 
 ## Commands

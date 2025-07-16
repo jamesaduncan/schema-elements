@@ -5,7 +5,7 @@
  * Treats microdata embedded in HTML as a live data layer with automatic DOM synchronization.
  * 
  * Key features:
- * - Live data binding through window.microdata
+ * - Live data binding through document.microdata
  * - Array operations (push, pop, splice) with DOM updates
  * - Multi-view synchronization across templates
  * - Schema validation with Schema.org and organised.team support
@@ -16,7 +16,7 @@
  * 
  * @example
  * // Access microdata
- * const company = window.microdata.company;
+ * const company = document.microdata.company;
  * 
  * // Modify data (DOM updates automatically)
  * company.name = "New Company Name";
@@ -25,12 +25,12 @@
  * company.employee.push({ name: "John Doe", email: "john@example.com" });
  * 
  * // Iterate over items
- * for (const item of window.microdata) {
+ * for (const item of document.microdata) {
  *   console.log(item);
  * }
  * 
  * // JSON-LD serialization
- * const jsonLD = JSON.stringify(window.microdata);
+ * const jsonLD = JSON.stringify(document.microdata);
  * 
  * // Data source fetching
  * // <div data-microdata-source="users.json"> will fetch and populate templates
@@ -464,7 +464,7 @@ class MicrodataExtractor {
 /**
  * MicrodataAPI - Main API class for live microdata functionality
  * 
- * Provides the window.microdata interface with live data binding,
+ * Provides the document.microdata interface with live data binding,
  * DOM synchronization, and reactive array operations.
  */
 class MicrodataAPI {
@@ -1287,7 +1287,7 @@ class MicrodataAPI {
 
     /**
      * Get the main microdata proxy object that provides access to all items
-     * @returns {Proxy} The window.microdata proxy object
+     * @returns {Proxy} The document.microdata proxy object
      */
     get microdata() {
         const self = this;
@@ -1406,16 +1406,16 @@ class MicrodataAPI {
 const api = new MicrodataAPI();
 
 /**
- * Define window.microdata as a getter that returns the live microdata proxy
+ * Define document.microdata as a getter that returns the live microdata proxy
  * 
  * This provides the main entry point for accessing microdata:
- * - window.microdata.itemId - Access items by ID
- * - window.microdata[0] - Access items without ID by index
- * - window.microdata.forEach() - Iterate over all items
- * - for (const item of window.microdata) - Use iterator protocol
- * - JSON.stringify(window.microdata) - Serialize to JSON-LD
+ * - document.microdata.itemId - Access items by ID
+ * - document.microdata[0] - Access items without ID by index
+ * - document.microdata.forEach() - Iterate over all items
+ * - for (const item of document.microdata) - Use iterator protocol
+ * - JSON.stringify(document.microdata) - Serialize to JSON-LD
  */
-Object.defineProperty(window, 'microdata', {
+Object.defineProperty(document, 'microdata', {
     get() {
         return api.microdata;
     },

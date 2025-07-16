@@ -4,7 +4,7 @@ Schema Elements provides a live, reactive JavaScript API for HTML microdata. It 
 
 ## Features
 
-- **Live Data Binding**: Access and modify microdata through `window.microdata` with automatic DOM synchronization
+- **Live Data Binding**: Access and modify microdata through `document.microdata` with automatic DOM synchronization
 - **Array Operations**: Full support for array methods (push, pop, splice) on collections
 - **Multi-View Synchronization**: Automatically updates data across multiple views (lists, tables, cards)
 - **Schema Validation**: Built-in support for Schema.org and organised.team schemas
@@ -38,7 +38,7 @@ Access it via JavaScript:
 
 ```javascript
 // Access by ID
-const company = window.microdata.company;
+const company = document.microdata.company;
 console.log(company.name); // "Acme Corporation"
 console.log(company.description); // "A leading provider of innovative solutions"
 
@@ -68,7 +68,7 @@ For properties that can have multiple values:
 
 ```javascript
 // Access employees array
-const employees = window.microdata.org.employee;
+const employees = document.microdata.org.employee;
 console.log(employees.length); // 2
 
 // Add new employee - DOM updates automatically
@@ -134,7 +134,7 @@ Items without an ID are accessible by numeric index:
 
 ```javascript
 // Access by index
-const book = window.microdata[0];
+const book = document.microdata[0];
 console.log(book.name); // "The Great Gatsby"
 ```
 
@@ -144,12 +144,12 @@ Iterate over all microdata items:
 
 ```javascript
 // Using for...of
-for (const item of window.microdata) {
+for (const item of document.microdata) {
   console.log(item);
 }
 
 // Using forEach
-window.microdata.forEach((item, key) => {
+document.microdata.forEach((item, key) => {
   console.log(key, item);
 });
 ```
@@ -166,12 +166,12 @@ Changes to the DOM automatically update the microdata:
 
 ```javascript
 // Initial value
-console.log(window.microdata.person.name); // "Click to edit"
+console.log(document.microdata.person.name); // "Click to edit"
 
 // User edits the text in the browser...
 
 // Value is automatically updated
-console.log(window.microdata.person.name); // "New name"
+console.log(document.microdata.person.name); // "New name"
 ```
 
 ### Data Source Fetching
@@ -237,7 +237,7 @@ The library automatically serializes microdata to JSON-LD format:
 
 ```javascript
 // Serialize a single item
-const person = window.microdata.person;
+const person = document.microdata.person;
 console.log(JSON.stringify(person, null, 2));
 // Output:
 // {
@@ -249,7 +249,7 @@ console.log(JSON.stringify(person, null, 2));
 // }
 
 // Serialize an organization with employees
-const org = window.microdata.company;
+const org = document.microdata.company;
 console.log(JSON.stringify(org, null, 2));
 // Output:
 // {
@@ -268,7 +268,7 @@ console.log(JSON.stringify(org, null, 2));
 // }
 
 // Serialize all microdata (mixed items)
-const allData = JSON.stringify(window.microdata);
+const allData = JSON.stringify(document.microdata);
 // Output when there are items with IDs:
 // {
 //   "company": {
@@ -288,7 +288,7 @@ const allData = JSON.stringify(window.microdata);
 // }
 
 // When only items without IDs exist, returns an array:
-const usersData = JSON.stringify(window.microdata);
+const usersData = JSON.stringify(document.microdata);
 // Output:
 // [
 //   {
@@ -329,15 +329,15 @@ await registry.loadSchema('https://example.com/MySchema');
 
 ## API Reference
 
-### window.microdata
+### document.microdata
 
 The main entry point for accessing microdata.
 
 #### Properties
 
-- `window.microdata[id]` - Access item by ID
-- `window.microdata[index]` - Access item by numeric index (for items without IDs)
-- `window.microdata.length` - Total number of microdata items
+- `document.microdata[id]` - Access item by ID
+- `document.microdata[index]` - Access item by numeric index (for items without IDs)
+- `document.microdata.length` - Total number of microdata items
 
 #### Methods
 

@@ -302,10 +302,10 @@
                 
                 log.textContent = `Adding employee: ${JSON.stringify(newEmployee, null, 2)}\n`;
                 
-                window.microdata.example.employee.push(newEmployee);
+                document.microdata.example.employee.push(newEmployee);
                 employeeCounter++;
                 
-                log.textContent += `Success! Total employees: ${window.microdata.example.employee.length}`;
+                log.textContent += `Success! Total employees: ${document.microdata.example.employee.length}`;
                 status.className = 'status pass';
                 status.textContent = 'PASS';
             } catch (error) {
@@ -320,21 +320,21 @@
             const status = document.getElementById('test1-status');
             
             try {
-                console.log('Remove employee - checking microdata:', window.microdata);
-                console.log('Remove employee - checking example:', window.microdata.example);
+                console.log('Remove employee - checking microdata:', document.microdata);
+                console.log('Remove employee - checking example:', document.microdata.example);
                 
-                if (window.microdata.example && window.microdata.example.employee && window.microdata.example.employee.length > 0) {
-                    const removed = window.microdata.example.employee.pop();
+                if (document.microdata.example && document.microdata.example.employee && document.microdata.example.employee.length > 0) {
+                    const removed = document.microdata.example.employee.pop();
                     log.textContent = `Removed employee: ${removed.name}\n`;
-                    log.textContent += `Remaining employees: ${window.microdata.example.employee.length}`;
+                    log.textContent += `Remaining employees: ${document.microdata.example.employee.length}`;
                     status.className = 'status pass';
                     status.textContent = 'PASS';
                 } else {
                     log.textContent = 'No employees to remove';
                     console.log('Debug info:');
-                    console.log('- window.microdata:', window.microdata);
-                    console.log('- window.microdata.example:', window.microdata.example);
-                    console.log('- window.microdata.example?.employee:', window.microdata.example?.employee);
+                    console.log('- document.microdata:', document.microdata);
+                    console.log('- document.microdata.example:', document.microdata.example);
+                    console.log('- document.microdata.example?.employee:', document.microdata.example?.employee);
                     status.className = 'status fail';
                     status.textContent = 'FAIL';
                 }
@@ -351,8 +351,8 @@
             const status = document.getElementById('test1-status');
             
             try {
-                if (window.microdata.example.employee.length > 0) {
-                    const firstEmployee = window.microdata.example.employee[0];
+                if (document.microdata.example.employee.length > 0) {
+                    const firstEmployee = document.microdata.example.employee[0];
                     log.textContent = `First employee object:\n${JSON.stringify(firstEmployee, null, 2)}\n\n`;
                     
                     const oldName = firstEmployee.name;
@@ -388,12 +388,12 @@
             
             try {
                 log.textContent = 'Organization Data:\n';
-                log.textContent += `Name: ${window.microdata.example.name}\n`;
-                log.textContent += `Description: ${window.microdata.example.description}\n`;
-                log.textContent += `Employee Count: ${window.microdata.example.employee.length}\n\n`;
+                log.textContent += `Name: ${document.microdata.example.name}\n`;
+                log.textContent += `Description: ${document.microdata.example.description}\n`;
+                log.textContent += `Employee Count: ${document.microdata.example.employee.length}\n\n`;
                 
                 log.textContent += 'Employees:\n';
-                window.microdata.example.employee.forEach((emp, i) => {
+                document.microdata.example.employee.forEach((emp, i) => {
                     log.textContent += `${i + 1}. ${emp.name} (${emp.email})\n`;
                 });
                 
@@ -525,11 +525,11 @@
             try {
                 log.textContent = 'Checking nested items:\n\n';
                 
-                log.textContent += `Book 1: ${window.microdata.book1.name}\n`;
-                log.textContent += `Author: ${window.microdata.book1.author.name}\n\n`;
+                log.textContent += `Book 1: ${document.microdata.book1.name}\n`;
+                log.textContent += `Author: ${document.microdata.book1.author.name}\n\n`;
                 
-                log.textContent += `Book 2: ${window.microdata.book2.name}\n`;
-                log.textContent += `Author: ${window.microdata.book2.author.name}\n\n`;
+                log.textContent += `Book 2: ${document.microdata.book2.name}\n`;
+                log.textContent += `Author: ${document.microdata.book2.author.name}\n\n`;
                 
                 log.textContent += 'Both books have the same author reference.';
                 
@@ -549,11 +549,11 @@
             try {
                 const newName = 'Francis Scott Key Fitzgerald';
                 // Access the author through the book since it's a nested item
-                window.microdata.book1.author.name = newName;
+                document.microdata.book1.author.name = newName;
                 
                 log.textContent = `Modified author name to: ${newName}\n\n`;
-                log.textContent += `Book 1 author: ${window.microdata.book1.author.name}\n`;
-                log.textContent += `Book 2 author: ${window.microdata.book2.author.name}\n`;
+                log.textContent += `Book 1 author: ${document.microdata.book1.author.name}\n`;
+                log.textContent += `Book 2 author: ${document.microdata.book2.author.name}\n`;
                 
                 status.className = 'status pass';
                 status.textContent = 'PASS';
@@ -595,10 +595,10 @@
             try {
                 // Give the observer time to detect changes
                 setTimeout(() => {
-                    if (window.microdata['dynamic-org']) {
+                    if (document.microdata['dynamic-org']) {
                         log.textContent = 'Dynamic content found in microdata:\n';
-                        log.textContent += `Name: ${window.microdata['dynamic-org'].name}\n`;
-                        log.textContent += `URL: ${window.microdata['dynamic-org'].url}`;
+                        log.textContent += `Name: ${document.microdata['dynamic-org'].name}\n`;
+                        log.textContent += `URL: ${document.microdata['dynamic-org'].url}`;
                         status.className = 'status pass';
                         status.textContent = 'PASS';
                     } else {
@@ -624,7 +624,7 @@
                 
                 // Give the observer time to detect changes
                 setTimeout(() => {
-                    if (!window.microdata['dynamic-org']) {
+                    if (!document.microdata['dynamic-org']) {
                         log.textContent = 'Dynamic content successfully removed from microdata';
                         status.className = 'status pass';
                         status.textContent = 'PASS';
@@ -647,8 +647,8 @@
             const status = document.getElementById('test5-status');
             
             try {
-                if (window.microdata.example.employee.length > 0) {
-                    const employee = window.microdata.example.employee[0];
+                if (document.microdata.example.employee.length > 0) {
+                    const employee = document.microdata.example.employee[0];
                     const json = JSON.stringify(employee, null, 2);
                     
                     log.textContent = 'First Employee JSON-LD:\n' + json;
@@ -679,7 +679,7 @@
             const status = document.getElementById('test5-status');
             
             try {
-                const employees = window.microdata.example.employee;
+                const employees = document.microdata.example.employee;
                 const json = JSON.stringify(employees, null, 2);
                 
                 log.textContent = 'All Employees JSON:\n' + json;
@@ -705,7 +705,7 @@
             const status = document.getElementById('test5-status');
             
             try {
-                const organization = window.microdata.example;
+                const organization = document.microdata.example;
                 const json = JSON.stringify(organization, null, 2);
                 
                 log.textContent = 'Organization JSON-LD:\n' + json;
@@ -733,7 +733,7 @@
             const status = document.getElementById('test5-status');
             
             try {
-                const allMicrodata = window.microdata;
+                const allMicrodata = document.microdata;
                 const json = JSON.stringify(allMicrodata, null, 2);
                 
                 log.textContent = 'All Microdata JSON-LD:\n' + json;
@@ -765,7 +765,7 @@
             const status = document.getElementById('test6-status');
             
             try {
-                const person = window.microdata['sync-test'];
+                const person = document.microdata['sync-test'];
                 if (person) {
                     log.textContent = 'Initial values from microdata:\n';
                     log.textContent += `Name: ${person.name}\n`;
@@ -821,7 +821,7 @@
             try {
                 // Give the MutationObserver time to process the changes
                 setTimeout(() => {
-                    const person = window.microdata['sync-test'];
+                    const person = document.microdata['sync-test'];
                     if (person) {
                         log.textContent = 'Updated values from microdata:\n';
                         log.textContent += `Name: ${person.name}\n`;
@@ -862,7 +862,7 @@
             // Give the API time to initialize
             setTimeout(() => {
                 console.log('Microdata API initialized');
-                console.log('Available items:', Object.keys(window.microdata));
+                console.log('Available items:', Object.keys(document.microdata));
             }, 100);
         });
     </script>
