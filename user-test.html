@@ -51,6 +51,15 @@
                     </http-can>
                 </td>
             </tr>
+            <tr itemscope itemtype="https://rustybeam.net/schema/Credential">
+                <td itemprop="username" contenteditable="plaintext-only">andy@stance.global</td>
+                <td itemprop="role" contenteditable="plaintext-only">administrator</td>
+                <td>
+                    <http-can method="delete" selector="#users">
+                        <button command="--remove" closest="tr">Remove User</button>
+                    </http-can>
+                </td>
+            </tr>
         </tbody>
     </table>
 </body>

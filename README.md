@@ -173,16 +173,79 @@ console.log(window.microdata.person.name); // "Click to edit"
 console.log(window.microdata.person.name); // "New name"
 ```
 
-### JSON Serialization
+### JSON-LD Serialization
 
-Convert microdata to JSON:
+The library automatically serializes microdata to JSON-LD format:
 
 ```javascript
 // Serialize a single item
-const personJSON = JSON.stringify(window.microdata.person);
+const person = window.microdata.person;
+console.log(JSON.stringify(person, null, 2));
+// Output:
+// {
+//   "@context": "https://schema.org",
+//   "@type": "Person",
+//   "@id": "#person",
+//   "name": "John Doe",
+//   "email": "john@example.com"
+// }
 
-// Serialize all microdata
-const allDataJSON = JSON.stringify(window.microdata);
+// Serialize an organization with employees
+const org = window.microdata.company;
+console.log(JSON.stringify(org, null, 2));
+// Output:
+// {
+//   "@context": "https://schema.org",
+//   "@type": "Organization",
+//   "@id": "#company",
+//   "name": "Acme Corp",
+//   "employee": [
+//     {
+//       "@context": "https://schema.org",
+//       "@type": "Person",
+//       "name": "Jane Smith",
+//       "email": "jane@example.com"
+//     }
+//   ]
+// }
+
+// Serialize all microdata (mixed items)
+const allData = JSON.stringify(window.microdata);
+// Output when there are items with IDs:
+// {
+//   "company": {
+//     "@context": "https://schema.org",
+//     "@type": "Organization",
+//     "@id": "#company",
+//     "name": "Acme Corp",
+//     "employee": [...]
+//   },
+//   "person": {
+//     "@context": "https://schema.org",
+//     "@type": "Person", 
+//     "@id": "#person",
+//     "name": "John Doe",
+//     "email": "john@example.com"
+//   }
+// }
+
+// When only items without IDs exist, returns an array:
+const usersData = JSON.stringify(window.microdata);
+// Output:
+// [
+//   {
+//     "@context": "https://schema.org",
+//     "@type": "Credential",
+//     "username": "user1@example.com",
+//     "role": "admin"
+//   },
+//   {
+//     "@context": "https://schema.org",
+//     "@type": "Credential",
+//     "username": "user2@example.com", 
+//     "role": "user"
+//   }
+// ]
 ```
 
 ## Schema Support

@@ -528,8 +528,21 @@ class MicrodataAPI {
                     if (prop === 'toJSON') {
                         return () => {
                             return target.map(item => {
-                                if (item && typeof item === 'object' && item.properties) {
-                                    return item.properties;
+                                if (item && typeof item === 'object' && item.toJSON) {
+                                    return item.toJSON();
+                                } else if (item && typeof item === 'object' && item.properties) {
+                                    // Create JSON-LD for items that don't have toJSON
+                                    const result = {
+                                        "@context": "https://schema.org"
+                                    };
+                                    if (item.type) {
+                                        result["@type"] = item.type.split('/').pop();
+                                    }
+                                    if (item.id) {
+                                        result["@id"] = item.id;
+                                    }
+                                    Object.assign(result, item.properties);
+                                    return result;
                                 }
                                 return item;
                             });
@@ -655,18 +668,50 @@ class MicrodataAPI {
                 // Handle toJSON for serialization
                 if (prop === 'toJSON') {
                     return () => {
-                        const result = {};
+                        const result = {
+                            "@context": "https://schema.org"
+                        };
+                        
+                        // Add @type from itemtype
+                        if (target.type) {
+                            // Extract the type name from the URL
+                            const typeName = target.type.split('/').pop();
+                            result["@type"] = typeName;
+                        }
+                        
+                        // Add @id if present
+                        if (target.id) {
+                            result["@id"] = target.id;
+                        }
+                        
+                        // Add all properties
                         for (const key in target.properties) {
                             const value = target.properties[key];
                             if (Array.isArray(value)) {
                                 result[key] = value.map(item => {
-                                    if (item && typeof item === 'object' && item.properties) {
-                                        return item.properties;
+                                    if (item && typeof item === 'object' && item.toJSON) {
+                                        return item.toJSON();
+                                    } else if (item && typeof item === 'object' && item.properties) {
+                                        // Manually create JSON-LD for nested items
+                                        const nestedResult = {
+                                            "@type": item.type ? item.type.split('/').pop() : undefined
+                                        };
+                                        if (item.id) nestedResult["@id"] = item.id;
+                                        Object.assign(nestedResult, item.properties);
+                                        return nestedResult;
                                     }
                                     return item;
                                 });
+                            } else if (value && typeof value === 'object' && value.toJSON) {
+                                result[key] = value.toJSON();
                             } else if (value && typeof value === 'object' && value.properties) {
-                                result[key] = value.properties;
+                                // Manually create JSON-LD for nested items
+                                const nestedResult = {
+                                    "@type": value.type ? value.type.split('/').pop() : undefined
+                                };
+                                if (value.id) nestedResult["@id"] = value.id;
+                                Object.assign(nestedResult, value.properties);
+                                result[key] = nestedResult;
                             } else {
                                 result[key] = value;
                             }
@@ -1080,14 +1125,36 @@ class MicrodataAPI {
                 // Handle toJSON for serialization
                 if (prop === 'toJSON') {
                     return () => {
+                        // If we only have items without IDs, return an array
+                        if (self.items.size === 0 && self.itemsWithoutId.length > 0) {
+                            return self.itemsWithoutId.map(item => {
+                                if (item && typeof item.toJSON === 'function') {
+                                    return item.toJSON();
+                                }
+                                return item;
+                            });
+                        }
+                        
+                        // Otherwise return an object
                         const result = {};
+                        
+                        // Add items with IDs as properties
                         for (const [key, item] of self.items) {
                             if (item && typeof item.toJSON === 'function') {
-                                result[key] = item.toJSON();
-                            } else {
-                                result[key] = item;
+                                // Use the key (without #) as the property name
+                                const propKey = key.startsWith('#') ? key.substring(1) : key;
+                                result[propKey] = item.toJSON();
                             }
                         }
+                        
+                        // Add items without IDs with numeric indices
+                        for (let i = 0; i < self.itemsWithoutId.length; i++) {
+                            const item = self.itemsWithoutId[i];
+                            if (item && typeof item.toJSON === 'function') {
+                                result[i] = item.toJSON();
+                            }
+                        }
+                        
                         return result;
                     };
                 }

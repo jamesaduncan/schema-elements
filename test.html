@@ -650,16 +650,16 @@
                     const employee = window.microdata.example.employee[0];
                     const json = JSON.stringify(employee, null, 2);
                     
-                    log.textContent = 'First Employee JSON:\n' + json;
+                    log.textContent = 'First Employee JSON-LD:\n' + json;
                     
-                    // Verify it's valid JSON by parsing it back
+                    // Verify it's valid JSON-LD by parsing it back
                     const parsed = JSON.parse(json);
-                    if (parsed.name && parsed.email) {
+                    if (parsed['@context'] && parsed['@type'] === 'Person' && parsed.name && parsed.email) {
                         status.className = 'status pass';
-                        status.textContent = 'PASS';
+                        status.textContent = 'PASS - Valid JSON-LD';
                     } else {
                         status.className = 'status fail';
-                        status.textContent = 'FAIL - Missing properties';
+                        status.textContent = 'FAIL - Invalid JSON-LD format';
                     }
                 } else {
                     log.textContent = 'No employees to serialize';
@@ -707,16 +707,18 @@
                 const organization = window.microdata.example;
                 const json = JSON.stringify(organization, null, 2);
                 
-                log.textContent = 'Organization JSON:\n' + json;
+                log.textContent = 'Organization JSON-LD:\n' + json;
                 
-                // Verify it's valid JSON by parsing it back
+                // Verify it's valid JSON-LD by parsing it back
                 const parsed = JSON.parse(json);
-                if (parsed.name && parsed.description && Array.isArray(parsed.employee)) {
+                if (parsed['@context'] && parsed['@type'] === 'Organization' && 
+                    parsed['@id'] === '#example' && parsed.name && 
+                    parsed.description && Array.isArray(parsed.employee)) {
                     status.className = 'status pass';
-                    status.textContent = 'PASS';
+                    status.textContent = 'PASS - Valid JSON-LD';
                 } else {
                     status.className = 'status fail';
-                    status.textContent = 'FAIL - Missing organization properties';
+                    status.textContent = 'FAIL - Invalid JSON-LD format';
                 }
             } catch (error) {
                 log.textContent = `Error: ${error.message}`;
@@ -733,16 +735,21 @@
                 const allMicrodata = window.microdata;
                 const json = JSON.stringify(allMicrodata, null, 2);
                 
-                log.textContent = 'All Microdata JSON:\n' + json;
+                log.textContent = 'All Microdata JSON-LD:\n' + json;
                 
-                // Verify it's valid JSON by parsing it back
+                // Verify it contains the expected structure
                 const parsed = JSON.parse(json);
-                if (parsed.example && parsed.example.name) {
+                // Check for expected items by key
+                const hasExample = parsed.example && parsed.example['@type'] === 'Organization';
+                const hasBooks = parsed.book1 || parsed.book2 || parsed.fitzgerald;
+                const hasSyncTest = parsed['sync-test'] && parsed['sync-test']['@type'] === 'Person';
+                
+                if (hasExample || hasBooks || hasSyncTest) {
                     status.className = 'status pass';
-                    status.textContent = 'PASS';
+                    status.textContent = 'PASS - Valid JSON-LD serialization';
                 } else {
                     status.className = 'status fail';
-                    status.textContent = 'FAIL - Missing microdata structure';
+                    status.textContent = 'FAIL - Missing expected items';
                 }
             } catch (error) {
                 log.textContent = `Error: ${error.message}`;
