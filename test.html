@@ -114,24 +114,24 @@
         <h2>Test 1: Live Microdata API with Multiple Views</h2>
         <p>This test demonstrates the live microdata API with organization and employee data synchronized across multiple views.</p>
         
-        <div id="example" itemscope itemtype="http://organised.team/Organization">
+        <div id="example" itemscope itemtype="https://organised.team/Organization">
             <h3 itemprop="name">Acme Corporation</h3>
             <p itemprop="description">A leading provider of innovative solutions</p>
             
             <!-- View 1: List of employees -->
             <h4>Employee List</h4>
             <ul class="employee-list">
-                <template itemtype="http://schema.org/Person">
-                    <li itemprop="employee" itemscope itemtype="http://schema.org/Person">
+                <template itemtype="https://schema.org/Person">
+                    <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
                         <strong itemprop="name"></strong> - 
                         <span itemprop="email"></span>
                     </li>
                 </template>
-                <li itemprop="employee" itemscope itemtype="http://schema.org/Person">
+                <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
                     <strong itemprop="name">John Doe</strong> - 
                     <span itemprop="email">john@example.com</span>
                 </li>
-                <li itemprop="employee" itemscope itemtype="http://schema.org/Person">
+                <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
                     <strong itemprop="name">Jane Doe</strong> - 
                     <span itemprop="email">jane@example.com</span>
                 </li>
@@ -147,8 +147,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <template itemtype="http://schema.org/Person">
-                        <tr itemprop="employee" itemscope itemtype="http://schema.org/Person">
+                    <template itemtype="https://schema.org/Person">
+                        <tr itemprop="employee" itemscope itemtype="https://schema.org/Person">
                             <td itemprop="name"></td>
                             <td itemprop="email"></td>
                         </tr>
@@ -159,8 +159,8 @@
             <!-- View 3: Employee cards -->
             <h4>Employee Cards</h4>
             <div class="employee-cards">
-                <template itemtype="http://schema.org/Person">
-                    <div itemprop="employee" itemscope itemtype="http://schema.org/Person" class="card">
+                <template itemtype="https://schema.org/Person">
+                    <div itemprop="employee" itemscope itemtype="https://schema.org/Person" class="card">
                         <h5 itemprop="name"></h5>
                         <p>Email: <a itemprop="email" href=""></a></p>
                     </div>
@@ -205,16 +205,16 @@
         <h2>Test 3: Nested Items and References</h2>
         <p>This test demonstrates nested microdata items and references between items.</p>
         
-        <div id="book1" itemscope itemtype="http://schema.org/Book">
+        <div id="book1" itemscope itemtype="https://schema.org/Book">
             <h3 itemprop="name">The Great Gatsby</h3>
-            <div itemprop="author" itemscope itemtype="http://schema.org/Person" id="fitzgerald">
+            <div itemprop="author" itemscope itemtype="https://schema.org/Person" id="fitzgerald">
                 <span itemprop="name">F. Scott Fitzgerald</span>
             </div>
         </div>
         
-        <div id="book2" itemscope itemtype="http://schema.org/Book">
+        <div id="book2" itemscope itemtype="https://schema.org/Book">
             <h3 itemprop="name">Tender Is the Night</h3>
-            <div itemprop="author" itemscope itemtype="http://schema.org/Person" itemid="#fitzgerald">
+            <div itemprop="author" itemscope itemtype="https://schema.org/Person" itemid="#fitzgerald">
                 <span itemprop="name">F. Scott Fitzgerald</span>
             </div>
         </div>
@@ -572,7 +572,7 @@
             try {
                 const container = document.getElementById('dynamic-container');
                 container.innerHTML = `
-                    <div id="dynamic-org" itemscope itemtype="http://schema.org/Organization">
+                    <div id="dynamic-org" itemscope itemtype="https://schema.org/Organization">
                         <h3 itemprop="name">Dynamic Organization</h3>
                         <p itemprop="url">https://dynamic.example.com</p>
                     </div>

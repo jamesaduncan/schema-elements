@@ -884,20 +884,35 @@ class MicrodataAPI {
         return this.createJsonLd(item);
     }
 
+    /**
+     * Extract context and type name from a type URL
+     * @param {string} typeUrl - The full type URL
+     * @returns {Object} Object with context and typeName properties
+     */
+    parseTypeUrl(typeUrl) {
+        if (!typeUrl) {
+            return { context: "https://schema.org", typeName: null };
+        }
+        
+        const lastSlashIndex = typeUrl.lastIndexOf('/');
+        if (lastSlashIndex <= 0) {
+            return { context: "https://schema.org", typeName: typeUrl };
+        }
+        
+        return {
+            context: typeUrl.substring(0, lastSlashIndex),
+            typeName: typeUrl.substring(lastSlashIndex + 1)
+        };
+    }
+
     createJsonLd(item) {
         const result = {};
+        const { context, typeName } = this.parseTypeUrl(item.type);
         
-        if (item.type) {
-            // Extract context from the type URL
-            const typeUrl = item.type;
-            const lastSlashIndex = typeUrl.lastIndexOf('/');
-            const context = lastSlashIndex > 0 ? typeUrl.substring(0, lastSlashIndex) : "https://schema.org";
-            const typeName = typeUrl.substring(lastSlashIndex + 1);
-            
-            result["@context"] = context;
+        result["@context"] = context;
+        
+        if (typeName) {
             result["@type"] = typeName;
-        } else {
-            result["@context"] = "https://schema.org";
         }
         
         if (item.id) {

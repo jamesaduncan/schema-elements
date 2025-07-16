@@ -9,6 +9,7 @@ Code should always be beautiful. Especially code that is about to be released.
 Beautiful code, is well-factored code, and code-paths should not be duplicated.
 Beautiful code has named methods and function that explain their purpose, and won't confused the reader by being misnamed.
 Beautiful code doesn't have extra debugging information in it.
+Beautiful code is also well documented.
 
 More importantly, and this is ** CRITICAL **, is that the code works as intended at all times.
 
