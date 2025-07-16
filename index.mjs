@@ -885,13 +885,19 @@ class MicrodataAPI {
     }
 
     createJsonLd(item) {
-        const result = {
-            "@context": "https://schema.org"
-        };
+        const result = {};
         
         if (item.type) {
-            const typeName = item.type.split('/').pop();
+            // Extract context from the type URL
+            const typeUrl = item.type;
+            const lastSlashIndex = typeUrl.lastIndexOf('/');
+            const context = lastSlashIndex > 0 ? typeUrl.substring(0, lastSlashIndex) : "https://schema.org";
+            const typeName = typeUrl.substring(lastSlashIndex + 1);
+            
+            result["@context"] = context;
             result["@type"] = typeName;
+        } else {
+            result["@context"] = "https://schema.org";
         }
         
         if (item.id) {
