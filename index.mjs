@@ -701,19 +701,11 @@ class MicrodataAPI {
             normalizedType.replace(/\/$/, '')
         ];
         
-        // Look for template within the container first
+        // Only look for templates within the container (children only)
         let template = null;
         for (const typeVar of typeVariations) {
             template = container.querySelector(`template[itemtype="${typeVar}"]`);
             if (template) break;
-        }
-        
-        if (!template) {
-            // Look for template anywhere in the document
-            for (const typeVar of typeVariations) {
-                template = document.querySelector(`template[itemtype="${typeVar}"]`);
-                if (template) break;
-            }
         }
         
         return template;
