@@ -10,6 +10,7 @@ Schema Elements provides a live, reactive JavaScript API for HTML microdata. It 
 - **Schema Validation**: Built-in support for Schema.org and organised.team schemas
 - **Iterator Protocol**: Iterate over microdata items using for...of loops
 - **DOM-to-Microdata Sync**: Changes to the DOM automatically update the microdata objects
+- **Data Source Fetching**: Populate templates from external JSON-LD or HTML microdata files
 - **JSON Serialization**: Easy conversion of microdata to JSON format
 
 ## Installation
@@ -27,7 +28,7 @@ Include the module in your HTML:
 Given this HTML with microdata:
 
 ```html
-<div id="company" itemscope itemtype="https://schema.org/Organization">
+<div id="company" itemscope itemtype="https://organised.team/Organization">
   <h1 itemprop="name">Acme Corporation</h1>
   <p itemprop="description">A leading provider of innovative solutions</p>
 </div>
@@ -50,7 +51,7 @@ company.name = "Acme Corp";
 For properties that can have multiple values:
 
 ```html
-<div id="org" itemscope itemtype="https://schema.org/Organization">
+<div id="org" itemscope itemtype="https://organised.team/Organization">
   <h2 itemprop="name">Tech Company</h2>
   <ul>
     <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
@@ -173,6 +174,63 @@ console.log(window.microdata.person.name); // "Click to edit"
 console.log(window.microdata.person.name); // "New name"
 ```
 
+### Data Source Fetching
+
+You can populate templates from external data sources using the `data-microdata-source` attribute:
+
+```html
+<!-- Fetch from JSON-LD file -->
+<div data-microdata-source="users.json">
+  <template itemtype="https://schema.org/Person">
+    <div itemscope itemtype="https://schema.org/Person">
+      <span itemprop="name"></span>
+      <span itemprop="email"></span>
+    </div>
+  </template>
+</div>
+
+<!-- Fetch from HTML with microdata -->
+<div data-microdata-source="people.html">
+  <template itemtype="https://schema.org/Person">
+    <li itemscope itemtype="https://schema.org/Person">
+      <span itemprop="name"></span>
+    </li>
+  </template>
+</div>
+```
+
+**JSON-LD Data Source (users.json):**
+```json
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  {
+    "@context": "https://schema.org", 
+    "@type": "Person",
+    "name": "Jane Smith",
+    "email": "jane@example.com"
+  }
+]
+```
+
+**HTML Data Source (people.html):**
+```html
+<div itemscope itemtype="https://schema.org/Person">
+  <span itemprop="name">Bob Wilson</span>
+  <span itemprop="email">bob@example.com</span>
+</div>
+```
+
+The library will automatically:
+- Fetch the data source when the page loads
+- Parse JSON-LD or extract microdata from HTML
+- Populate the appropriate templates based on item types
+- Insert the populated items into the DOM
+
 ### JSON-LD Serialization
 
 The library automatically serializes microdata to JSON-LD format:
@@ -195,7 +253,7 @@ const org = window.microdata.company;
 console.log(JSON.stringify(org, null, 2));
 // Output:
 // {
-//   "@context": "https://schema.org",
+//   "@context": "https://organised.team",
 //   "@type": "Organization",
 //   "@id": "#company",
 //   "name": "Acme Corp",
@@ -214,7 +272,7 @@ const allData = JSON.stringify(window.microdata);
 // Output when there are items with IDs:
 // {
 //   "company": {
-//     "@context": "https://schema.org",
+//     "@context": "https://organised.team",
 //     "@type": "Organization",
 //     "@id": "#company",
 //     "name": "Acme Corp",
@@ -234,13 +292,13 @@ const usersData = JSON.stringify(window.microdata);
 // Output:
 // [
 //   {
-//     "@context": "https://schema.org",
+//     "@context": "https://rustybeam.net/schema",
 //     "@type": "Credential",
 //     "username": "user1@example.com",
 //     "role": "admin"
 //   },
 //   {
-//     "@context": "https://schema.org",
+//     "@context": "https://rustybeam.net/schema",
 //     "@type": "Credential",
 //     "username": "user2@example.com", 
 //     "role": "user"
@@ -249,14 +307,6 @@ const usersData = JSON.stringify(window.microdata);
 ```
 
 ## Schema Support
-
-### Built-in Schema.org Types
-
-The library includes built-in support for common Schema.org types:
-
-- Organization (with properties: name, description, employee, url)
-- Person (with properties: name, email, contact)
-- Book (with properties: name, author)
 
 ### Schema Validation
 

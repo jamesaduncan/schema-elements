@@ -12,6 +12,7 @@
  * - JSON-LD serialization
  * - Iterator protocol support
  * - DOM-to-microdata synchronization
+ * - Data source fetching (data-microdata-source attribute) for JSON-LD or HTML microdata
  * 
  * @example
  * // Access microdata
@@ -30,13 +31,18 @@
  * 
  * // JSON-LD serialization
  * const jsonLD = JSON.stringify(window.microdata);
+ * 
+ * // Data source fetching
+ * // <div data-microdata-source="users.json"> will fetch and populate templates
+ * // Supports both JSON-LD files and HTML documents with microdata
  */
 
 /**
  * SchemaRegistry - Manages schema definitions and type validation
  * 
  * Handles loading schemas from URLs, validating data against schemas,
- * and providing type validators for basic data types.
+ * and providing type validators for basic data types. Always fetches
+ * schemas from their URLs to ensure up-to-date definitions.
  */
 class SchemaRegistry {
     constructor() {
@@ -73,70 +79,15 @@ class SchemaRegistry {
         });
     }
 
-    /**
-     * Get built-in schema definitions for common types
-     * @param {string} url - The schema URL
-     * @returns {Object|null} The schema definition or null if not found
-     */
-    getBuiltInSchema(url) {
-        const type = url.split('/').pop();
-        const schemas = {
-            'Organization': {
-                id: url,
-                name: 'Organization',
-                properties: [
-                    { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
-                    { name: 'description', type: 'https://schema.org/Text', cardinality: '0..1' },
-                    { name: 'employee', type: 'https://schema.org/Person', cardinality: '0..n' },
-                    { name: 'url', type: 'https://schema.org/URL', cardinality: '0..1' }
-                ]
-            },
-            'Person': {
-                id: url,
-                name: 'Person',
-                properties: [
-                    { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
-                    { name: 'email', type: 'https://schema.org/Text', cardinality: '0..1' },
-                    { name: 'contact', type: 'https://schema.org/Person', cardinality: '0..n' }
-                ]
-            },
-            'Book': {
-                id: url,
-                name: 'Book',
-                properties: [
-                    { name: 'name', type: 'https://schema.org/Text', cardinality: '0..1' },
-                    { name: 'author', type: 'https://schema.org/Person', cardinality: '0..1' }
-                ]
-            },
-            'Credential': {
-                id: url,
-                name: 'Credential',
-                properties: [
-                    { name: 'username', type: 'https://schema.org/Text', cardinality: '0..1' },
-                    { name: 'role', type: 'https://schema.org/Text', cardinality: '0..1' }
-                ]
-            }
-        };
-        return schemas[type] || null;
-    }
 
     /**
-     * Load a schema from a URL or return a built-in definition
+     * Load a schema from a URL
      * @param {string} url - The schema URL to load
      * @returns {Promise<Object|null>} The schema definition or null if not found
      */
     async loadSchema(url) {
         if (this.schemas.has(url)) {
             return this.schemas.get(url);
-        }
-
-        // Check built-in schemas first
-        if (url.includes('schema.org') || url.includes('organised.team')) {
-            const builtInSchema = this.getBuiltInSchema(url);
-            if (builtInSchema) {
-                this.schemas.set(url, builtInSchema);
-                return builtInSchema;
-            }
         }
 
         try {
@@ -561,11 +512,227 @@ class MicrodataAPI {
         this.itemsWithoutId = [];
         this.templates.clear();
 
+        // Process data-microdata-source elements first
+        await this.processDataSources();
+
         // Find all templates
         this.collectTemplates();
 
         // Extract all items
         await this.extractAllItems();
+    }
+
+    /**
+     * Process all elements with data-microdata-source attributes
+     */
+    async processDataSources() {
+        const dataSourceElements = document.querySelectorAll('[data-microdata-source]');
+        
+        for (const element of dataSourceElements) {
+            const dataSourceUrl = element.getAttribute('data-microdata-source');
+            if (dataSourceUrl) {
+                await this.applyDataSource(element, dataSourceUrl);
+            }
+        }
+    }
+
+    /**
+     * Apply data from a data source to an element
+     * @param {Element} element - The element to apply data to
+     * @param {string} url - The URL to fetch data from
+     */
+    async applyDataSource(element, url) {
+        try {
+            const response = await fetch(url);
+            const contentType = response.headers.get('content-type') || '';
+            
+            if (contentType.includes('application/json') || url.endsWith('.json')) {
+                // Handle JSON-LD data
+                const jsonData = await response.json();
+                await this.applyJsonLdData(element, jsonData);
+            } else {
+                // Handle HTML data with microdata
+                const html = await response.text();
+                await this.applyHtmlData(element, html);
+            }
+        } catch (error) {
+            // Silently fail if data source can't be loaded
+        }
+    }
+
+    /**
+     * Apply JSON-LD data to an element
+     * @param {Element} element - The element to apply data to
+     * @param {Array|Object} data - The JSON-LD data
+     */
+    async applyJsonLdData(element, data) {
+        const items = Array.isArray(data) ? data : [data];
+        
+        for (const item of items) {
+            if (item['@type']) {
+                const itemType = this.resolveJsonLdType(item['@type'], item['@context']);
+                await this.createItemFromJsonLd(element, item, itemType);
+            }
+        }
+    }
+
+    /**
+     * Apply HTML microdata to an element
+     * @param {Element} element - The element to apply data to
+     * @param {string} html - The HTML content with microdata
+     */
+    async applyHtmlData(element, html) {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const microdataElements = doc.querySelectorAll('[itemscope]');
+        
+        for (const microdataElement of microdataElements) {
+            const extractedItem = await this.extractor.extractFromElement(microdataElement);
+            if (extractedItem) {
+                await this.createItemFromExtracted(element, extractedItem);
+            }
+        }
+    }
+
+    /**
+     * Resolve JSON-LD type to full URL
+     * @param {string} type - The type (short or full URL)
+     * @param {string} context - The @context URL
+     * @returns {string} The resolved type URL
+     */
+    resolveJsonLdType(type, context) {
+        if (type.startsWith('http')) {
+            return type;
+        }
+        
+        if (context) {
+            return context.endsWith('/') ? context + type : context + '/' + type;
+        }
+        
+        return 'https://schema.org/' + type;
+    }
+
+    /**
+     * Create an item from JSON-LD data
+     * @param {Element} container - The container element
+     * @param {Object} jsonLdItem - The JSON-LD item
+     * @param {string} itemType - The resolved item type URL
+     */
+    async createItemFromJsonLd(container, jsonLdItem, itemType) {
+        const template = this.findTemplateForType(container, itemType);
+        if (!template) return;
+
+        const clone = template.content.cloneNode(true);
+        const itemElement = clone.querySelector('[itemscope]');
+        
+        if (itemElement) {
+            // Apply properties from JSON-LD
+            for (const [key, value] of Object.entries(jsonLdItem)) {
+                if (key.startsWith('@')) continue; // Skip JSON-LD metadata
+                
+                const propElements = itemElement.querySelectorAll(`[itemprop="${key}"]`);
+                propElements.forEach(el => {
+                    if (el.hasAttribute('content')) {
+                        el.setAttribute('content', value);
+                    } else {
+                        el.textContent = value;
+                    }
+                });
+            }
+            
+            // Insert into DOM
+            const insertionPoint = this.findInsertionPoint(container, template);
+            if (insertionPoint) {
+                insertionPoint.appendChild(clone);
+            }
+        }
+    }
+
+    /**
+     * Create an item from extracted microdata
+     * @param {Element} container - The container element
+     * @param {Object} extractedItem - The extracted item
+     */
+    async createItemFromExtracted(container, extractedItem) {
+        const template = this.findTemplateForType(container, extractedItem.type);
+        if (!template) return;
+
+        const clone = template.content.cloneNode(true);
+        const itemElement = clone.querySelector('[itemscope]');
+        
+        if (itemElement) {
+            // Apply properties from extracted item
+            for (const [key, value] of Object.entries(extractedItem.properties)) {
+                if (typeof value === 'string') {
+                    const propElements = itemElement.querySelectorAll(`[itemprop="${key}"]`);
+                    propElements.forEach(el => {
+                        if (el.hasAttribute('content')) {
+                            el.setAttribute('content', value);
+                        } else {
+                            el.textContent = value;
+                        }
+                    });
+                }
+            }
+            
+            // Insert into DOM
+            const insertionPoint = this.findInsertionPoint(container, template);
+            if (insertionPoint) {
+                insertionPoint.appendChild(clone);
+            }
+        }
+    }
+
+    /**
+     * Find a template for a given type within a container
+     * @param {Element} container - The container element
+     * @param {string} itemType - The item type URL
+     * @returns {Element|null} The template element or null
+     */
+    findTemplateForType(container, itemType) {
+        const normalizedType = this.normalizeSchemaUrl(itemType);
+        
+        // Try various variations of the type URL
+        const typeVariations = [
+            itemType,
+            normalizedType,
+            itemType + '/',
+            normalizedType + '/',
+            itemType.replace(/\/$/, ''),
+            normalizedType.replace(/\/$/, '')
+        ];
+        
+        // Look for template within the container first
+        let template = null;
+        for (const typeVar of typeVariations) {
+            template = container.querySelector(`template[itemtype="${typeVar}"]`);
+            if (template) break;
+        }
+        
+        if (!template) {
+            // Look for template anywhere in the document
+            for (const typeVar of typeVariations) {
+                template = document.querySelector(`template[itemtype="${typeVar}"]`);
+                if (template) break;
+            }
+        }
+        
+        return template;
+    }
+
+    /**
+     * Find the insertion point for new items
+     * @param {Element} container - The container element
+     * @param {Element} template - The template element
+     * @returns {Element|null} The insertion point or null
+     */
+    findInsertionPoint(container, template) {
+        // If template is within the container, use its parent
+        if (container.contains(template)) {
+            return template.parentElement;
+        }
+        
+        // Otherwise, use the container itself
+        return container;
     }
 
     collectTemplates() {
