@@ -736,6 +736,46 @@ class MicrodataAPI {
     }
 
     /**
+     * Apply microdata from a rendered element or data object to existing DOM elements
+     * @param {Element|DocumentFragment} target - The target element to apply microdata to
+     * @param {Element|DocumentFragment|Object} source - The source of microdata (rendered element, fragment, or data object)
+     * @returns {void}
+     */
+    static apply(target, source) {
+        if (!target) {
+            throw new Error('Target element is required');
+        }
+        
+        if (!source) {
+            throw new Error('Source data is required');
+        }
+        
+        let data;
+        
+        // Extract data from source
+        if (source instanceof DocumentFragment) {
+            // Extract from document fragment
+            const itemElement = source.querySelector('[itemscope]');
+            if (itemElement) {
+                data = MicrodataAPI.extractMicrodataFromElement(itemElement);
+            } else {
+                throw new Error('No itemscope element found in source fragment');
+            }
+        } else if (source instanceof Element && source.hasAttribute('itemscope')) {
+            // Extract from element
+            data = MicrodataAPI.extractMicrodataFromElement(source);
+        } else if (typeof source === 'object') {
+            // Use data object directly
+            data = source;
+        } else {
+            throw new Error('Invalid source type. Must be Element, DocumentFragment, or Object');
+        }
+        
+        // Apply data to target
+        MicrodataAPI.populateTemplateElement(target, data);
+    }
+
+    /**
      * Render template from URL (returns Promise)
      * @param {HTMLTemplateElement} template - The template element to render to
      * @param {string} url - The URL to fetch data from

@@ -186,6 +186,27 @@
         <div id="results" class="container"></div>
     </div>
     
+    <!-- Apply Test -->
+    <div class="example-section">
+        <h2>Apply Microdata Test</h2>
+        <p>This demonstrates applying rendered microdata to existing DOM elements.</p>
+        
+        <h3>Target Element (will be populated):</h3>
+        <nav id="target-nav" itemscope itemtype="https://schema.org/Person">
+            <div itemprop="name">[Name will appear here]</div>
+            <div itemprop="email">[Email will appear here]</div>
+            <div itemprop="jobTitle">[Job will appear here]</div>
+            <menu>
+                <li><a href="/">← Home</a></li>
+                <li><a href="/demos/">← Demos</a></li>
+            </menu>
+        </nav>
+        
+        <button onclick="testApplyFromRender()">Apply from Rendered Template</button>
+        <button onclick="testApplyFromData()">Apply from Data Object</button>
+        <button onclick="testApplyFromUrl()">Apply from URL</button>
+    </div>
+
     <!-- Example JSON-LD Data -->
     <div class="example-section">
         <h2>Example JSON-LD Data</h2>
@@ -361,6 +382,65 @@
                 appendResult('Array Repetition Template (Sync)', rendered);
             } catch (error) {
                 appendError('Error rendering array repetition template', error);
+            }
+        };
+
+        window.testApplyFromRender = function() {
+            const template = document.getElementById('person-card');
+            const targetNav = document.getElementById('target-nav');
+            
+            const testData = {
+                name: "James Duncan",
+                email: "james@kinburnstreet.consulting",
+                jobTitle: "Software Consultant"
+            };
+            
+            try {
+                // First render the template
+                const rendered = MicrodataAPI.render(template, testData);
+                
+                // Then apply it to the target element
+                MicrodataAPI.apply(targetNav, rendered);
+                
+                console.log('Applied rendered template to nav element');
+            } catch (error) {
+                console.error('Error applying from render:', error);
+            }
+        };
+        
+        window.testApplyFromData = function() {
+            const targetNav = document.getElementById('target-nav');
+            
+            const testData = {
+                name: "Direct Data Person",
+                email: "direct@example.com",
+                jobTitle: "Data Specialist"
+            };
+            
+            try {
+                // Apply data object directly
+                MicrodataAPI.apply(targetNav, testData);
+                
+                console.log('Applied data object to nav element');
+            } catch (error) {
+                console.error('Error applying from data:', error);
+            }
+        };
+        
+        window.testApplyFromUrl = async function() {
+            const template = document.getElementById('person-card');
+            const targetNav = document.getElementById('target-nav');
+            
+            try {
+                // First render from URL
+                const rendered = await MicrodataAPI.render(template, './test-data.json');
+                
+                // Then apply it to the target element
+                MicrodataAPI.apply(targetNav, rendered);
+                
+                console.log('Applied URL-rendered template to nav element');
+            } catch (error) {
+                console.error('Error applying from URL:', error);
             }
         };
 
