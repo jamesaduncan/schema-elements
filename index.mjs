@@ -89,12 +89,99 @@ class SchemaRegistry {
         this.typeValidators.set('https://schema.org/DateTime', (value) => !isNaN(Date.parse(value)));
         this.typeValidators.set('https://schema.org/Time', (value) => SchemaRegistry.REGEX_PATTERNS.TIME.test(value));
         
-        // organised.team Cardinal type
-        this.typeValidators.set('https://organised.team/Cardinal', (value) => {
-            return Object.values(SchemaRegistry.CARDINALITY).includes(value);
+        // Dynamic enumeration validation - will be populated as schemas are loaded
+        this.enumerationValidators = new Map();
+        
+        // Set up built-in enumeration validators as fallbacks
+        this.setupBuiltinEnumerations();
+    }
+
+    /**
+     * Set up built-in enumeration validators as fallbacks
+     */
+    setupBuiltinEnumerations() {
+        // organised.team Cardinal enumeration
+        this.registerEnumerationValidator('https://organised.team/Cardinal', 
+            Object.values(SchemaRegistry.CARDINALITY));
+    }
+
+    /**
+     * Check if a schema represents an enumeration type
+     * @param {Object} schema - The schema to check
+     * @returns {boolean} True if it's an enumeration
+     */
+    isEnumerationSchema(schema) {
+        return schema && (
+            schema.parent === 'https://schema.org/Enumeration' ||
+            schema.parent === 'https://organised.team/Enumerated' ||
+            this.schemas.get(schema.parent)?.parent === 'https://schema.org/Enumeration'
+        );
+    }
+
+    /**
+     * Extract enumeration values from a schema document
+     * @param {Document} doc - The schema document
+     * @param {string} enumerationType - The enumeration type URL
+     * @returns {Array<string>} Array of valid enumeration values
+     */
+    extractEnumerationValues(doc, enumerationType) {
+        const values = [];
+        
+        // Look for enumeration instances in the document
+        const enumInstances = doc.querySelectorAll(`[itemscope][itemtype="${enumerationType}"]`);
+        
+        enumInstances.forEach(instance => {
+            // Skip the main schema definition (it should have an itemprop="parent")
+            const parentElement = instance.querySelector('[itemprop="parent"]');
+            if (parentElement) {
+                return; // This is the schema definition, not an enumeration value
+            }
+            
+            // This is an enumeration value instance
+            const nameElement = instance.querySelector('[itemprop="name"]');
+            if (nameElement) {
+                const value = nameElement.textContent.trim();
+                if (value) {
+                    values.push(value);
+                }
+            }
+        });
+        
+        return values;
+    }
+
+    /**
+     * Register enumeration validator for a type
+     * @param {string} typeUrl - The enumeration type URL
+     * @param {Array<string>} validValues - Array of valid enumeration values
+     */
+    registerEnumerationValidator(typeUrl, validValues) {
+        this.enumerationValidators.set(typeUrl, new Set(validValues));
+        
+        // Also register as a type validator
+        this.typeValidators.set(typeUrl, (value) => {
+            return this.enumerationValidators.get(typeUrl)?.has(value) || false;
         });
     }
 
+    /**
+     * Get valid enumeration values for a type
+     * @param {string} typeUrl - The enumeration type URL
+     * @returns {Array<string>} Array of valid values, or empty array if not found
+     */
+    getEnumerationValues(typeUrl) {
+        const values = this.enumerationValidators.get(typeUrl);
+        return values ? Array.from(values) : [];
+    }
+
+    /**
+     * Check if a type is an enumeration
+     * @param {string} typeUrl - The type URL to check
+     * @returns {boolean} True if it's a registered enumeration
+     */
+    isEnumerationType(typeUrl) {
+        return this.enumerationValidators.has(typeUrl);
+    }
 
     /**
      * Load a schema from a URL
@@ -112,6 +199,14 @@ class SchemaRegistry {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const schema = this.parseSchemaFromDocument(doc, url);
             this.schemas.set(url, schema);
+            
+            // Check if this is an enumeration schema and register its values
+            if (this.isEnumerationSchema(schema)) {
+                const enumValues = this.extractEnumerationValues(doc, url);
+                if (enumValues.length > 0) {
+                    this.registerEnumerationValidator(url, enumValues);
+                }
+            }
             
             // Load parent schema if exists
             if (schema.parent) {
@@ -577,6 +672,7 @@ class MicrodataAPI {
         this.internalIdCounter = 0; // Counter for generating internal IDs
         this.elementToInternalId = new WeakMap(); // Track which elements belong to which internal ID
         this.internalIdToElements = new Map(); // Track all elements for each internal ID
+        this.propertyTypeMap = new Map(); // Maps itemType:propertyName to property type for validation
         this.initialize();
     }
 
@@ -586,6 +682,7 @@ class MicrodataAPI {
     initialize() {
         const setup = async () => {
             await this.refresh();
+            this.discoverEnumerations();
             this.observeChanges();
         };
 
@@ -1034,6 +1131,12 @@ class MicrodataAPI {
             },
             
             set(target, prop, value) {
+                // Validate the value before setting it
+                const isValid = self.validatePropertyValue(target, prop, value);
+                if (!isValid) {
+                    throw new Error(`Invalid value "${value}" for property "${prop}"`);
+                }
+                
                 target.properties[prop] = value;
                 
                 // Skip DOM updates if we're already updating from DOM
@@ -1355,6 +1458,79 @@ class MicrodataAPI {
         Object.entries(data).forEach(([key, value]) => {
             const propElements = element.querySelectorAll(`[itemprop="${key}"]`);
             propElements.forEach(el => this.updatePropertyElement(el, value));
+        });
+    }
+
+    /**
+     * Validate a property value against its type constraints
+     * @param {Object} target - The target item
+     * @param {string} prop - The property name
+     * @param {*} value - The value to validate
+     * @returns {boolean} True if the value is valid
+     */
+    validatePropertyValue(target, prop, value) {
+        try {
+            // Look up the property type from our mapping
+            const mapKey = `${target.type}:${prop}`;
+            const propertyType = this.propertyTypeMap.get(mapKey);
+            
+            if (propertyType) {
+                // Check if we have a validator for this type
+                const validator = this.registry.typeValidators.get(propertyType);
+                if (validator) {
+                    return validator(value);
+                }
+            }
+            
+            // No type mapping or validator found, allow the value
+            return true;
+        } catch (error) {
+            console.warn(`Validation error for ${prop}:`, error);
+            return true; // On error, allow the value (fail-open)
+        }
+    }
+
+    /**
+     * Discover and register enumeration schemas in the current document
+     */
+    discoverEnumerations() {
+        // Find all itemscope elements that might be schema definitions
+        const schemaElements = document.querySelectorAll('[itemscope][itemtype]');
+        
+        schemaElements.forEach(element => {
+            const itemType = element.getAttribute('itemtype');
+            
+            // Check if this element defines an enumeration schema
+            const parentElement = element.querySelector('[itemprop="parent"]');
+            if (parentElement) {
+                const parent = parentElement.textContent.trim() || parentElement.getAttribute('content');
+                
+                // If parent is Enumeration, this is an enumeration schema
+                if (parent === 'https://schema.org/Enumeration' || 
+                    parent === 'https://organised.team/Enumerated') {
+                    
+                    // Extract enumeration values from the document
+                    const values = this.registry.extractEnumerationValues(document, itemType);
+                    
+                    if (values.length > 0) {
+                        this.registry.registerEnumerationValidator(itemType, values);
+                        console.log(`Discovered enumeration: ${itemType} with values:`, values);
+                    }
+                }
+            }
+            
+            // Also check if this element defines properties with enumeration types
+            const properties = element.querySelectorAll('[itemscope][itemtype="https://organised.team/Property"]');
+            properties.forEach(propElement => {
+                const propName = propElement.querySelector('[itemprop="name"]')?.textContent?.trim();
+                const propType = propElement.querySelector('[itemprop="type"]')?.textContent?.trim();
+                
+                if (propName && propType) {
+                    const mapKey = `${itemType}:${propName}`;
+                    this.propertyTypeMap.set(mapKey, propType);
+                    console.log(`Mapped property: ${mapKey} → ${propType}`);
+                }
+            });
         });
     }
 
@@ -1744,6 +1920,9 @@ Object.defineProperty(document, 'microdata', {
     },
     configurable: true
 });
+
+// Expose API to global scope for debugging and advanced usage
+window.microdataAPI = api;
 
 // Export for module usage
 export { SchemaRegistry, MicrodataExtractor, MicrodataAPI };
