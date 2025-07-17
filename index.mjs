@@ -448,7 +448,8 @@ class MicrodataExtractor {
             const shouldBeArray = this.shouldPropertyBeArray(propName, schema);
             const values = await this.extractPropertyValues(propElements);
             
-            if (shouldBeArray) {
+            // If there are multiple values, treat as array regardless of schema
+            if (shouldBeArray || values.length > 1) {
                 item.properties[propName] = values;
             } else {
                 item.properties[propName] = values.length > 0 ? values[0] : null;
@@ -773,6 +774,124 @@ class MicrodataAPI {
         
         // Apply data to target
         MicrodataAPI.populateTemplateElement(target, data);
+    }
+
+    /**
+     * Fetch microdata from a URL without requiring a template
+     * @param {string} url - The URL to fetch microdata from
+     * @param {string} [expectedType] - Optional expected itemtype to filter results
+     * @returns {Promise<Object|Array<Object>>} Promise resolving to microdata object(s)
+     */
+    static async fetch(url, expectedType = null) {
+        try {
+            // Resolve relative URLs using document.baseURI
+            const resolvedURL = new URL(url, document.baseURI);
+            
+            // Fetch the URL
+            const response = await fetch(resolvedURL);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const contentType = response.headers.get('content-type') || '';
+            let data;
+            
+            if (contentType.includes('application/json') || contentType.includes('application/ld+json')) {
+                // Parse as JSON-LD
+                data = await response.json();
+                
+                // If expected type is specified, filter results
+                if (expectedType && data) {
+                    if (Array.isArray(data)) {
+                        const filtered = data.filter(item => 
+                            item['@type'] === expectedType.split('/').pop() || 
+                            item.itemtype === expectedType
+                        );
+                        return filtered.length === 1 ? filtered[0] : filtered;
+                    } else if (data['@type'] === expectedType.split('/').pop() || data.itemtype === expectedType) {
+                        return data;
+                    } else {
+                        throw new Error(`No microdata found matching type "${expectedType}"`);
+                    }
+                }
+                
+                return data;
+            } else if (contentType.includes('text/html')) {
+                // Parse as HTML and extract microdata
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                
+                if (expectedType) {
+                    // Look for specific itemtype
+                    const matchingElement = doc.querySelector(`[itemscope][itemtype="${expectedType}"]`);
+                    if (!matchingElement) {
+                        throw new Error(`No microdata found matching type "${expectedType}"`);
+                    }
+                    return MicrodataAPI.extractMicrodataFromElement(matchingElement);
+                } else {
+                    // Extract all microdata items
+                    const microdataElements = doc.querySelectorAll('[itemscope]');
+                    if (microdataElements.length === 0) {
+                        throw new Error('No microdata found in HTML content');
+                    }
+                    
+                    const results = Array.from(microdataElements).map(element => 
+                        MicrodataAPI.extractMicrodataFromElement(element)
+                    );
+                    
+                    // Return single item if only one found, otherwise return array
+                    return results.length === 1 ? results[0] : results;
+                }
+            } else {
+                // Try to parse as JSON first, then fallback to HTML
+                const text = await response.text();
+                try {
+                    data = JSON.parse(text);
+                    
+                    // Apply expectedType filtering if specified
+                    if (expectedType && data) {
+                        if (Array.isArray(data)) {
+                            const filtered = data.filter(item => 
+                                item['@type'] === expectedType.split('/').pop() || 
+                                item.itemtype === expectedType
+                            );
+                            return filtered.length === 1 ? filtered[0] : filtered;
+                        } else if (data['@type'] === expectedType.split('/').pop() || data.itemtype === expectedType) {
+                            return data;
+                        } else {
+                            throw new Error(`No microdata found matching type "${expectedType}"`);
+                        }
+                    }
+                    
+                    return data;
+                } catch {
+                    // Try as HTML
+                    const doc = new DOMParser().parseFromString(text, 'text/html');
+                    
+                    if (expectedType) {
+                        const matchingElement = doc.querySelector(`[itemscope][itemtype="${expectedType}"]`);
+                        if (!matchingElement) {
+                            throw new Error(`No microdata found matching type "${expectedType}"`);
+                        }
+                        return MicrodataAPI.extractMicrodataFromElement(matchingElement);
+                    } else {
+                        const microdataElements = doc.querySelectorAll('[itemscope]');
+                        if (microdataElements.length === 0) {
+                            throw new Error('No microdata found in content');
+                        }
+                        
+                        const results = Array.from(microdataElements).map(element => 
+                            MicrodataAPI.extractMicrodataFromElement(element)
+                        );
+                        
+                        return results.length === 1 ? results[0] : results;
+                    }
+                }
+            }
+        } catch (error) {
+            throw new Error(`Failed to fetch microdata from URL "${url}": ${error.message}`);
+        }
     }
 
     /**
@@ -1512,12 +1631,13 @@ class MicrodataAPI {
                         self.handleArraySplice({ target, start, deleteCount, items, propName, parentItem, parentElement });
                 }
                 
-                // Create live proxies for array items
+                // Create live proxies for array items that are microdata items
                 if (typeof prop === 'number' || MicrodataAPI.isNumericIndex(prop)) {
                     const index = Number(prop);
-                    if (target[index]) {
+                    if (target[index] && self.isMicrodataItem(target[index])) {
                         return self.createLiveProxy(target[index]);
                     }
+                    return target[index];
                 }
                 
                 return target[prop];
@@ -1644,6 +1764,12 @@ class MicrodataAPI {
      * @returns {Proxy} A proxy with live DOM synchronization
      */
     createLiveProxy(item) {
+        // Ensure item is an object and has the expected structure
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            console.error('Invalid item for proxy creation:', item);
+            return item;
+        }
+        
         return new Proxy(item, this.createItemProxyHandler(item));
     }
 

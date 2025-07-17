@@ -65,12 +65,27 @@
             <h3 itemprop="name">John Doe</h3>
             <p itemprop="email">john@example.com</p>
             <p itemprop="jobTitle">Software Developer</p>
+            <span itemprop="age" content="32">32 years old</span>
+            <div>
+                <span itemprop="skills">JavaScript</span>
+                <span itemprop="skills">Python</span>
+                <span itemprop="skills">React</span>
+            </div>
+            <meta itemprop="contactMethod" content="email">
+            <meta itemprop="department" content="Engineering">
         </div>
         
         <div id="person2" itemscope itemtype="https://schema.org/Person">
             <h3 itemprop="name">Jane Smith</h3>
             <p itemprop="email">jane@example.com</p>
             <p itemprop="jobTitle">Product Manager</p>
+            <span itemprop="age" content="28">28 years old</span>
+            <div>
+                <span itemprop="skills">Product Strategy</span>
+                <span itemprop="skills">User Research</span>
+            </div>
+            <meta itemprop="contactMethod" content="phone">
+            <meta itemprop="department" content="Product">
         </div>
     </div>
     
@@ -205,6 +220,20 @@
         <button onclick="testApplyFromRender()">Apply from Rendered Template</button>
         <button onclick="testApplyFromData()">Apply from Data Object</button>
         <button onclick="testApplyFromUrl()">Apply from URL</button>
+    </div>
+    
+    <!-- Fetch Method Test -->
+    <div class="example-section">
+        <h2>Fetch Method Test</h2>
+        <p>This demonstrates the MicrodataAPI.fetch() method for direct data fetching.</p>
+        
+        <button onclick="testFetchJson()">Fetch JSON Data</button>
+        <button onclick="testFetchHtml()">Fetch HTML Data</button>
+        <button onclick="testFetchSpecificType()">Fetch Specific Type</button>
+        <button onclick="testFetchAndApply()">Fetch and Apply</button>
+        <button onclick="clearFetchResults()">Clear Fetch Results</button>
+        
+        <div id="fetch-results" class="container"></div>
     </div>
 
     <!-- Example JSON-LD Data -->
@@ -354,7 +383,8 @@
             const template = document.getElementById('person-card');
             
             try {
-                const rendered = await MicrodataAPI.render(template, '/schema-elements/test-data.json');
+                // Use a relative path from the current location
+                const rendered = await MicrodataAPI.render(template, './test-data.json');
                 appendResult('Relative URL → Card Template', rendered);
             } catch (error) {
                 appendError('Error rendering relative URL to card', error);
@@ -444,8 +474,98 @@
             }
         };
 
+        window.testFetchJson = async function() {
+            try {
+                const data = await MicrodataAPI.fetch('./test-data.json');
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data, null, 2);
+                appendFetchResult('Fetched JSON Data', pre);
+            } catch (error) {
+                appendFetchError('Error fetching JSON data', error);
+            }
+        };
+
+        window.testFetchHtml = async function() {
+            try {
+                const data = await MicrodataAPI.fetch('./test-data.html');
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data, null, 2);
+                appendFetchResult('Fetched HTML Data', pre);
+            } catch (error) {
+                appendFetchError('Error fetching HTML data', error);
+            }
+        };
+
+        window.testFetchSpecificType = async function() {
+            try {
+                const data = await MicrodataAPI.fetch('./test-data.html', 'https://schema.org/Person');
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data, null, 2);
+                appendFetchResult('Fetched Specific Type (Person)', pre);
+            } catch (error) {
+                appendFetchError('Error fetching specific type', error);
+            }
+        };
+
+        window.testFetchAndApply = async function() {
+            const targetNav = document.getElementById('target-nav');
+            
+            try {
+                // Fetch data directly and apply to target
+                const data = await MicrodataAPI.fetch('./test-data.json');
+                MicrodataAPI.apply(targetNav, data);
+                
+                console.log('Fetched and applied data to nav element');
+                appendFetchResult('Fetch and Apply', document.createTextNode('Data applied to navigation element above'));
+            } catch (error) {
+                appendFetchError('Error in fetch and apply', error);
+            }
+        };
+
+        function appendFetchResult(title, content) {
+            const results = document.getElementById('fetch-results');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'example-section';
+            
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            wrapper.appendChild(heading);
+            
+            if (content instanceof DocumentFragment || content instanceof Element) {
+                wrapper.appendChild(content);
+            } else {
+                wrapper.appendChild(content);
+            }
+            
+            results.appendChild(wrapper);
+        }
+
+        function appendFetchError(title, error) {
+            const results = document.getElementById('fetch-results');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'example-section';
+            wrapper.style.backgroundColor = '#ffe6e6';
+            wrapper.style.borderColor = '#ff9999';
+            
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            heading.style.color = '#cc0000';
+            wrapper.appendChild(heading);
+            
+            const errorMsg = document.createElement('pre');
+            errorMsg.textContent = error.message;
+            errorMsg.style.color = '#cc0000';
+            wrapper.appendChild(errorMsg);
+            
+            results.appendChild(wrapper);
+        }
+
         window.clearResults = function() {
             document.getElementById('results').innerHTML = '';
+        };
+        
+        window.clearFetchResults = function() {
+            document.getElementById('fetch-results').innerHTML = '';
         };
         
         function appendResult(title, content) {

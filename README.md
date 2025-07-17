@@ -9,6 +9,7 @@ Schema Elements provides a live, reactive JavaScript API for HTML microdata. It 
 - **Multi-View Synchronization**: Automatically updates data across multiple views (lists, tables, cards)
 - **Template Rendering**: Render microdata, JSON-LD, forms, or URL content to HTML templates
 - **Apply to DOM**: Apply rendered microdata to existing DOM elements while preserving structure
+- **Direct Data Fetching**: Fetch microdata directly from URLs without requiring templates
 - **Array Repetition**: Use `[]` syntax in templates to automatically repeat elements for arrays
 - **URL Fetching**: Fetch and render data from JSON-LD or HTML URLs
 - **Form Integration**: Extract data from HTML forms and render to templates
@@ -639,6 +640,63 @@ MicrodataAPI.apply(document.querySelector('nav'), sourceElement);
 ```
 
 The `apply` method preserves the existing DOM structure while populating microdata properties, making it perfect for updating persistent page elements like navigation, headers, or sidebars.
+
+#### MicrodataAPI.fetch(url, expectedType?)
+
+Fetches microdata directly from a URL without requiring a template. This method is useful for retrieving data that will be processed or applied to existing DOM elements.
+
+**Parameters:**
+- `url` (string) - The URL to fetch microdata from
+- `expectedType` (string, optional) - Optional expected itemtype to filter results
+
+**Returns:**
+- `Promise<Object|Array<Object>>` - Promise resolving to microdata object(s)
+
+**Example Usage:**
+
+```javascript
+import { MicrodataAPI } from './index.mjs';
+
+// Fetch all microdata from a URL
+const allData = await MicrodataAPI.fetch('./data.json');
+
+// Fetch specific type of microdata
+const personData = await MicrodataAPI.fetch('./people.html', 'https://schema.org/Person');
+
+// Use with apply() method
+const userData = await MicrodataAPI.fetch('./user-profile.json');
+MicrodataAPI.apply(document.querySelector('#user-nav'), userData);
+
+// Combined fetch and apply pattern
+MicrodataAPI.apply(
+    document.querySelector('#destination'),
+    await MicrodataAPI.fetch('./source.html')
+);
+```
+
+**Data Source Support:**
+- **JSON files** (`application/json`, `application/ld+json`): Parsed as JSON-LD
+- **HTML files** (`text/html`): Microdata is extracted from elements
+- **Mixed content**: Attempts JSON parsing first, then HTML extraction
+- **Type filtering**: When `expectedType` is provided, only matching items are returned
+
+**Return Value Handling:**
+- Single matching item: Returns the object directly
+- Multiple matching items: Returns an array of objects
+- No matching items: Throws an error
+
+**Error Handling:**
+- Network errors (404, 500, etc.) result in Promise rejection
+- Missing or invalid microdata results in descriptive error messages
+- Type mismatches (when `expectedType` is specified) throw errors
+
+**Use Cases:**
+- Direct data fetching without template rendering
+- Data preprocessing before applying to DOM
+- Combining with `apply()` for streamlined data flow
+- Type-specific data retrieval from mixed content sources
+
+The `fetch()` method complements the existing `render()` and `apply()` methods, providing a complete toolkit for working with microdata from various sources.
 
 ## How It Works
 
