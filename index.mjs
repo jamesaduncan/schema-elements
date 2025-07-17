@@ -650,6 +650,9 @@ class MicrodataAPI {
     // Internal tracking attribute
     static INTERNAL_ID_ATTR = 'data-microdata-internal-id';
     
+    // Array syntax for template repetition
+    static ARRAY_SYNTAX = '[]';
+    
     /**
      * Check if a property is a numeric index
      * @param {*} prop - The property to check
@@ -660,10 +663,41 @@ class MicrodataAPI {
     }
 
     /**
-     * Render a microdata item, JSON-LD object, or form data to a template
+     * Check if a property name uses array syntax and extract the clean name
+     * @param {string} propName - The property name to check
+     * @returns {Object} Object with isArray and cleanName properties
+     */
+    static parsePropertyName(propName) {
+        const isArray = propName.endsWith(MicrodataAPI.ARRAY_SYNTAX);
+        const cleanName = isArray ? propName.slice(0, -MicrodataAPI.ARRAY_SYNTAX.length) : propName;
+        return { isArray, cleanName };
+    }
+
+    /**
+     * Extract value from a microdata property element
+     * @param {Element} propElement - The element to extract value from
+     * @returns {*} The extracted value
+     */
+    static extractElementValue(propElement) {
+        if (propElement.hasAttribute('itemscope')) {
+            // Nested microdata item
+            return MicrodataAPI.extractMicrodataFromElement(propElement);
+        } else if (propElement.hasAttribute('content')) {
+            return propElement.getAttribute('content');
+        } else if (propElement.tagName === 'A') {
+            return propElement.href;
+        } else if (propElement.tagName === 'IMG') {
+            return propElement.src;
+        } else {
+            return propElement.textContent.trim();
+        }
+    }
+
+    /**
+     * Render a microdata item, JSON-LD object, form data, or URL to a template
      * @param {HTMLTemplateElement} template - The template element to render to
-     * @param {Object|HTMLFormElement} data - The microdata item, JSON-LD object, or form element to render
-     * @returns {DocumentFragment} The populated template content
+     * @param {Object|HTMLFormElement|string} data - The microdata item, JSON-LD object, form element, or URL to render
+     * @returns {DocumentFragment|Promise<DocumentFragment>} The populated template content, or a Promise if data is a URL
      */
     static render(template, data) {
         if (!template || !template.content) {
@@ -672,6 +706,11 @@ class MicrodataAPI {
         
         if (!data) {
             throw new Error('No data provided to render');
+        }
+        
+        // Check if data is a URL string
+        if (typeof data === 'string') {
+            return MicrodataAPI.renderFromURL(template, data);
         }
         
         // Clone the template content
@@ -694,6 +733,134 @@ class MicrodataAPI {
         MicrodataAPI.populateTemplateElement(itemElement, processedData);
         
         return clone;
+    }
+
+    /**
+     * Render template from URL (returns Promise)
+     * @param {HTMLTemplateElement} template - The template element to render to
+     * @param {string} url - The URL to fetch data from
+     * @returns {Promise<DocumentFragment>} Promise resolving to populated template content
+     */
+    static async renderFromURL(template, url) {
+        try {
+            // Resolve relative URLs using document.baseURI
+            const resolvedURL = new URL(url, document.baseURI);
+            
+            // Fetch the URL
+            const response = await fetch(resolvedURL);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const contentType = response.headers.get('content-type') || '';
+            let data;
+            
+            if (contentType.includes('application/json') || contentType.includes('application/ld+json')) {
+                // Parse as JSON-LD
+                data = await response.json();
+            } else if (contentType.includes('text/html')) {
+                // Parse as HTML and extract microdata
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                data = MicrodataAPI.extractMatchingMicrodata(doc, template);
+            } else {
+                // Try to parse as JSON first, then fallback to HTML
+                const text = await response.text();
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    // Try as HTML
+                    const doc = new DOMParser().parseFromString(text, 'text/html');
+                    data = MicrodataAPI.extractMatchingMicrodata(doc, template);
+                }
+            }
+            
+            if (!data) {
+                throw new Error('No matching microdata found in fetched content');
+            }
+            
+            // Use the existing render method with the extracted data
+            return MicrodataAPI.render(template, data);
+            
+        } catch (error) {
+            throw new Error(`Failed to render from URL "${url}": ${error.message}`);
+        }
+    }
+
+    /**
+     * Extract microdata from HTML document that matches the template's itemtype
+     * @param {Document} doc - The HTML document to extract from
+     * @param {HTMLTemplateElement} template - The template to match against
+     * @returns {Object|null} The matching microdata object or null if not found
+     */
+    static extractMatchingMicrodata(doc, template) {
+        const itemElement = template.content.querySelector('[itemscope]');
+        if (!itemElement) {
+            return null;
+        }
+        
+        const expectedType = itemElement.getAttribute('itemtype');
+        if (!expectedType) {
+            // No specific type expected, get first microdata item
+            const firstItem = doc.querySelector('[itemscope]');
+            return firstItem ? MicrodataAPI.extractMicrodataFromElement(firstItem) : null;
+        }
+        
+        // Look for matching itemtype
+        const matchingElement = doc.querySelector(`[itemscope][itemtype="${expectedType}"]`);
+        if (!matchingElement) {
+            return null;
+        }
+        
+        return MicrodataAPI.extractMicrodataFromElement(matchingElement);
+    }
+
+    /**
+     * Extract microdata from a single element
+     * @param {Element} element - The element to extract microdata from
+     * @returns {Object} The extracted microdata object
+     */
+    static extractMicrodataFromElement(element) {
+        const result = {};
+        
+        // Add basic properties
+        const itemType = element.getAttribute('itemtype');
+        const itemId = element.getAttribute('itemid') || element.getAttribute('id');
+        
+        if (itemType) {
+            result['@type'] = itemType.split('/').pop(); // Get the last part
+            result['@context'] = itemType.substring(0, itemType.lastIndexOf('/'));
+        }
+        
+        if (itemId) {
+            result['@id'] = itemId.startsWith('#') ? itemId : `#${itemId}`;
+        }
+        
+        // Extract properties
+        const propElements = element.querySelectorAll('[itemprop]');
+        propElements.forEach(propElement => {
+            // Skip nested itemscope elements that are not direct children
+            if (propElement.hasAttribute('itemscope') && propElement.closest('[itemscope]') !== element) {
+                return;
+            }
+            
+            const propName = propElement.getAttribute('itemprop');
+            const value = MicrodataAPI.extractElementValue(propElement);
+            
+            // Handle multiple values for same property
+            if (result[propName] !== undefined) {
+                if (Array.isArray(result[propName])) {
+                    result[propName].push(value);
+                } else {
+                    result[propName] = [result[propName], value];
+                }
+            } else {
+                result[propName] = value;
+            }
+        });
+        
+        return result;
     }
 
     /**
@@ -808,44 +975,103 @@ class MicrodataAPI {
         
         // For each property name, try to get the value from the data object
         propertyNames.forEach(propName => {
+            const { isArray: isArrayProperty, cleanName: cleanPropName } = MicrodataAPI.parsePropertyName(propName);
+            
             let value;
             
             // Try to get value - works for both proxy objects and plain objects
-            if (data.properties && data.properties[propName] !== undefined) {
+            if (data.properties && data.properties[cleanPropName] !== undefined) {
                 // Microdata proxy object with properties
-                value = data.properties[propName];
-            } else if (data[propName] !== undefined) {
+                value = data.properties[cleanPropName];
+            } else if (data[cleanPropName] !== undefined) {
                 // Direct property access (works for proxy objects and JSON-LD)
-                value = data[propName];
+                value = data[cleanPropName];
             } else {
                 // Property not found
                 return;
             }
             
             // Skip JSON-LD metadata
-            if (['@context', '@type', '@id'].includes(propName)) {
+            if (['@context', '@type', '@id'].includes(cleanPropName)) {
                 return;
             }
             
-            // Find elements with this property (non-nested)
-            const targetElements = element.querySelectorAll(`[itemprop="${propName}"]:not([itemscope])`);
+            if (isArrayProperty && Array.isArray(value)) {
+                // Handle array repetition with [] syntax
+                MicrodataAPI.handleArrayRepetition(element, propName, cleanPropName, value);
+            } else {
+                // Handle regular properties
+                const targetElements = element.querySelectorAll(`[itemprop="${propName}"]:not([itemscope])`);
+                
+                targetElements.forEach((targetElement, index) => {
+                    if (Array.isArray(value)) {
+                        // For array values, use the corresponding index for multiple elements
+                        MicrodataAPI.setElementValue(targetElement, value[index] || '');
+                    } else {
+                        MicrodataAPI.setElementValue(targetElement, value);
+                    }
+                });
+                
+                // Handle nested itemscope elements
+                const nestedElements = element.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
+                nestedElements.forEach(nestedElement => {
+                    if (typeof value === 'object' && !Array.isArray(value)) {
+                        MicrodataAPI.populateTemplateElement(nestedElement, value);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Handle array repetition for elements with [] syntax
+     * @param {Element} container - The container element
+     * @param {string} fullPropName - The full property name with []
+     * @param {string} cleanPropName - The property name without []
+     * @param {Array} values - The array of values to repeat
+     */
+    static handleArrayRepetition(container, fullPropName, cleanPropName, values) {
+        // Find the template element with the [] syntax
+        const templateElement = container.querySelector(`[itemprop="${fullPropName}"]`);
+        if (!templateElement) {
+            return;
+        }
+        
+        // Get the parent element to insert the repeated elements
+        const parentElement = templateElement.parentElement;
+        if (!parentElement) {
+            return;
+        }
+        
+        // Store the original element's position
+        const nextSibling = templateElement.nextSibling;
+        
+        // Remove the original template element
+        templateElement.remove();
+        
+        // Create and insert elements for each value
+        values.forEach((value, index) => {
+            // Clone the template element
+            const newElement = templateElement.cloneNode(true);
             
-            targetElements.forEach(targetElement => {
-                if (Array.isArray(value)) {
-                    // For array values, use the first value
-                    MicrodataAPI.setElementValue(targetElement, value[0] || '');
-                } else {
-                    MicrodataAPI.setElementValue(targetElement, value);
-                }
-            });
+            // Update the itemprop to remove the [] syntax
+            newElement.setAttribute('itemprop', cleanPropName);
             
-            // Handle nested itemscope elements
-            const nestedElements = element.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
-            nestedElements.forEach(nestedElement => {
-                if (typeof value === 'object' && !Array.isArray(value)) {
-                    MicrodataAPI.populateTemplateElement(nestedElement, value);
-                }
-            });
+            // Populate the element with the value
+            if (typeof value === 'object' && !Array.isArray(value)) {
+                // For nested objects, populate recursively
+                MicrodataAPI.populateTemplateElement(newElement, value);
+            } else {
+                // For simple values, set the element value
+                MicrodataAPI.setElementValue(newElement, value);
+            }
+            
+            // Insert the new element in the correct position
+            if (nextSibling) {
+                parentElement.insertBefore(newElement, nextSibling);
+            } else {
+                parentElement.appendChild(newElement);
+            }
         });
     }
 
@@ -1621,7 +1847,7 @@ class MicrodataAPI {
             const itemElement = clone.querySelector('[itemscope]');
             
             if (itemElement) {
-                this.populateElement(itemElement, data);
+                MicrodataAPI.populateTemplateElement(itemElement, data);
                 
                 const parent = template.parentElement;
                 if (insertBefore) {
@@ -1669,12 +1895,6 @@ class MicrodataAPI {
         return this.templates.get(normalizedType) || this.templates.get(itemType) || [];
     }
 
-    populateElement(element, data) {
-        Object.entries(data).forEach(([key, value]) => {
-            const propElements = element.querySelectorAll(`[itemprop="${key}"]`);
-            propElements.forEach(el => this.updatePropertyElement(el, value));
-        });
-    }
 
     /**
      * Validate a property value against its type constraints

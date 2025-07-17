@@ -1,0 +1,10 @@
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Remote Person",
+  "email": "remote@example.com",
+  "jobTitle": "Remote Developer",
+  "age": 35,
+  "skills": ["JavaScript", "Node.js", "React"],
+  "department": "Engineering"
+}

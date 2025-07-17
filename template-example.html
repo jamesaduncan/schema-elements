@@ -85,7 +85,11 @@
                 <p><strong>Email:</strong> <span itemprop="email"></span></p>
                 <p><strong>Job:</strong> <span itemprop="jobTitle"></span></p>
                 <p><strong>Age:</strong> <span itemprop="age"></span></p>
-                <p><strong>Skills:</strong> <span itemprop="skills"></span></p>
+                <p><strong>Skills:</strong> 
+                    <span itemprop="skills"></span>
+                    <span itemprop="skills" style="margin-left: 10px;"></span>
+                    <span itemprop="skills" style="margin-left: 10px;"></span>
+                </p>
                 <p><strong>Contact Method:</strong> <span itemprop="contactMethod"></span></p>
                 <p><strong>Department:</strong> <span itemprop="department"></span></p>
             </div>
@@ -97,6 +101,22 @@
                 <span itemprop="name"></span> - <span itemprop="jobTitle"></span> (<span itemprop="email"></span>)
                 <span style="margin-left: 10px; color: #666;">Age: <span itemprop="age"></span></span>
             </li>
+        </template>
+        
+        <h3>Array Repetition Template</h3>
+        <template id="person-array-template">
+            <div class="rendered-item" itemscope itemtype="https://schema.org/Person">
+                <h4 itemprop="name"></h4>
+                <p><strong>Email:</strong> <span itemprop="email"></span></p>
+                <p><strong>Job:</strong> <span itemprop="jobTitle"></span></p>
+                <p><strong>Age:</strong> <span itemprop="age"></span></p>
+                <p><strong>Skills:</strong></p>
+                <ul>
+                    <li itemprop="skills[]"></li>
+                </ul>
+                <p><strong>Contact Method:</strong> <span itemprop="contactMethod"></span></p>
+                <p><strong>Department:</strong> <span itemprop="department"></span></p>
+            </div>
         </template>
     </div>
     
@@ -157,6 +177,10 @@
         <button onclick="renderFormToCard()">Render Form to Card</button>
         <button onclick="renderFormToList()">Render Form to List</button>
         <button onclick="showFormData()">Show Extracted Form Data</button>
+        <button onclick="renderUrlJsonToCard()">Render URL (JSON) to Card</button>
+        <button onclick="renderUrlHtmlToCard()">Render URL (HTML) to Card</button>
+        <button onclick="renderRelativeUrlToCard()">Render Relative URL to Card</button>
+        <button onclick="renderArrayRepetition()">Test Array Repetition</button>
         <button onclick="clearResults()">Clear Results</button>
         
         <div id="results" class="container"></div>
@@ -272,6 +296,71 @@
                 appendResult('Extracted Form Data', pre);
             } catch (error) {
                 appendError('Error extracting form data', error);
+            }
+        };
+
+        window.renderUrlJsonToCard = async function() {
+            const template = document.getElementById('person-card');
+            
+            try {
+                const rendered = await MicrodataAPI.render(template, './test-data.json');
+                appendResult('URL (JSON) → Card Template', rendered);
+            } catch (error) {
+                appendError('Error rendering URL (JSON) to card', error);
+            }
+        };
+        
+        window.renderUrlHtmlToCard = async function() {
+            const template = document.getElementById('person-card');
+            
+            try {
+                // First, let's see what data is being extracted
+                const response = await fetch('./test-data.html');
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const extracted = MicrodataAPI.extractMatchingMicrodata(doc, template);
+                
+                console.log('Extracted data from HTML:', extracted);
+                
+                const rendered = await MicrodataAPI.render(template, './test-data.html');
+                appendResult('URL (HTML) → Card Template', rendered);
+            } catch (error) {
+                appendError('Error rendering URL (HTML) to card', error);
+            }
+        };
+        
+        window.renderRelativeUrlToCard = async function() {
+            const template = document.getElementById('person-card');
+            
+            try {
+                const rendered = await MicrodataAPI.render(template, '/schema-elements/test-data.json');
+                appendResult('Relative URL → Card Template', rendered);
+            } catch (error) {
+                appendError('Error rendering relative URL to card', error);
+            }
+        };
+
+        window.renderArrayRepetition = function() {
+            const template = document.getElementById('person-array-template');
+            
+            // Test with synchronous JSON data
+            const testData = {
+                "@context": "https://schema.org",
+                "@type": "Person",
+                "name": "Test Person",
+                "email": "test@example.com",
+                "jobTitle": "Test Developer",
+                "age": 30,
+                "skills": ["HTML", "CSS", "JavaScript", "React"],
+                "contactMethod": "email",
+                "department": "Engineering"
+            };
+            
+            try {
+                const rendered = MicrodataAPI.render(template, testData);
+                appendResult('Array Repetition Template (Sync)', rendered);
+            } catch (error) {
+                appendError('Error rendering array repetition template', error);
             }
         };
 

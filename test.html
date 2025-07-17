@@ -125,15 +125,20 @@
                     <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
                         <strong itemprop="name"></strong> - 
                         <span itemprop="email"></span>
+                        <div>Skills: <span itemprop="skills[]"></span></div>
                     </li>
                 </template>
                 <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
                     <strong itemprop="name">John Doe</strong> - 
                     <span itemprop="email">john@example.com</span>
+                    <span itemprop="skills">JavaScript</span>
+                    <span itemprop="skills">Python</span>
                 </li>
                 <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
                     <strong itemprop="name">Jane Doe</strong> - 
                     <span itemprop="email">jane@example.com</span>
+                    <span itemprop="skills">React</span>
+                    <span itemprop="skills">Node.js</span>
                 </li>
             </ul>
             
@@ -297,7 +302,8 @@
             try {
                 const newEmployee = {
                     name: `Employee ${employeeCounter}`,
-                    email: `employee${employeeCounter}@example.com`
+                    email: `employee${employeeCounter}@example.com`,
+                    skills: ['HTML', 'CSS', 'JavaScript']
                 };
                 
                 log.textContent = `Adding employee: ${JSON.stringify(newEmployee, null, 2)}\n`;
