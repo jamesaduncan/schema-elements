@@ -45,6 +45,22 @@
  * schemas from their URLs to ensure up-to-date definitions.
  */
 class SchemaRegistry {
+    // Cardinality constants
+    static CARDINALITY = {
+        ONE: '1',
+        ZERO_OR_ONE: '0..1',
+        ZERO_OR_MANY: '0..n',
+        ONE_OR_MANY: '1..n'
+    };
+    
+    static DEFAULT_CARDINALITY = SchemaRegistry.CARDINALITY.ZERO_OR_ONE;
+    
+    // Regex patterns for validation
+    static REGEX_PATTERNS = {
+        TIME: /^\d{2}:\d{2}(:\d{2})?$/,
+        NUMERIC_INDEX: /^\d+$/
+    };
+    
     constructor() {
         this.schemas = new Map();
         this.typeValidators = new Map();
@@ -71,11 +87,11 @@ class SchemaRegistry {
         this.typeValidators.set('https://schema.org/Integer', (value) => Number.isInteger(Number(value)));
         this.typeValidators.set('https://schema.org/Date', (value) => !isNaN(Date.parse(value)));
         this.typeValidators.set('https://schema.org/DateTime', (value) => !isNaN(Date.parse(value)));
-        this.typeValidators.set('https://schema.org/Time', (value) => /^\d{2}:\d{2}(:\d{2})?$/.test(value));
+        this.typeValidators.set('https://schema.org/Time', (value) => SchemaRegistry.REGEX_PATTERNS.TIME.test(value));
         
         // organised.team Cardinal type
         this.typeValidators.set('https://organised.team/Cardinal', (value) => {
-            return ['1', '0..1', '0..n', '1..n'].includes(value);
+            return Object.values(SchemaRegistry.CARDINALITY).includes(value);
         });
     }
 
@@ -133,7 +149,7 @@ class SchemaRegistry {
             const property = {
                 name: this.extractProperty(propElement, 'name'),
                 type: this.extractProperty(propElement, 'type'),
-                cardinality: this.extractProperty(propElement, 'cardinality') || '0..1',
+                cardinality: this.extractProperty(propElement, 'cardinality') || SchemaRegistry.DEFAULT_CARDINALITY,
                 required: this.extractProperty(propElement, 'required') === 'true',
                 description: this.extractProperty(propElement, 'description')
             };
@@ -252,34 +268,58 @@ class SchemaRegistry {
 }
 
 class MicrodataExtractor {
+    // Container elements that group microdata items
+    static CONTAINER_ELEMENTS = ['UL', 'TBODY', 'DIV'];
+    
     constructor(registry) {
         this.registry = registry;
     }
 
-    async extractFromElement(element) {
-        if (!element.hasAttribute('itemscope')) {
-            return null;
-        }
+    /**
+     * Check if an element is a valid microdata element
+     * @param {Element} element - The element to check
+     * @returns {boolean} True if the element has itemscope
+     */
+    isValidMicrodataElement(element) {
+        return element.hasAttribute('itemscope');
+    }
 
+    /**
+     * Create a basic item object from an element
+     * @param {Element} element - The element to create item from
+     * @returns {Object} The item object with element, type, id, and properties
+     */
+    createItemFromElement(element) {
         const type = element.getAttribute('itemtype');
         const id = element.getAttribute('itemid') || 
                    (element.id ? `#${element.id}` : null);
 
-        const item = {
+        return {
             element,
             type: this.normalizeSchemaUrl(type),
             id,
             properties: {}
         };
+    }
 
-        // Load schema if available
-        const schema = type ? await this.registry.loadSchema(type) : null;
+    /**
+     * Load schema if type is available
+     * @param {string} type - The item type URL
+     * @returns {Promise<Object|null>} The schema or null
+     */
+    async loadSchemaIfAvailable(type) {
+        return type ? await this.registry.loadSchema(type) : null;
+    }
 
-        // Extract properties
+    /**
+     * Group properties by their itemprop name
+     * @param {Element} element - The element to extract properties from
+     * @returns {Object} Properties grouped by name
+     */
+    groupPropertiesByName(element) {
         const props = element.querySelectorAll('[itemprop]');
         const propGroups = {};
 
-        // Group properties by name
         props.forEach(prop => {
             const propName = prop.getAttribute('itemprop');
             if (!propGroups[propName]) {
@@ -288,11 +328,22 @@ class MicrodataExtractor {
             propGroups[propName].push(prop);
         });
 
+        return propGroups;
+    }
+
+    /**
+     * Process property groups with deduplication and value extraction
+     * @param {Object} propGroups - Properties grouped by name
+     * @param {Object} item - The item to add properties to
+     * @param {Element} element - The parent element
+     * @param {Object} schema - The schema definition
+     */
+    async processPropertyGroups(propGroups, item, element, schema) {
         // Handle deduplication for array properties
         for (const [propName, props] of Object.entries(propGroups)) {
             const itemscopeProps = props.filter(p => p.hasAttribute('itemscope'));
             
-            if (itemscopeProps.length > 1 && this.shouldDeduplicate(props)) {
+            if (itemscopeProps.length > 1 && this.hasPropertiesInMultipleContainers(props)) {
                 propGroups[propName] = this.deduplicateProperties(propName, props, element);
             }
         }
@@ -308,32 +359,56 @@ class MicrodataExtractor {
                 item.properties[propName] = values.length > 0 ? values[0] : null;
             }
         }
+    }
 
-        // Ensure all schema-defined properties exist, even if empty
-        if (schema) {
-            for (const schemaProp of schema.properties) {
-                if (!(schemaProp.name in item.properties)) {
-                    const cardinality = schemaProp.cardinality || '0..1';
-                    if (cardinality === '0..n' || cardinality === '1..n') {
-                        item.properties[schemaProp.name] = [];
-                    } else {
-                        item.properties[schemaProp.name] = null;
-                    }
+    /**
+     * Ensure all schema-defined properties exist on the item
+     * @param {Object} item - The item to add properties to
+     * @param {Object} schema - The schema definition
+     */
+    ensureSchemaPropertiesExist(item, schema) {
+        if (!schema) return;
+
+        for (const schemaProp of schema.properties) {
+            if (!(schemaProp.name in item.properties)) {
+                const cardinality = schemaProp.cardinality || SchemaRegistry.DEFAULT_CARDINALITY;
+                if (cardinality === SchemaRegistry.CARDINALITY.ZERO_OR_MANY || 
+                    cardinality === SchemaRegistry.CARDINALITY.ONE_OR_MANY) {
+                    item.properties[schemaProp.name] = [];
+                } else {
+                    item.properties[schemaProp.name] = null;
                 }
             }
         }
+    }
 
+    async extractFromElement(element) {
+        if (!this.isValidMicrodataElement(element)) {
+            return null;
+        }
+        
+        const item = this.createItemFromElement(element);
+        const schema = await this.loadSchemaIfAvailable(item.type);
+        
+        const propGroups = this.groupPropertiesByName(element);
+        await this.processPropertyGroups(propGroups, item, element, schema);
+        this.ensureSchemaPropertiesExist(item, schema);
+        
         return item;
     }
 
-    shouldDeduplicate(props) {
-        // Check if properties are in different container types
+    /**
+     * Check if properties are distributed across multiple container elements
+     * @param {Array<Element>} props - Array of property elements
+     * @returns {boolean} True if properties are in multiple containers
+     */
+    hasPropertiesInMultipleContainers(props) {
         const containers = new Set();
         props.forEach(prop => {
             if (prop.hasAttribute('itemscope')) {
                 let container = prop.parentElement;
                 while (container && container.tagName !== 'BODY') {
-                    if (['UL', 'TBODY', 'DIV'].includes(container.tagName)) {
+                    if (MicrodataExtractor.CONTAINER_ELEMENTS.includes(container.tagName)) {
                         containers.add(container);
                         break;
                     }
@@ -351,7 +426,7 @@ class MicrodataExtractor {
             if (prop.hasAttribute('itemscope')) {
                 let container = prop.parentElement;
                 while (container && container !== element) {
-                    if (['UL', 'TBODY', 'DIV'].includes(container.tagName)) {
+                    if (MicrodataExtractor.CONTAINER_ELEMENTS.includes(container.tagName)) {
                         containers.add(container);
                         break;
                     }
@@ -368,7 +443,7 @@ class MicrodataExtractor {
                 let container = p.parentElement;
                 while (container && container !== element) {
                     if (container === firstContainer) return true;
-                    if (container.tagName === 'UL' || container.tagName === 'TBODY' || container.tagName === 'DIV') {
+                    if (MicrodataExtractor.CONTAINER_ELEMENTS.includes(container.tagName)) {
                         return false;
                     }
                     container = container.parentElement;
@@ -380,12 +455,19 @@ class MicrodataExtractor {
         return props;
     }
 
+    /**
+     * Determine if a property should be treated as an array based on schema
+     * @param {string} propName - The property name
+     * @param {Object} schema - The schema definition
+     * @returns {boolean} True if the property should be an array
+     */
     shouldPropertyBeArray(propName, schema) {
         if (schema) {
             const property = schema.properties.find(p => p.name === propName);
             if (property) {
-                const cardinality = property.cardinality || '1';
-                return cardinality === '0..n' || cardinality === '1..n';
+                const cardinality = property.cardinality || SchemaRegistry.CARDINALITY.ONE;
+                return cardinality === SchemaRegistry.CARDINALITY.ZERO_OR_MANY || 
+                       cardinality === SchemaRegistry.CARDINALITY.ONE_OR_MANY;
             }
         }
         return false;
@@ -462,6 +544,26 @@ class MicrodataExtractor {
  * DOM synchronization, and reactive array operations.
  */
 class MicrodataAPI {
+    // DOM node type constants
+    static NODE_TYPE = {
+        ELEMENT: 1,
+        TEXT: 3,
+        COMMENT: 8,
+        DOCUMENT: 9
+    };
+    
+    // Internal tracking attribute
+    static INTERNAL_ID_ATTR = 'data-microdata-internal-id';
+    
+    /**
+     * Check if a property is a numeric index
+     * @param {*} prop - The property to check
+     * @returns {boolean} True if the property represents a numeric index
+     */
+    static isNumericIndex(prop) {
+        return typeof prop === 'string' && SchemaRegistry.REGEX_PATTERNS.NUMERIC_INDEX.test(prop);
+    }
+    
     /**
      * Initialize the microdata API
      */
@@ -472,6 +574,9 @@ class MicrodataAPI {
         this.itemsWithoutId = []; // Items without IDs (accessed by numeric index)
         this.templates = new Map(); // Templates for rendering new items
         this.isUpdatingFromDOM = false; // Flag to prevent infinite loops
+        this.internalIdCounter = 0; // Counter for generating internal IDs
+        this.elementToInternalId = new WeakMap(); // Track which elements belong to which internal ID
+        this.internalIdToElements = new Map(); // Track all elements for each internal ID
         this.initialize();
     }
 
@@ -729,9 +834,25 @@ class MicrodataAPI {
         });
     }
 
+    /**
+     * Create a content signature for an item for deduplication
+     * @param {Object} item - The item to create a signature for
+     * @returns {string} A signature based on the item's properties
+     */
+    createItemSignature(item) {
+        const props = [];
+        for (const [key, value] of Object.entries(item.properties)) {
+            if (typeof value === 'string' || typeof value === 'number') {
+                props.push(`${key}:${value}`);
+            }
+        }
+        return `${item.type}|${props.sort().join('|')}`;
+    }
+
     async extractAllItems() {
         const itemElements = document.querySelectorAll('[itemscope]');
         const topLevelItemsWithoutId = [];
+        const itemsBySignature = new Map(); // Track items by their content signature
         
         for (const element of itemElements) {
             if (this.isNestedItem(element)) continue;
@@ -740,10 +861,31 @@ class MicrodataAPI {
             
             if (item) {
                 const proxy = this.createLiveProxy(item);
+                
                 if (item.id) {
                     this.items.set(item.id, proxy);
                 } else {
-                    topLevelItemsWithoutId.push(proxy);
+                    // For items without IDs, check if we've seen this content before
+                    const signature = this.createItemSignature(item);
+                    
+                    if (itemsBySignature.has(signature)) {
+                        // This is a duplicate item in another view
+                        const existingItem = itemsBySignature.get(signature);
+                        const internalId = this.elementToInternalId.get(existingItem._element) || this.generateInternalId();
+                        
+                        // Register both elements with the same internal ID
+                        if (!this.elementToInternalId.has(existingItem._element)) {
+                            this.registerElementWithInternalId(existingItem._element, internalId);
+                        }
+                        this.registerElementWithInternalId(element, internalId);
+                    } else {
+                        // This is a new unique item
+                        itemsBySignature.set(signature, proxy);
+                        topLevelItemsWithoutId.push(proxy);
+                        
+                        // Generate and register internal ID
+                        this.generateAndRegisterInternalId(element);
+                    }
                 }
             }
         }
@@ -763,71 +905,132 @@ class MicrodataAPI {
     }
 
     /**
-     * Create a live proxy object for an item with reactive behavior
-     * @param {Object} item - The item to create a proxy for
-     * @returns {Proxy} A proxy with live DOM synchronization
+     * Create array proxy handler for reactive array operations
+     * @param {Array} items - The array to proxy
+     * @param {string} propName - The property name this array belongs to
+     * @param {Object} parentItem - The parent item
+     * @param {Element} parentElement - The parent DOM element
+     * @returns {Object} Proxy handler object
      */
-    createLiveProxy(item) {
+    createArrayProxyHandler(items, propName, parentItem, parentElement) {
         const self = this;
         
-        const createArrayProxy = (items, propName, parentElement) => {
-            return new Proxy(items, {
-                get(target, prop) {
-                    // Handle toJSON for serialization
-                    if (prop === 'toJSON') {
-                        return () => self.serializeArray(target);
-                    }
-                    
-                    // Array methods
-                    if (prop === 'push') {
-                        return (...args) => self.handleArrayPush(target, args, item, propName, parentElement);
-                    }
-                    if (prop === 'pop') {
-                        return () => self.handleArrayPop(target, propName, item);
-                    }
-                    if (prop === 'splice') {
-                        return async (start, deleteCount, ...items) => 
-                            self.handleArraySplice(target, start, deleteCount, items, propName, item, parentElement);
-                    }
-                    
-                    // Create live proxies for array items
-                    if (typeof prop === 'number' || (typeof prop === 'string' && /^\d+$/.test(prop))) {
-                        const index = Number(prop);
-                        if (target[index]) {
-                            return self.createLiveProxy(target[index]);
-                        }
-                    }
-                    
-                    return target[prop];
-                }
-            });
-        };
-        
-        return new Proxy(item, {
+        return {
             get(target, prop) {
-                // Handle special properties
-                if (prop === '_element') return target.element;
-                if (prop === '_type') return target.type;
-                if (prop === '_id') return target.id;
-                
                 // Handle toJSON for serialization
                 if (prop === 'toJSON') {
-                    return () => self.serializeItem(target);
+                    return () => self.serializeArray(target);
+                }
+                
+                // Array methods
+                if (prop === 'push') {
+                    return (...args) => self.handleArrayPush(target, args, parentItem, propName, parentElement);
+                }
+                if (prop === 'pop') {
+                    return () => self.handleArrayPop(target, propName, parentItem);
+                }
+                if (prop === 'splice') {
+                    return async (start, deleteCount, ...items) => 
+                        self.handleArraySplice({ target, start, deleteCount, items, propName, parentItem, parentElement });
+                }
+                
+                // Create live proxies for array items
+                if (typeof prop === 'number' || MicrodataAPI.isNumericIndex(prop)) {
+                    const index = Number(prop);
+                    if (target[index]) {
+                        return self.createLiveProxy(target[index]);
+                    }
+                }
+                
+                return target[prop];
+            }
+        };
+    }
+
+    /**
+     * Create array proxy for reactive array operations
+     * @param {Array} items - The array to proxy
+     * @param {string} propName - The property name this array belongs to
+     * @param {Object} parentItem - The parent item
+     * @param {Element} parentElement - The parent DOM element
+     * @returns {Proxy} Proxied array with reactive behavior
+     */
+    createArrayProxy(items, propName, parentItem, parentElement) {
+        return new Proxy(items, this.createArrayProxyHandler(items, propName, parentItem, parentElement));
+    }
+
+    /**
+     * Handle special proxy properties for items
+     * @param {Object} target - The target item
+     * @param {string} prop - The property being accessed
+     * @returns {*} The property value or undefined if not a special property
+     */
+    handleSpecialProperties(target, prop) {
+        if (prop === '_element') return target.element;
+        if (prop === '_type') return target.type;
+        if (prop === '_id') return target.id;
+        if (prop === 'toJSON') return () => this.serializeItem(target);
+        
+        return undefined;
+    }
+
+    /**
+     * Check if a value is a microdata item object
+     * @param {*} value - The value to check
+     * @returns {boolean} True if the value is a microdata item
+     */
+    isMicrodataItem(value) {
+        return value && typeof value === 'object' && value.element;
+    }
+
+    /**
+     * Check if a value is a microdata item with properties
+     * @param {*} value - The value to check
+     * @returns {boolean} True if the value is a microdata item with properties
+     */
+    isMicrodataItemWithProperties(value) {
+        return value && typeof value === 'object' && value.properties;
+    }
+
+    /**
+     * Get the appropriate proxy for a property value
+     * @param {*} value - The property value
+     * @param {string} propName - The property name
+     * @param {Object} parentItem - The parent item
+     * @returns {*} The value or a proxy if applicable
+     */
+    getProxiedValue(value, propName, parentItem) {
+        // If it's an array, wrap in array proxy
+        if (Array.isArray(value)) {
+            return this.createArrayProxy(value, propName, parentItem, parentItem.element);
+        }
+        
+        // If it's a nested item, wrap in proxy
+        if (this.isMicrodataItem(value)) {
+            return this.createLiveProxy(value);
+        }
+        
+        return value;
+    }
+
+    /**
+     * Create item proxy handler for reactive item operations
+     * @param {Object} item - The item to proxy
+     * @returns {Object} Proxy handler object
+     */
+    createItemProxyHandler(item) {
+        const self = this;
+        
+        return {
+            get(target, prop) {
+                // Handle special properties
+                const specialValue = self.handleSpecialProperties(target, prop);
+                if (specialValue !== undefined) {
+                    return specialValue;
                 }
                 
                 const value = target.properties[prop];
-                
-                // If it's an array, wrap in array proxy
-                if (Array.isArray(value)) {
-                    return createArrayProxy(value, prop, target.element);
-                }
-                
-                // If it's a nested item, wrap in proxy
-                if (value && typeof value === 'object' && value.element) {
-                    return self.createLiveProxy(value);
-                }
-                
-                return value;
+                return self.getProxiedValue(value, prop, target);
             },
             
             set(target, prop, value) {
@@ -848,18 +1051,48 @@ class MicrodataAPI {
             has(target, prop) {
                 return prop in target.properties;
             }
-        });
+        };
+    }
+
+    /**
+     * Create a live proxy object for an item with reactive behavior
+     * @param {Object} item - The item to create a proxy for
+     * @returns {Proxy} A proxy with live DOM synchronization
+     */
+    createLiveProxy(item) {
+        return new Proxy(item, this.createItemProxyHandler(item));
     }
 
     serializeArray(items) {
         return items.map(item => {
-            if (item && typeof item === 'object' && item.toJSON) {
+            if (this.canSerializeToJson(item)) {
                 return item.toJSON();
             } else if (item && typeof item === 'object' && item.properties) {
                 return this.createJsonLd(item);
             }
             return item;
         });
+    }
+
+    /**
+     * Check if an object can be JSON serialized
+     * @param {*} obj - The object to check
+     * @returns {boolean} True if the object has a toJSON method
+     */
+    canSerializeToJson(obj) {
+        return obj && typeof obj === 'object' && typeof obj.toJSON === 'function';
+    }
+
+    /**
+     * Serialize an object if possible, otherwise return it as-is
+     * @param {*} obj - The object to serialize
+     * @returns {*} The serialized object or the original value
+     */
+    serializeIfPossible(obj) {
+        if (this.canSerializeToJson(obj)) {
+            return obj.toJSON();
+        }
+        return obj;
     }
 
     serializeItem(item) {
@@ -905,9 +1138,9 @@ class MicrodataAPI {
         for (const [key, value] of Object.entries(item.properties)) {
             if (Array.isArray(value)) {
                 result[key] = this.serializeArray(value);
-            } else if (value && typeof value === 'object' && value.toJSON) {
+            } else if (this.canSerializeToJson(value)) {
                 result[key] = value.toJSON();
-            } else if (value && typeof value === 'object' && value.properties) {
+            } else if (this.isMicrodataItemWithProperties(value)) {
                 result[key] = this.createJsonLd(value);
             } else {
                 result[key] = value;
@@ -937,7 +1170,19 @@ class MicrodataAPI {
         return target.pop();
     }
 
-    async handleArraySplice(target, start, deleteCount, items, propName, parentItem, parentElement) {
+    /**
+     * Handle array splice operation with DOM updates
+     * @param {Object} spliceOptions - The splice operation parameters
+     * @param {Array} spliceOptions.target - The target array
+     * @param {number} spliceOptions.start - The start index
+     * @param {number} spliceOptions.deleteCount - Number of items to delete
+     * @param {Array} spliceOptions.items - Items to insert
+     * @param {string} spliceOptions.propName - The property name
+     * @param {Object} spliceOptions.parentItem - The parent item
+     * @param {Element} spliceOptions.parentElement - The parent DOM element
+     */
+    async handleArraySplice(spliceOptions) {
+        const { target, start, deleteCount, items, propName, parentItem, parentElement } = spliceOptions;
         let itemType = this.getItemTypeForArray(target, propName, parentItem);
         
         if (!itemType) {
@@ -972,7 +1217,10 @@ class MicrodataAPI {
             const parent = template.parentElement;
             const elements = parent.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
             if (elements.length > 0) {
-                elements[elements.length - 1].remove();
+                const elementToRemove = elements[elements.length - 1];
+                // Clean up internal ID tracking before removing
+                this.unregisterElement(elementToRemove);
+                elementToRemove.remove();
             }
         });
     }
@@ -1046,6 +1294,9 @@ class MicrodataAPI {
         
         if (templates.length === 0) return;
 
+        // Generate a unique internal ID for this data item
+        const internalId = this.generateInternalId();
+
         // Clone and populate template for each location
         templates.forEach(template => {
             const clone = template.content.cloneNode(true);
@@ -1059,6 +1310,12 @@ class MicrodataAPI {
                     parent.insertBefore(clone, insertBefore);
                 } else {
                     parent.appendChild(clone);
+                }
+                
+                // Register the newly created element with the internal ID
+                const insertedElement = parent.lastElementChild;
+                if (insertedElement && insertedElement.hasAttribute('itemscope')) {
+                    this.registerElementWithInternalId(insertedElement, internalId);
                 }
             }
         });
@@ -1106,7 +1363,7 @@ class MicrodataAPI {
      */
     observeChanges() {
         const observer = new MutationObserver((mutations) => {
-            const changes = this.analyzeMutations(mutations);
+            const changes = this.determineRequiredChanges(mutations);
             
             if (changes.shouldRefresh) {
                 this.refresh();
@@ -1125,7 +1382,12 @@ class MicrodataAPI {
         });
     }
 
-    analyzeMutations(mutations) {
+    /**
+     * Determine what changes are needed based on DOM mutations
+     * @param {Array<MutationRecord>} mutations - The DOM mutations
+     * @returns {Object} Object with shouldRefresh and propertiesToUpdate
+     */
+    determineRequiredChanges(mutations) {
         let shouldRefresh = false;
         const propertiesToUpdate = new Map();
         
@@ -1148,9 +1410,9 @@ class MicrodataAPI {
         let shouldRefresh = false;
         const propertiesToUpdate = new Map();
         
-        const checkNodes = (nodes) => {
+        const checkNodesForMicrodataChanges = (nodes) => {
             nodes.forEach(node => {
-                if (node.nodeType === 1) {
+                if (node.nodeType === MicrodataAPI.NODE_TYPE.ELEMENT) {
                     if (node.hasAttribute('itemscope') || node.querySelector?.('[itemscope]')) {
                         shouldRefresh = true;
                     } else if (node.hasAttribute('itemprop')) {
@@ -1160,8 +1422,8 @@ class MicrodataAPI {
             });
         };
         
-        checkNodes(mutation.addedNodes);
-        checkNodes(mutation.removedNodes);
+        checkNodesForMicrodataChanges(mutation.addedNodes);
+        checkNodesForMicrodataChanges(mutation.removedNodes);
         
         if (mutation.target.hasAttribute('itemprop')) {
             propertiesToUpdate.set(mutation.target, mutation.target.getAttribute('itemprop'));
@@ -1258,25 +1520,86 @@ class MicrodataAPI {
         return null;
     }
 
+    /**
+     * Generate a unique internal ID for tracking elements
+     * @returns {string} A unique internal ID
+     */
+    generateInternalId() {
+        return `__microdata_internal_${++this.internalIdCounter}`;
+    }
+
+    /**
+     * Generate and register a new internal ID for an element
+     * @param {Element} element - The element to register
+     * @returns {string} The generated internal ID
+     */
+    generateAndRegisterInternalId(element) {
+        const internalId = this.generateInternalId();
+        this.registerElementWithInternalId(element, internalId);
+        return internalId;
+    }
+
+    /**
+     * Register an element with an internal ID for tracking
+     * @param {Element} element - The DOM element to track
+     * @param {string} internalId - The internal ID to associate
+     */
+    registerElementWithInternalId(element, internalId) {
+        // Store the ID on the element as a data attribute
+        element.setAttribute(MicrodataAPI.INTERNAL_ID_ATTR, internalId);
+        
+        // Track in our maps
+        this.elementToInternalId.set(element, internalId);
+        
+        if (!this.internalIdToElements.has(internalId)) {
+            this.internalIdToElements.set(internalId, new Set());
+        }
+        this.internalIdToElements.get(internalId).add(element);
+    }
+
+    /**
+     * Get all elements associated with an internal ID
+     * @param {string} internalId - The internal ID
+     * @returns {Set<Element>} Set of elements with this ID
+     */
+    getElementsWithInternalId(internalId) {
+        return this.internalIdToElements.get(internalId) || new Set();
+    }
+
+    /**
+     * Clean up tracking for removed elements
+     * @param {Element} element - The element being removed
+     */
+    unregisterElement(element) {
+        const internalId = this.elementToInternalId.get(element);
+        if (internalId) {
+            this.elementToInternalId.delete(element);
+            const elements = this.internalIdToElements.get(internalId);
+            if (elements) {
+                elements.delete(element);
+                if (elements.size === 0) {
+                    this.internalIdToElements.delete(internalId);
+                }
+            }
+        }
+    }
+
     updateCorrespondingElements(target, prop, value) {
-        const parentElement = this.findParentWithItemscope(target.element);
+        // Get the internal ID from the element
+        const internalId = this.elementToInternalId.get(target.element);
         
-        if (!parentElement) return;
+        if (!internalId) {
+            // If no internal ID, this element wasn't created via our tracking system
+            return;
+        }
         
-        const siblings = Array.from(parentElement.querySelectorAll(`[itemprop][itemscope][itemtype="${target.type}"]`));
-        const elementIndex = siblings.indexOf(target.element);
+        // Get all elements with the same internal ID
+        const correspondingElements = this.getElementsWithInternalId(internalId);
         
-        if (elementIndex === -1) return;
-        
-        // Find all other containers with similar structure
-        const allContainers = document.querySelectorAll(`[itemscope][itemtype="${parentElement.getAttribute('itemtype')}"]`);
-        
-        allContainers.forEach(container => {
-            if (container === parentElement) return;
-            
-            const correspondingSiblings = container.querySelectorAll(`[itemprop][itemscope][itemtype="${target.type}"]`);
-            if (correspondingSiblings[elementIndex]) {
-                this.updatePropertyElements(correspondingSiblings[elementIndex], prop, value);
+        // Update all corresponding elements
+        correspondingElements.forEach(element => {
+            if (element !== target.element) {
+                this.updatePropertyElements(element, prop, value);
             }
         });
     }
@@ -1303,7 +1626,7 @@ class MicrodataAPI {
                 }
                 
                 // Handle numeric indices for items without IDs
-                if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+                if (MicrodataAPI.isNumericIndex(prop)) {
                     const index = parseInt(prop, 10);
                     if (index >= 0 && index < self.itemsWithoutId.length) {
                         return self.itemsWithoutId[index];
@@ -1363,7 +1686,7 @@ class MicrodataAPI {
             },
             
             has(target, prop) {
-                if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+                if (MicrodataAPI.isNumericIndex(prop)) {
                     const index = parseInt(prop, 10);
                     return index >= 0 && index < self.itemsWithoutId.length;
                 }
@@ -1375,12 +1698,7 @@ class MicrodataAPI {
     serializeAll() {
         // If we only have items without IDs, return an array
         if (this.items.size === 0 && this.itemsWithoutId.length > 0) {
-            return this.itemsWithoutId.map(item => {
-                if (item && typeof item.toJSON === 'function') {
-                    return item.toJSON();
-                }
-                return item;
-            });
+            return this.itemsWithoutId.map(item => this.serializeIfPossible(item));
         }
         
         // Otherwise return an object
@@ -1388,17 +1706,18 @@ class MicrodataAPI {
         
         // Add items with IDs as properties
         for (const [key, item] of this.items) {
-            if (item && typeof item.toJSON === 'function') {
+            const serialized = this.serializeIfPossible(item);
+            if (serialized !== item) { // Only add if it was actually serializable
                 const propKey = key.startsWith('#') ? key.substring(1) : key;
-                result[propKey] = item.toJSON();
+                result[propKey] = serialized;
             }
         }
         
         // Add items without IDs with numeric indices
         for (let i = 0; i < this.itemsWithoutId.length; i++) {
-            const item = this.itemsWithoutId[i];
-            if (item && typeof item.toJSON === 'function') {
-                result[i] = item.toJSON();
+            const serialized = this.serializeIfPossible(this.itemsWithoutId[i]);
+            if (serialized !== this.itemsWithoutId[i]) { // Only add if it was actually serializable
+                result[i] = serialized;
             }
         }
         
