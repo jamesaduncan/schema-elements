@@ -363,6 +363,87 @@ For properties with multiple values:
 - `splice(start, deleteCount, ...items)` - Add/remove items at any position
 - Standard array properties: `length`, numeric indices
 
+### Template Rendering
+
+The library provides a static method for rendering microdata items or JSON-LD objects to HTML templates.
+
+#### MicrodataAPI.render(template, data)
+
+Renders microdata items or JSON-LD objects to a template element.
+
+**Parameters:**
+- `template` (HTMLTemplateElement) - The template element to render to
+- `data` (Object) - Either a microdata proxy object or JSON-LD object
+
+**Returns:**
+- `DocumentFragment` - The populated template content ready to insert into the DOM
+
+**Example Usage:**
+
+```javascript
+import { MicrodataAPI } from './index.mjs';
+
+// Get a template element
+const template = document.querySelector('template#person-card');
+
+// Render existing microdata item
+const rendered1 = MicrodataAPI.render(template, document.microdata.person1);
+document.body.appendChild(rendered1);
+
+// Render JSON-LD object
+const jsonData = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "jobTitle": "Software Developer"
+};
+const rendered2 = MicrodataAPI.render(template, jsonData);
+document.body.appendChild(rendered2);
+```
+
+**Template Structure:**
+
+Templates must contain an element with `itemscope` and appropriate `itemprop` attributes:
+
+```html
+<template id="person-card">
+  <div class="card" itemscope itemtype="https://schema.org/Person">
+    <h3 itemprop="name"></h3>
+    <p>Email: <span itemprop="email"></span></p>
+    <p>Job: <span itemprop="jobTitle"></span></p>
+  </div>
+</template>
+```
+
+**Smart Element Handling:**
+
+The render method intelligently populates different element types:
+- Elements with `content` attribute: Sets the `content` attribute value
+- Input elements: Sets the `value` property
+- Link elements (`<a>`): Sets `href` and optionally text content
+- Image elements (`<img>`): Sets `src` and `alt` attributes
+- Other elements: Sets `textContent`
+
+**Nested Objects:**
+
+The method supports nested microdata structures:
+
+```html
+<template id="book-template">
+  <div itemscope itemtype="https://schema.org/Book">
+    <h3 itemprop="name"></h3>
+    <div itemprop="author" itemscope itemtype="https://schema.org/Person">
+      <span>by <span itemprop="name"></span></span>
+    </div>
+  </div>
+</template>
+```
+
+**Array Properties:**
+
+For properties that contain arrays, the first array element is used for template population.
+
 ## How It Works
 
 1. **Initialization**: On page load, the library scans for all elements with `itemscope` attributes

@@ -658,6 +658,120 @@ class MicrodataAPI {
     static isNumericIndex(prop) {
         return typeof prop === 'string' && SchemaRegistry.REGEX_PATTERNS.NUMERIC_INDEX.test(prop);
     }
+
+    /**
+     * Render a microdata item or JSON-LD object to a template
+     * @param {HTMLTemplateElement} template - The template element to render to
+     * @param {Object} data - The microdata item or JSON-LD object to render
+     * @returns {DocumentFragment} The populated template content
+     */
+    static render(template, data) {
+        if (!template || !template.content) {
+            throw new Error('Invalid template element provided');
+        }
+        
+        if (!data) {
+            throw new Error('No data provided to render');
+        }
+        
+        // Clone the template content
+        const clone = template.content.cloneNode(true);
+        const itemElement = clone.querySelector('[itemscope]');
+        
+        if (!itemElement) {
+            throw new Error('Template must contain an element with itemscope attribute');
+        }
+        
+        // Populate the template with data
+        MicrodataAPI.populateTemplateElement(itemElement, data);
+        
+        return clone;
+    }
+
+    /**
+     * Populate a template element with data from a microdata item or JSON-LD
+     * @param {Element} element - The element to populate
+     * @param {Object} data - The data to populate with
+     */
+    static populateTemplateElement(element, data) {
+        // Get all potential property names from the template
+        const propElements = element.querySelectorAll('[itemprop]');
+        const propertyNames = new Set();
+        
+        propElements.forEach(el => {
+            const propName = el.getAttribute('itemprop');
+            if (propName) {
+                propertyNames.add(propName);
+            }
+        });
+        
+        // For each property name, try to get the value from the data object
+        propertyNames.forEach(propName => {
+            let value;
+            
+            // Try to get value - works for both proxy objects and plain objects
+            if (data.properties && data.properties[propName] !== undefined) {
+                // Microdata proxy object with properties
+                value = data.properties[propName];
+            } else if (data[propName] !== undefined) {
+                // Direct property access (works for proxy objects and JSON-LD)
+                value = data[propName];
+            } else {
+                // Property not found
+                return;
+            }
+            
+            // Skip JSON-LD metadata
+            if (['@context', '@type', '@id'].includes(propName)) {
+                return;
+            }
+            
+            // Find elements with this property (non-nested)
+            const targetElements = element.querySelectorAll(`[itemprop="${propName}"]:not([itemscope])`);
+            
+            targetElements.forEach(targetElement => {
+                if (Array.isArray(value)) {
+                    // For array values, use the first value
+                    MicrodataAPI.setElementValue(targetElement, value[0] || '');
+                } else {
+                    MicrodataAPI.setElementValue(targetElement, value);
+                }
+            });
+            
+            // Handle nested itemscope elements
+            const nestedElements = element.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
+            nestedElements.forEach(nestedElement => {
+                if (typeof value === 'object' && !Array.isArray(value)) {
+                    MicrodataAPI.populateTemplateElement(nestedElement, value);
+                }
+            });
+        });
+    }
+
+    /**
+     * Set the value of an element appropriately based on its type
+     * @param {Element} element - The element to set the value on
+     * @param {*} value - The value to set
+     */
+    static setElementValue(element, value) {
+        const stringValue = String(value || '');
+        
+        if (element.hasAttribute('content')) {
+            element.setAttribute('content', stringValue);
+        } else if (element.tagName === 'INPUT') {
+            element.value = stringValue;
+        } else if (element.tagName === 'A' && element.hasAttribute('href')) {
+            element.href = stringValue;
+            if (!element.textContent.trim()) {
+                element.textContent = stringValue;
+            }
+        } else if (element.tagName === 'IMG' && element.hasAttribute('src')) {
+            element.src = stringValue;
+            element.alt = element.alt || stringValue;
+        } else {
+            element.textContent = stringValue;
+        }
+    }
     
     /**
      * Initialize the microdata API

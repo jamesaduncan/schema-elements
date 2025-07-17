@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Rendering Example</title>
+    <script type="module" src="./index.mjs"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .example-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .rendered-item {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            background-color: #007cba;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #005a8b;
+        }
+        
+        .container {
+            margin: 20px 0;
+        }
+        
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>MicrodataAPI.render() Example</h1>
+    
+    <!-- Existing Microdata -->
+    <div class="example-section">
+        <h2>Existing Microdata</h2>
+        <div id="person1" itemscope itemtype="https://schema.org/Person">
+            <h3 itemprop="name">John Doe</h3>
+            <p itemprop="email">john@example.com</p>
+            <p itemprop="jobTitle">Software Developer</p>
+        </div>
+        
+        <div id="person2" itemscope itemtype="https://schema.org/Person">
+            <h3 itemprop="name">Jane Smith</h3>
+            <p itemprop="email">jane@example.com</p>
+            <p itemprop="jobTitle">Product Manager</p>
+        </div>
+    </div>
+    
+    <!-- Templates -->
+    <div class="example-section">
+        <h2>Templates</h2>
+        
+        <h3>Card Template</h3>
+        <template id="person-card">
+            <div class="rendered-item" itemscope itemtype="https://schema.org/Person">
+                <h4 itemprop="name"></h4>
+                <p><strong>Email:</strong> <span itemprop="email"></span></p>
+                <p><strong>Job:</strong> <span itemprop="jobTitle"></span></p>
+            </div>
+        </template>
+        
+        <h3>List Item Template</h3>
+        <template id="person-list-item">
+            <li itemscope itemtype="https://schema.org/Person">
+                <span itemprop="name"></span> - <span itemprop="jobTitle"></span> (<span itemprop="email"></span>)
+            </li>
+        </template>
+    </div>
+    
+    <!-- Controls -->
+    <div class="example-section">
+        <h2>Template Rendering Tests</h2>
+        
+        <button onclick="renderExistingToCard()">Render Existing Person to Card</button>
+        <button onclick="renderExistingToList()">Render Existing Person to List</button>
+        <button onclick="renderJsonToCard()">Render JSON-LD to Card</button>
+        <button onclick="renderJsonToList()">Render JSON-LD to List</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="results" class="container"></div>
+    </div>
+    
+    <!-- Example JSON-LD Data -->
+    <div class="example-section">
+        <h2>Example JSON-LD Data</h2>
+        <pre id="json-example"></pre>
+    </div>
+    
+    <script type="module">
+        import { MicrodataAPI } from './index.mjs';
+        
+        // Sample JSON-LD data
+        const sampleJsonLD = {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "name": "Alice Johnson",
+            "email": "alice@example.com", 
+            "jobTitle": "UX Designer"
+        };
+        
+        // Display the JSON-LD example
+        document.getElementById('json-example').textContent = JSON.stringify(sampleJsonLD, null, 2);
+        
+        // Make functions global for onclick handlers
+        window.renderExistingToCard = function() {
+            const template = document.getElementById('person-card');
+            const person = document.microdata.person1;
+            
+            try {
+                const rendered = MicrodataAPI.render(template, person);
+                appendResult('Existing Person → Card Template', rendered);
+            } catch (error) {
+                appendError('Error rendering existing person to card', error);
+            }
+        };
+        
+        window.renderExistingToList = function() {
+            const template = document.getElementById('person-list-item');
+            const person = document.microdata.person2;
+            
+            try {
+                const rendered = MicrodataAPI.render(template, person);
+                const ul = document.createElement('ul');
+                ul.appendChild(rendered);
+                appendResult('Existing Person → List Template', ul);
+            } catch (error) {
+                appendError('Error rendering existing person to list', error);
+            }
+        };
+        
+        window.renderJsonToCard = function() {
+            const template = document.getElementById('person-card');
+            
+            try {
+                const rendered = MicrodataAPI.render(template, sampleJsonLD);
+                appendResult('JSON-LD → Card Template', rendered);
+            } catch (error) {
+                appendError('Error rendering JSON-LD to card', error);
+            }
+        };
+        
+        window.renderJsonToList = function() {
+            const template = document.getElementById('person-list-item');
+            
+            try {
+                const rendered = MicrodataAPI.render(template, sampleJsonLD);
+                const ul = document.createElement('ul');
+                ul.appendChild(rendered);
+                appendResult('JSON-LD → List Template', ul);
+            } catch (error) {
+                appendError('Error rendering JSON-LD to list', error);
+            }
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        };
+        
+        function appendResult(title, content) {
+            const results = document.getElementById('results');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'example-section';
+            
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            wrapper.appendChild(heading);
+            
+            if (content instanceof DocumentFragment || content instanceof Element) {
+                wrapper.appendChild(content);
+            } else {
+                wrapper.textContent = String(content);
+            }
+            
+            results.appendChild(wrapper);
+        }
+        
+        function appendError(title, error) {
+            const results = document.getElementById('results');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'example-section';
+            wrapper.style.backgroundColor = '#ffe6e6';
+            wrapper.style.borderColor = '#ff9999';
+            
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            heading.style.color = '#cc0000';
+            wrapper.appendChild(heading);
+            
+            const errorMsg = document.createElement('pre');
+            errorMsg.textContent = error.message;
+            errorMsg.style.color = '#cc0000';
+            wrapper.appendChild(errorMsg);
+            
+            results.appendChild(wrapper);
+        }
+        
+        // Wait for microdata to be ready
+        setTimeout(() => {
+            console.log('Template example ready');
+            console.log('Available people:', {
+                person1: document.microdata.person1,
+                person2: document.microdata.person2
+            });
+        }, 500);
+    </script>
+</body>
+</html>
