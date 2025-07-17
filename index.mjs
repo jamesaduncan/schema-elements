@@ -660,9 +660,9 @@ class MicrodataAPI {
     }
 
     /**
-     * Render a microdata item or JSON-LD object to a template
+     * Render a microdata item, JSON-LD object, or form data to a template
      * @param {HTMLTemplateElement} template - The template element to render to
-     * @param {Object} data - The microdata item or JSON-LD object to render
+     * @param {Object|HTMLFormElement} data - The microdata item, JSON-LD object, or form element to render
      * @returns {DocumentFragment} The populated template content
      */
     static render(template, data) {
@@ -682,10 +682,111 @@ class MicrodataAPI {
             throw new Error('Template must contain an element with itemscope attribute');
         }
         
+        // Check if data is a form element
+        let processedData;
+        if (data.tagName === 'FORM') {
+            processedData = MicrodataAPI.extractFormData(data, itemElement);
+        } else {
+            processedData = data;
+        }
+        
         // Populate the template with data
-        MicrodataAPI.populateTemplateElement(itemElement, data);
+        MicrodataAPI.populateTemplateElement(itemElement, processedData);
         
         return clone;
+    }
+
+    /**
+     * Extract data from a form element and convert to microdata format
+     * @param {HTMLFormElement} form - The form element to extract data from
+     * @param {Element} templateElement - The template element to determine expected properties
+     * @returns {Object} Object with form data in microdata format
+     */
+    static extractFormData(form, templateElement) {
+        const formData = new FormData(form);
+        const result = {};
+        
+        // Get all unique form field names
+        const fieldNames = new Set();
+        for (const [name] of formData.entries()) {
+            fieldNames.add(name);
+        }
+        
+        // Process each field
+        fieldNames.forEach(name => {
+            const values = formData.getAll(name);
+            const formElement = form.elements[name];
+            
+            if (!formElement) {
+                return;
+            }
+            
+            // Handle different input types
+            if (formElement.type === 'checkbox' || formElement.type === 'radio') {
+                // For checkboxes/radios, only include checked values
+                const checkedElements = form.querySelectorAll(`[name="${name}"]:checked`);
+                const checkedValues = Array.from(checkedElements).map(el => el.value);
+                
+                if (checkedValues.length === 0) {
+                    return; // Skip unchecked checkboxes/radios
+                } else if (checkedValues.length === 1 && formElement.type === 'radio') {
+                    result[name] = checkedValues[0];
+                } else {
+                    result[name] = checkedValues;
+                }
+            } else if (formElement.tagName === 'SELECT') {
+                // Handle select elements
+                if (formElement.multiple) {
+                    // Multi-select: get all selected values
+                    const selectedValues = Array.from(formElement.selectedOptions).map(option => option.value);
+                    if (selectedValues.length > 0) {
+                        result[name] = selectedValues.length === 1 ? selectedValues[0] : selectedValues;
+                    }
+                } else {
+                    // Single select: get selected value
+                    if (formElement.selectedIndex >= 0) {
+                        result[name] = formElement.value;
+                    }
+                }
+            } else if (formElement.type === 'file') {
+                // For file inputs, we might want to handle differently
+                // For now, just skip files
+                return;
+            } else {
+                // For other input types (text, hidden, email, url, number, textarea, etc.)
+                if (values.length === 1) {
+                    const value = values[0];
+                    // Basic type conversion for number inputs
+                    if (formElement.type === 'number' && value !== '') {
+                        const numValue = parseFloat(value);
+                        result[name] = isNaN(numValue) ? value : numValue;
+                    } else {
+                        result[name] = value;
+                    }
+                } else if (values.length > 1) {
+                    result[name] = values;
+                }
+            }
+        });
+        
+        // Add JSON-LD context and type if available from hidden inputs
+        if (result['@context']) {
+            // Keep JSON-LD metadata
+        }
+        if (result['@type']) {
+            // Keep JSON-LD type
+        }
+        
+        // Try to infer type from template if not provided
+        if (!result['@type'] && templateElement) {
+            const itemType = templateElement.getAttribute('itemtype');
+            if (itemType) {
+                result['@type'] = itemType.split('/').pop(); // Get the last part of the URL
+                result['@context'] = itemType.substring(0, itemType.lastIndexOf('/'));
+            }
+        }
+        
+        return result;
     }
 
     /**

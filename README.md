@@ -365,15 +365,15 @@ For properties with multiple values:
 
 ### Template Rendering
 
-The library provides a static method for rendering microdata items or JSON-LD objects to HTML templates.
+The library provides a static method for rendering microdata items, JSON-LD objects, or form data to HTML templates.
 
 #### MicrodataAPI.render(template, data)
 
-Renders microdata items or JSON-LD objects to a template element.
+Renders microdata items, JSON-LD objects, or form data to a template element.
 
 **Parameters:**
 - `template` (HTMLTemplateElement) - The template element to render to
-- `data` (Object) - Either a microdata proxy object or JSON-LD object
+- `data` (Object|HTMLFormElement) - Either a microdata proxy object, JSON-LD object, or HTML form element
 
 **Returns:**
 - `DocumentFragment` - The populated template content ready to insert into the DOM
@@ -400,6 +400,11 @@ const jsonData = {
 };
 const rendered2 = MicrodataAPI.render(template, jsonData);
 document.body.appendChild(rendered2);
+
+// Render form data to template
+const form = document.querySelector('#person-form');
+const rendered3 = MicrodataAPI.render(template, form);
+document.body.appendChild(rendered3);
 ```
 
 **Template Structure:**
@@ -443,6 +448,73 @@ The method supports nested microdata structures:
 **Array Properties:**
 
 For properties that contain arrays, the first array element is used for template population.
+
+**Form Rendering:**
+
+The `render` method can extract data from HTML forms and render it to templates. Form element `name` attributes are mapped to `itemprop` properties in the template.
+
+```html
+<!-- Form with various input types -->
+<form id="person-form">
+  <input type="hidden" name="@context" value="https://schema.org">
+  <input type="hidden" name="@type" value="Person">
+  
+  <input type="text" name="name" value="John Doe">
+  <input type="email" name="email" value="john@example.com">
+  <input type="number" name="age" value="30">
+  
+  <!-- Checkboxes create arrays for multiple values -->
+  <input type="checkbox" name="skills" value="JavaScript" checked>
+  <input type="checkbox" name="skills" value="Python" checked>
+  
+  <!-- Radio buttons return single values -->
+  <input type="radio" name="contactMethod" value="email" checked>
+  <input type="radio" name="contactMethod" value="phone">
+  
+  <!-- Select elements -->
+  <select name="department">
+    <option value="Engineering" selected>Engineering</option>
+    <option value="Design">Design</option>
+  </select>
+  
+  <!-- Multi-select creates arrays -->
+  <select name="languages" multiple>
+    <option value="English" selected>English</option>
+    <option value="Spanish" selected>Spanish</option>
+  </select>
+  
+  <textarea name="bio">Software developer with 5+ years experience.</textarea>
+</form>
+```
+
+```javascript
+// Render form data to template
+const form = document.querySelector('#person-form');
+const template = document.querySelector('#person-template');
+const rendered = MicrodataAPI.render(template, form);
+document.body.appendChild(rendered);
+```
+
+**Form Element Support:**
+
+- **Text inputs** (`text`, `email`, `url`, `hidden`, etc.): Uses `value` property
+- **Number inputs**: Converts strings to numbers automatically
+- **Checkboxes**: Creates arrays for multiple checked values with same name
+- **Radio buttons**: Returns single selected value
+- **Select elements**: Handles both single and multi-select (arrays for multiple)
+- **Textarea**: Uses `value` property
+- **File inputs**: Currently skipped (not processed)
+
+**JSON-LD Metadata:**
+
+Forms can include JSON-LD metadata using hidden inputs:
+
+```html
+<input type="hidden" name="@context" value="https://schema.org">
+<input type="hidden" name="@type" value="Person">
+```
+
+If not provided, the method will attempt to infer the type from the template's `itemtype` attribute.
 
 ## How It Works
 

@@ -84,6 +84,10 @@
                 <h4 itemprop="name"></h4>
                 <p><strong>Email:</strong> <span itemprop="email"></span></p>
                 <p><strong>Job:</strong> <span itemprop="jobTitle"></span></p>
+                <p><strong>Age:</strong> <span itemprop="age"></span></p>
+                <p><strong>Skills:</strong> <span itemprop="skills"></span></p>
+                <p><strong>Contact Method:</strong> <span itemprop="contactMethod"></span></p>
+                <p><strong>Department:</strong> <span itemprop="department"></span></p>
             </div>
         </template>
         
@@ -91,10 +95,57 @@
         <template id="person-list-item">
             <li itemscope itemtype="https://schema.org/Person">
                 <span itemprop="name"></span> - <span itemprop="jobTitle"></span> (<span itemprop="email"></span>)
+                <span style="margin-left: 10px; color: #666;">Age: <span itemprop="age"></span></span>
             </li>
         </template>
     </div>
     
+    <!-- Test Form -->
+    <div class="example-section">
+        <h2>Test Form for Form Rendering</h2>
+        <form id="test-form">
+            <input type="hidden" name="@context" value="https://schema.org">
+            <input type="hidden" name="@type" value="Person">
+            
+            <div style="margin: 10px 0;">
+                <label>Name: <input type="text" name="name" value="Alice Johnson"></label>
+            </div>
+            <div style="margin: 10px 0;">
+                <label>Email: <input type="email" name="email" value="alice@example.com"></label>
+            </div>
+            <div style="margin: 10px 0;">
+                <label>Job Title: <input type="text" name="jobTitle" value="UX Designer"></label>
+            </div>
+            <div style="margin: 10px 0;">
+                <label>Age: <input type="number" name="age" value="28"></label>
+            </div>
+            <div style="margin: 10px 0;">
+                <label>Skills:</label>
+                <div style="margin-left: 20px;">
+                    <label><input type="checkbox" name="skills" value="Design" checked> Design</label>
+                    <label><input type="checkbox" name="skills" value="Prototyping" checked> Prototyping</label>
+                    <label><input type="checkbox" name="skills" value="Research"> Research</label>
+                </div>
+            </div>
+            <div style="margin: 10px 0;">
+                <label>Contact Method:</label>
+                <div style="margin-left: 20px;">
+                    <label><input type="radio" name="contactMethod" value="email" checked> Email</label>
+                    <label><input type="radio" name="contactMethod" value="phone"> Phone</label>
+                </div>
+            </div>
+            <div style="margin: 10px 0;">
+                <label>Department: 
+                    <select name="department">
+                        <option value="Engineering">Engineering</option>
+                        <option value="Design" selected>Design</option>
+                        <option value="Marketing">Marketing</option>
+                    </select>
+                </label>
+            </div>
+        </form>
+    </div>
+
     <!-- Controls -->
     <div class="example-section">
         <h2>Template Rendering Tests</h2>
@@ -103,6 +154,9 @@
         <button onclick="renderExistingToList()">Render Existing Person to List</button>
         <button onclick="renderJsonToCard()">Render JSON-LD to Card</button>
         <button onclick="renderJsonToList()">Render JSON-LD to List</button>
+        <button onclick="renderFormToCard()">Render Form to Card</button>
+        <button onclick="renderFormToList()">Render Form to List</button>
+        <button onclick="showFormData()">Show Extracted Form Data</button>
         <button onclick="clearResults()">Clear Results</button>
         
         <div id="results" class="container"></div>
@@ -180,6 +234,47 @@
             }
         };
         
+        window.renderFormToCard = function() {
+            const form = document.getElementById('test-form');
+            const template = document.getElementById('person-card');
+            
+            try {
+                const rendered = MicrodataAPI.render(template, form);
+                appendResult('Form → Card Template', rendered);
+            } catch (error) {
+                appendError('Error rendering form to card', error);
+            }
+        };
+        
+        window.renderFormToList = function() {
+            const form = document.getElementById('test-form');
+            const template = document.getElementById('person-list-item');
+            
+            try {
+                const rendered = MicrodataAPI.render(template, form);
+                const ul = document.createElement('ul');
+                ul.appendChild(rendered);
+                appendResult('Form → List Template', ul);
+            } catch (error) {
+                appendError('Error rendering form to list', error);
+            }
+        };
+        
+        window.showFormData = function() {
+            const form = document.getElementById('test-form');
+            const template = document.getElementById('person-card');
+            const itemElement = template.content.querySelector('[itemscope]');
+            
+            try {
+                const extracted = MicrodataAPI.extractFormData(form, itemElement);
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(extracted, null, 2);
+                appendResult('Extracted Form Data', pre);
+            } catch (error) {
+                appendError('Error extracting form data', error);
+            }
+        };
+
         window.clearResults = function() {
             document.getElementById('results').innerHTML = '';
         };

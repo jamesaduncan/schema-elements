@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Rendering Example</title>
+    <script type="module" src="./index.mjs"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .example-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .form-container {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .form-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        
+        input[type="checkbox"], input[type="radio"] {
+            width: auto;
+            margin-right: 5px;
+        }
+        
+        .checkbox-group, .radio-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .checkbox-group label, .radio-group label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+        }
+        
+        button {
+            margin: 10px 5px;
+            padding: 10px 15px;
+            background-color: #007cba;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #005a8b;
+        }
+        
+        .rendered-item {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        
+        .results {
+            margin-top: 20px;
+        }
+        
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Form → Template Rendering Example</h1>
+    
+    <!-- Person Form -->
+    <div class="example-section">
+        <h2>Person Form</h2>
+        <div class="form-container">
+            <form id="person-form">
+                <input type="hidden" name="@context" value="https://schema.org">
+                <input type="hidden" name="@type" value="Person">
+                
+                <div class="form-group">
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" value="John Doe" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" value="john@example.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="jobTitle">Job Title:</label>
+                    <input type="text" id="jobTitle" name="jobTitle" value="Software Developer">
+                </div>
+                
+                <div class="form-group">
+                    <label for="age">Age:</label>
+                    <input type="number" id="age" name="age" value="30">
+                </div>
+                
+                <div class="form-group">
+                    <label for="bio">Bio:</label>
+                    <textarea id="bio" name="bio" rows="3">Passionate software developer with 5+ years experience.</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gender">Gender:</label>
+                    <select id="gender" name="gender">
+                        <option value="">Select...</option>
+                        <option value="male">Male</option>
+                        <option value="female" selected>Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Skills:</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="skills" value="JavaScript" checked> JavaScript</label>
+                        <label><input type="checkbox" name="skills" value="Python" checked> Python</label>
+                        <label><input type="checkbox" name="skills" value="Java"> Java</label>
+                        <label><input type="checkbox" name="skills" value="C++"> C++</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Preferred Contact Method:</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="contactMethod" value="email" checked> Email</label>
+                        <label><input type="radio" name="contactMethod" value="phone"> Phone</label>
+                        <label><input type="radio" name="contactMethod" value="slack"> Slack</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="languages">Languages (Multi-select):</label>
+                    <select id="languages" name="languages" multiple size="4">
+                        <option value="English" selected>English</option>
+                        <option value="Spanish" selected>Spanish</option>
+                        <option value="French">French</option>
+                        <option value="German">German</option>
+                        <option value="Chinese">Chinese</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Templates -->
+    <div class="example-section">
+        <h2>Templates</h2>
+        
+        <h3>Person Card Template</h3>
+        <template id="person-card">
+            <div class="rendered-item" itemscope itemtype="https://schema.org/Person">
+                <h3 itemprop="name"></h3>
+                <p><strong>Email:</strong> <span itemprop="email"></span></p>
+                <p><strong>Job:</strong> <span itemprop="jobTitle"></span></p>
+                <p><strong>Age:</strong> <span itemprop="age"></span></p>
+                <p><strong>Gender:</strong> <span itemprop="gender"></span></p>
+                <p><strong>Contact Method:</strong> <span itemprop="contactMethod"></span></p>
+                <p><strong>Bio:</strong> <span itemprop="bio"></span></p>
+                <p><strong>Skills:</strong> <span itemprop="skills"></span></p>
+                <p><strong>Languages:</strong> <span itemprop="languages"></span></p>
+            </div>
+        </template>
+        
+        <h3>Person Summary Template</h3>
+        <template id="person-summary">
+            <div class="rendered-item" itemscope itemtype="https://schema.org/Person">
+                <h4><span itemprop="name"></span> - <span itemprop="jobTitle"></span></h4>
+                <p>Contact: <a itemprop="email" href=""></a></p>
+                <p>Skills: <span itemprop="skills"></span></p>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Controls -->
+    <div class="example-section">
+        <h2>Form → Template Rendering</h2>
+        
+        <button onclick="renderFormToCard()">Render Form to Card</button>
+        <button onclick="renderFormToSummary()">Render Form to Summary</button>
+        <button onclick="showFormData()">Show Extracted Form Data</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="results" class="results"></div>
+    </div>
+    
+    <script type="module">
+        import { MicrodataAPI } from './index.mjs';
+        
+        // Make functions global for onclick handlers
+        window.renderFormToCard = function() {
+            const form = document.getElementById('person-form');
+            const template = document.getElementById('person-card');
+            
+            try {
+                const rendered = MicrodataAPI.render(template, form);
+                appendResult('Form → Card Template', rendered);
+            } catch (error) {
+                appendError('Error rendering form to card', error);
+            }
+        };
+        
+        window.renderFormToSummary = function() {
+            const form = document.getElementById('person-form');
+            const template = document.getElementById('person-summary');
+            
+            try {
+                const rendered = MicrodataAPI.render(template, form);
+                appendResult('Form → Summary Template', rendered);
+            } catch (error) {
+                appendError('Error rendering form to summary', error);
+            }
+        };
+        
+        window.showFormData = function() {
+            const form = document.getElementById('person-form');
+            const template = document.getElementById('person-card');
+            const itemElement = template.content.querySelector('[itemscope]');
+            
+            try {
+                const extracted = MicrodataAPI.extractFormData(form, itemElement);
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(extracted, null, 2);
+                appendResult('Extracted Form Data', pre);
+            } catch (error) {
+                appendError('Error extracting form data', error);
+            }
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        };
+        
+        function appendResult(title, content) {
+            const results = document.getElementById('results');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'example-section';
+            
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            wrapper.appendChild(heading);
+            
+            if (content instanceof DocumentFragment || content instanceof Element) {
+                wrapper.appendChild(content);
+            } else {
+                wrapper.textContent = String(content);
+            }
+            
+            results.appendChild(wrapper);
+        }
+        
+        function appendError(title, error) {
+            const results = document.getElementById('results');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'example-section';
+            wrapper.style.backgroundColor = '#ffe6e6';
+            wrapper.style.borderColor = '#ff9999';
+            
+            const heading = document.createElement('h3');
+            heading.textContent = title;
+            heading.style.color = '#cc0000';
+            wrapper.appendChild(heading);
+            
+            const errorMsg = document.createElement('pre');
+            errorMsg.textContent = error.message;
+            errorMsg.style.color = '#cc0000';
+            wrapper.appendChild(errorMsg);
+            
+            results.appendChild(wrapper);
+        }
+        
+        console.log('Form example ready');
+    </script>
+</body>
+</html>
