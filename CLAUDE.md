@@ -19,19 +19,19 @@ SchemaElements is a vanilla JavaScript library for working with HTML Microdata (
 
 ## API
 
-<body id="example" itemscope itemtype="http://schema.org/Organization">
+<body id="example" itemscope itemtype="https://organised.team/Organization">
     <ul>
-        <template itemtype="http://schema.org/Person">
-            <li itemprop="employee" itemscope itemtype="http://schema.org/Person">
+        <template itemtype="https://schema.org/Person">
+            <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
                 <h1 itemprop="name"></h1>
                 <addr itemprop="email"></addr>
             </li>
         </template>
-        <li itemprop="employee" itemscope itemtype="http://schema.org/Person">
+        <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
             <h1 itemprop="name">John Doe</h1>
             <addr itemprop="email">john@example.com</addr>
         </li>
-        <li itemprop="employee" itemscope itemtype="http://schema.org/Person">
+        <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
             <h1 itemprop="name">Jane Doe</h1>
             <addr itemprop="email">jane@example.com</addr>
         </li>
@@ -46,7 +46,7 @@ document.microdata.example.employee.push( { name: "Elizabeth Doe", email: "eliza
 
 Since this is a vanilla JavaScript library with no build tools:
 - **Running**: Open HTML files directly in a browser
-- **Testing**: Open http://127.0.0.1:8082/test.html
+- **Testing**: Open https://127.0.0.1:8082/test.html
 - **Development**: Edit `.mjs` files directly, no build step required
 
 ## Architecture

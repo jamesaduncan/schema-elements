@@ -447,13 +447,7 @@ class MicrodataExtractor {
                 
                 // Update DOM
                 const propElements = item.element.querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-                propElements.forEach(el => {
-                    if (el.hasAttribute('content')) {
-                        el.setAttribute('content', value);
-                    } else {
-                        el.textContent = value;
-                    }
-                });
+                propElements.forEach(el => self.updatePropertyElement(el, value));
                 
                 return true;
             }
@@ -630,13 +624,7 @@ class MicrodataAPI {
                 if (key.startsWith('@')) continue; // Skip JSON-LD metadata
                 
                 const propElements = itemElement.querySelectorAll(`[itemprop="${key}"]`);
-                propElements.forEach(el => {
-                    if (el.hasAttribute('content')) {
-                        el.setAttribute('content', value);
-                    } else {
-                        el.textContent = value;
-                    }
-                });
+                propElements.forEach(el => this.updatePropertyElement(el, value));
             }
             
             // Insert into DOM
@@ -664,13 +652,7 @@ class MicrodataAPI {
             for (const [key, value] of Object.entries(extractedItem.properties)) {
                 if (typeof value === 'string') {
                     const propElements = itemElement.querySelectorAll(`[itemprop="${key}"]`);
-                    propElements.forEach(el => {
-                        if (el.hasAttribute('content')) {
-                            el.setAttribute('content', value);
-                        } else {
-                            el.textContent = value;
-                        }
-                    });
+                    propElements.forEach(el => this.updatePropertyElement(el, value));
                 }
             }
             
@@ -1037,15 +1019,22 @@ class MicrodataAPI {
         }
     }
 
+    /**
+     * Update a single property element with a value
+     * @param {Element} element - The element to update
+     * @param {*} value - The value to set
+     */
+    updatePropertyElement(element, value) {
+        if (element.hasAttribute('content')) {
+            element.setAttribute('content', value);
+        } else {
+            element.textContent = value;
+        }
+    }
+
     updatePropertyElements(container, prop, value) {
         const propElements = container.querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-        propElements.forEach(el => {
-            if (el.hasAttribute('content')) {
-                el.setAttribute('content', value);
-            } else {
-                el.textContent = value;
-            }
-        });
+        propElements.forEach(el => this.updatePropertyElement(el, value));
     }
 
     async addItemFromData(data, parentType, propName, parentElement, insertBefore = null) {
@@ -1108,13 +1097,7 @@ class MicrodataAPI {
     populateElement(element, data) {
         Object.entries(data).forEach(([key, value]) => {
             const propElements = element.querySelectorAll(`[itemprop="${key}"]`);
-            propElements.forEach(el => {
-                if (el.hasAttribute('content')) {
-                    el.setAttribute('content', value);
-                } else {
-                    el.textContent = value;
-                }
-            });
+            propElements.forEach(el => this.updatePropertyElement(el, value));
         });
     }
 
