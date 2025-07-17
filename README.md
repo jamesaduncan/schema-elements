@@ -7,7 +7,12 @@ Schema Elements provides a live, reactive JavaScript API for HTML microdata. It 
 - **Live Data Binding**: Access and modify microdata through `document.microdata` with automatic DOM synchronization
 - **Array Operations**: Full support for array methods (push, pop, splice) on collections
 - **Multi-View Synchronization**: Automatically updates data across multiple views (lists, tables, cards)
-- **Schema Validation**: Built-in support for Schema.org and organised.team schemas
+- **Template Rendering**: Render microdata, JSON-LD, forms, or URL content to HTML templates
+- **Apply to DOM**: Apply rendered microdata to existing DOM elements while preserving structure
+- **Array Repetition**: Use `[]` syntax in templates to automatically repeat elements for arrays
+- **URL Fetching**: Fetch and render data from JSON-LD or HTML URLs
+- **Form Integration**: Extract data from HTML forms and render to templates
+- **Schema Validation**: Built-in support for Schema.org and organised.team schemas with dynamic enumeration validation
 - **Iterator Protocol**: Iterate over microdata items using for...of loops
 - **DOM-to-Microdata Sync**: Changes to the DOM automatically update the microdata objects
 - **Data Source Fetching**: Populate templates from external JSON-LD or HTML microdata files
@@ -365,18 +370,19 @@ For properties with multiple values:
 
 ### Template Rendering
 
-The library provides a static method for rendering microdata items, JSON-LD objects, or form data to HTML templates.
+The library provides static methods for rendering microdata items, JSON-LD objects, form data, or URL content to HTML templates, and for applying microdata to existing DOM elements.
 
 #### MicrodataAPI.render(template, data)
 
-Renders microdata items, JSON-LD objects, or form data to a template element.
+Renders microdata items, JSON-LD objects, form data, or URL content to a template element.
 
 **Parameters:**
 - `template` (HTMLTemplateElement) - The template element to render to
-- `data` (Object|HTMLFormElement) - Either a microdata proxy object, JSON-LD object, or HTML form element
+- `data` (Object|HTMLFormElement|string) - Either a microdata proxy object, JSON-LD object, HTML form element, or URL string
 
 **Returns:**
-- `DocumentFragment` - The populated template content ready to insert into the DOM
+- `DocumentFragment` - The populated template content ready to insert into the DOM (for synchronous calls)
+- `Promise<DocumentFragment>` - Promise resolving to populated template content (for URL calls)
 
 **Example Usage:**
 
@@ -405,6 +411,14 @@ document.body.appendChild(rendered2);
 const form = document.querySelector('#person-form');
 const rendered3 = MicrodataAPI.render(template, form);
 document.body.appendChild(rendered3);
+
+// Render from URL (returns Promise)
+const rendered4 = await MicrodataAPI.render(template, './data.json');
+document.body.appendChild(rendered4);
+
+// Render from HTML URL
+const rendered5 = await MicrodataAPI.render(template, './data.html');
+document.body.appendChild(rendered5);
 ```
 
 **Template Structure:**
@@ -515,6 +529,116 @@ Forms can include JSON-LD metadata using hidden inputs:
 ```
 
 If not provided, the method will attempt to infer the type from the template's `itemtype` attribute.
+
+**URL Rendering:**
+
+The `render` method can fetch data from URLs and render it to templates. It supports both JSON-LD and HTML with microdata.
+
+```javascript
+// Render from JSON-LD URL
+const rendered = await MicrodataAPI.render(template, './person.json');
+
+// Render from HTML URL (extracts matching microdata)
+const rendered = await MicrodataAPI.render(template, './person.html');
+
+// Render from relative path
+const rendered = await MicrodataAPI.render(template, '/api/person/123');
+```
+
+**URL Processing:**
+- **JSON files** (`application/json`, `application/ld+json`): Parsed as JSON-LD
+- **HTML files** (`text/html`): Microdata is extracted from elements matching the template's `itemtype`
+- **Relative URLs**: Resolved using `document.baseURI`
+- **Error handling**: Network errors and missing data result in Promise rejection
+
+**Array Repetition:**
+
+Templates can use the `[]` syntax to automatically repeat elements for array values:
+
+```html
+<template id="person-template">
+  <div itemscope itemtype="https://schema.org/Person">
+    <h3 itemprop="name"></h3>
+    <p><strong>Skills:</strong></p>
+    <ul>
+      <li itemprop="skills[]"></li>
+    </ul>
+  </div>
+</template>
+```
+
+When rendered with data like `{"name": "John", "skills": ["HTML", "CSS", "JavaScript"]}`, this creates:
+
+```html
+<div itemscope itemtype="https://schema.org/Person">
+  <h3 itemprop="name">John</h3>
+  <p><strong>Skills:</strong></p>
+  <ul>
+    <li itemprop="skills">HTML</li>
+    <li itemprop="skills">CSS</li>
+    <li itemprop="skills">JavaScript</li>
+  </ul>
+</div>
+```
+
+The `[]` syntax works with any property that contains an array, automatically creating the correct number of elements.
+
+#### MicrodataAPI.apply(target, source)
+
+Applies microdata from a rendered template, element, or data object to existing DOM elements.
+
+**Parameters:**
+- `target` (Element) - The DOM element to apply microdata to
+- `source` (DocumentFragment|Element|Object) - The source of microdata
+
+**Returns:**
+- `void` - Modifies the target element in place
+
+**Example Usage:**
+
+```javascript
+// Apply from rendered template
+const rendered = MicrodataAPI.render(template, data);
+MicrodataAPI.apply(document.querySelector('nav'), rendered);
+
+// Apply from data object directly
+const data = { name: "John Doe", email: "john@example.com" };
+MicrodataAPI.apply(document.querySelector('nav'), data);
+
+// Apply from existing element
+const sourceElement = document.querySelector('#person-card');
+MicrodataAPI.apply(document.querySelector('nav'), sourceElement);
+```
+
+**Use Cases:**
+- Populating navigation elements with user data
+- Updating existing DOM elements without replacing them
+- Applying template-rendered data to persistent page elements
+- Maintaining DOM structure while updating content
+
+**Example - Populating Navigation:**
+
+```html
+<!-- Target element (preserves structure) -->
+<nav itemscope itemtype="https://schema.org/Person">
+    <div itemprop="name">[Name will appear here]</div>
+    <menu>
+        <li><a href="/">← Home</a></li>
+        <li><a href="/demos/">← Demos</a></li>
+    </menu>
+</nav>
+
+<!-- After applying data -->
+<nav itemscope itemtype="https://schema.org/Person">
+    <div itemprop="name">John Doe</div>
+    <menu>
+        <li><a href="/">← Home</a></li>
+        <li><a href="/demos/">← Demos</a></li>
+    </menu>
+</nav>
+```
+
+The `apply` method preserves the existing DOM structure while populating microdata properties, making it perfect for updating persistent page elements like navigation, headers, or sidebars.
 
 ## How It Works
 
