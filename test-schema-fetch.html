@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Schema.org Fetch</title>
+</head>
+<body>
+    <h1>Testing Schema.org Response</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function testSchemaFetch() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('https://schema.org/Person');
+                const contentType = response.headers.get('content-type');
+                const text = await response.text();
+                
+                output.textContent = `Content-Type: ${contentType}\n\n`;
+                
+                // Show first 1000 characters
+                output.textContent += `First 1000 chars of response:\n${text.substring(0, 1000)}...\n\n`;
+                
+                // Try to parse as HTML and look for JSON-LD
+                const doc = new DOMParser().parseFromString(text, 'text/html');
+                const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+                
+                output.textContent += `Found ${jsonLdScripts.length} JSON-LD scripts\n`;
+                
+                if (jsonLdScripts.length > 0) {
+                    jsonLdScripts.forEach((script, i) => {
+                        try {
+                            const data = JSON.parse(script.textContent);
+                            output.textContent += `\nJSON-LD ${i + 1}:\n${JSON.stringify(data, null, 2).substring(0, 500)}...\n`;
+                        } catch (e) {
+                            output.textContent += `\nError parsing JSON-LD ${i + 1}: ${e.message}\n`;
+                        }
+                    });
+                }
+                
+                // Look for microdata
+                const microdataItems = doc.querySelectorAll('[itemscope]');
+                output.textContent += `\nFound ${microdataItems.length} microdata items\n`;
+                
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        testSchemaFetch();
+    </script>
+</body>
+</html>

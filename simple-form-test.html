@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Form Test</title>
+    <script type="module">
+        import { MicrodataAPI } from './index.mjs';
+        
+        window.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('testForm');
+            console.log('Testing form validation...');
+            console.log('Form element:', form);
+            console.log('Form tagName:', form.tagName);
+            
+            // Add some debugging to the validate method
+            const originalValidate = MicrodataAPI.validate;
+            MicrodataAPI.validate = function(element, ignoreEmpty = false) {
+                console.log('validate() called with:', element, 'tagName:', element?.tagName);
+                if (element && element.tagName === 'FORM') {
+                    console.log('Detected form, calling validateForm...');
+                    return MicrodataAPI.validateForm(element, ignoreEmpty);
+                }
+                console.log('Not a form, proceeding with normal validation...');
+                return originalValidate.call(this, element, ignoreEmpty);
+            };
+            
+            try {
+                const result = MicrodataAPI.validate(form);
+                console.log('Validation result:', result);
+            } catch (error) {
+                console.error('Validation error:', error.message);
+            }
+        });
+    </script>
+</head>
+<body>
+    <form id="testForm">
+        <input type="hidden" name="@type" value="Person">
+        <label>Name: <input type="text" name="name" value="Test"></label>
+    </form>
+</body>
+</html>

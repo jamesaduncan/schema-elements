@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Schema Validation</title>
+    <script type="module" src="./index.mjs"></script>
+</head>
+<body>
+    <h1>Debug Schema Validation</h1>
+    
+    <form id="testForm">
+        <input type="hidden" name="@type" value="Person">
+        <input type="hidden" name="@context" value="https://schema.org">
+        <label>Name: <input type="text" name="name" value="John Doe"></label>
+    </form>
+    
+    <script type="module">
+        import { MicrodataAPI, SchemaRegistry } from './index.mjs';
+        
+        async function debugValidation() {
+            const form = document.getElementById('testForm');
+            const formData = MicrodataAPI.extractFormData(form, null);
+            console.log('Form data:', formData);
+            
+            // Get the registry
+            const registry = window.microdataAPI ? window.microdataAPI.registry : new SchemaRegistry();
+            console.log('Registry:', registry);
+            
+            // Try to validate directly
+            const itemType = 'https://schema.org/Person';
+            console.log('Validating against:', itemType);
+            
+            try {
+                const result = await registry.validate(formData, itemType);
+                console.log('Validation result:', result);
+                
+                // Let's also check if the schema is loaded
+                console.log('Loaded schemas:', registry.schemas);
+                
+                // Try to load the schema manually
+                console.log('Loading schema manually...');
+                await registry.loadSchema(itemType);
+                console.log('Schema loaded, trying validation again...');
+                
+                const result2 = await registry.validate(formData, itemType);
+                console.log('Second validation result:', result2);
+                
+            } catch (error) {
+                console.error('Validation error:', error);
+            }
+            
+            // Also test the full validate method
+            console.log('\nTesting MicrodataAPI.validate()...');
+            try {
+                const isValid = await MicrodataAPI.validate(form);
+                console.log('MicrodataAPI.validate result:', isValid);
+            } catch (error) {
+                console.error('MicrodataAPI.validate error:', error);
+            }
+        }
+        
+        debugValidation();
+    </script>
+</body>
+</html>

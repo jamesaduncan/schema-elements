@@ -75,80 +75,86 @@
         
         const results = [];
         
-        // Test 1: Valid Person form
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form1'));
-            results.push(`Test 1 (Valid Person form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
-        } catch (error) {
-            results.push(`Test 1 (Valid Person form): FAIL - Error: ${error.message}`);
-        }
-        
-        // Test 2: Valid Person form without @context
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form2'));
-            results.push(`Test 2 (Person form, no @context): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
-        } catch (error) {
-            results.push(`Test 2 (Person form, no @context): FAIL - Error: ${error.message}`);
-        }
-        
-        // Test 3: Form with invalid property (might pass due to permissive validation)
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form3'));
-            results.push(`Test 3 (Invalid Person property): ${!isValid ? 'PASS' : 'WARNING'} - Expected: false, Got: ${isValid}`);
-            if (isValid) {
-                results.push(`  Note: Schema validation may be permissive for unknown properties`);
+        // Run all tests asynchronously
+        async function runTests() {
+            // Test 1: Valid Person form
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form1'));
+                results.push(`Test 1 (Valid Person form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+            } catch (error) {
+                results.push(`Test 1 (Valid Person form): FAIL - Error: ${error.message}`);
             }
-        } catch (error) {
-            results.push(`Test 3 (Invalid Person property): FAIL - Error: ${error.message}`);
+        
+            // Test 2: Valid Person form without @context
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form2'));
+                results.push(`Test 2 (Person form, no @context): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+            } catch (error) {
+                results.push(`Test 2 (Person form, no @context): FAIL - Error: ${error.message}`);
+            }
+        
+            // Test 3: Form with invalid property (might pass due to permissive validation)
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form3'));
+                results.push(`Test 3 (Invalid Person property): ${!isValid ? 'PASS' : 'WARNING'} - Expected: false, Got: ${isValid}`);
+                if (isValid) {
+                    results.push(`  Note: Schema validation may be permissive for unknown properties`);
+                }
+            } catch (error) {
+                results.push(`Test 3 (Invalid Person property): FAIL - Error: ${error.message}`);
+            }
+        
+            // Test 4: Form with no @type (should throw)
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form4'));
+                results.push(`Test 4 (No @type): FAIL - Expected error, Got: ${isValid}`);
+            } catch (error) {
+                results.push(`Test 4 (No @type): PASS - Expected error: "${error.message}"`);
+            }
+        
+            // Test 5: Form with no @type but ignoreEmpty=true
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form4'), true);
+                results.push(`Test 5 (No @type, ignoreEmpty): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+            } catch (error) {
+                results.push(`Test 5 (No @type, ignoreEmpty): FAIL - Error: ${error.message}`);
+            }
+        
+            // Test 6: Valid Organization form
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form5'));
+                results.push(`Test 6 (Valid Organization): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+            } catch (error) {
+                results.push(`Test 6 (Valid Organization): FAIL - Error: ${error.message}`);
+            }
+        
+            // Test 7: Empty form with @type
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form6'));
+                results.push(`Test 7 (Empty Person form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+            } catch (error) {
+                results.push(`Test 7 (Empty Person form): FAIL - Error: ${error.message}`);
+            }
+        
+            // Test 8: Form with multiple values
+            try {
+                const isValid = await MicrodataAPI.validate(document.getElementById('form7'));
+                results.push(`Test 8 (Multi-value form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+            } catch (error) {
+                results.push(`Test 8 (Multi-value form): FAIL - Error: ${error.message}`);
+            }
+            
+            // Display results
+            document.getElementById('results').textContent = results.join('\n');
+            
+            // Also log the extracted form data for debugging
+            console.log('Form 1 data:', MicrodataAPI.extractFormData(document.getElementById('form1'), null));
+            console.log('Form 2 data:', MicrodataAPI.extractFormData(document.getElementById('form2'), null));
+            console.log('Form 4 data:', MicrodataAPI.extractFormData(document.getElementById('form4'), null));
         }
         
-        // Test 4: Form with no @type (should throw)
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form4'));
-            results.push(`Test 4 (No @type): FAIL - Expected error, Got: ${isValid}`);
-        } catch (error) {
-            results.push(`Test 4 (No @type): PASS - Expected error: "${error.message}"`);
-        }
-        
-        // Test 5: Form with no @type but ignoreEmpty=true
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form4'), true);
-            results.push(`Test 5 (No @type, ignoreEmpty): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
-        } catch (error) {
-            results.push(`Test 5 (No @type, ignoreEmpty): FAIL - Error: ${error.message}`);
-        }
-        
-        // Test 6: Valid Organization form
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form5'));
-            results.push(`Test 6 (Valid Organization): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
-        } catch (error) {
-            results.push(`Test 6 (Valid Organization): FAIL - Error: ${error.message}`);
-        }
-        
-        // Test 7: Empty form with @type
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form6'));
-            results.push(`Test 7 (Empty Person form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
-        } catch (error) {
-            results.push(`Test 7 (Empty Person form): FAIL - Error: ${error.message}`);
-        }
-        
-        // Test 8: Form with multiple values
-        try {
-            const isValid = MicrodataAPI.validate(document.getElementById('form7'));
-            results.push(`Test 8 (Multi-value form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
-        } catch (error) {
-            results.push(`Test 8 (Multi-value form): FAIL - Error: ${error.message}`);
-        }
-        
-        // Display results
-        document.getElementById('results').textContent = results.join('\n');
-        
-        // Also log the extracted form data for debugging
-        console.log('Form 1 data:', MicrodataAPI.extractFormData(document.getElementById('form1'), null));
-        console.log('Form 2 data:', MicrodataAPI.extractFormData(document.getElementById('form2'), null));
-        console.log('Form 4 data:', MicrodataAPI.extractFormData(document.getElementById('form4'), null));
+        // Run the tests
+        runTests();
     </script>
 </body>
 </html>
