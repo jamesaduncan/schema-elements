@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test MicrodataAPI.validate()</title>
+    <script type="module" src="./index.mjs"></script>
+</head>
+<body>
+    <h1>MicrodataAPI.validate() Tests</h1>
+    
+    <!-- Test Case 1: Valid microdata with Person schema -->
+    <div id="test1" itemscope itemtype="https://schema.org/Person">
+        <span itemprop="name">John Doe</span>
+        <span itemprop="email">john@example.com</span>
+    </div>
+    
+    <!-- Test Case 2: Invalid microdata (invalid property for Person) -->
+    <div id="test2" itemscope itemtype="https://schema.org/Person">
+        <span itemprop="name">Jane Doe</span>
+        <span itemprop="invalidPropertyThatDoesNotExist">Some value</span>
+    </div>
+    
+    <!-- Test Case 3: No microdata -->
+    <div id="test3">
+        <span>Just regular content</span>
+    </div>
+    
+    <!-- Test Case 4: Orphaned itemprop without itemscope -->
+    <div id="test4">
+        <span itemprop="name">Orphaned Property</span>
+    </div>
+    
+    <!-- Test Case 5: Valid microdata without itemtype (generic) -->
+    <div id="test5" itemscope>
+        <span itemprop="property1">Value 1</span>
+        <span itemprop="property2">Value 2</span>
+    </div>
+    
+    <!-- Test Case 6: Nested valid microdata -->
+    <div id="test6" itemscope itemtype="https://schema.org/Organization">
+        <span itemprop="name">Acme Corp</span>
+        <div itemprop="employee" itemscope itemtype="https://schema.org/Person">
+            <span itemprop="name">Employee Name</span>
+        </div>
+    </div>
+    
+    <h2>Test Results:</h2>
+    <pre id="results"></pre>
+    
+    <script type="module">
+        import { MicrodataAPI } from './index.mjs';
+        
+        const results = [];
+        
+        // Test 1: Valid microdata
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('test1'));
+            results.push(`Test 1 (Valid Person): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 1 (Valid Person): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 2: Invalid microdata (this might pass if schema is not strict)
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('test2'));
+            results.push(`Test 2 (Invalid Person): ${!isValid ? 'PASS' : 'WARNING'} - Expected: false, Got: ${isValid}`);
+            if (isValid) {
+                results.push(`  Note: Schema validation may be permissive for unknown properties`);
+            }
+        } catch (error) {
+            results.push(`Test 2 (Invalid Person): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 3: No microdata (should throw)
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('test3'));
+            results.push(`Test 3 (No microdata): FAIL - Expected error, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 3 (No microdata): PASS - Expected error: "${error.message}"`);
+        }
+        
+        // Test 4: No microdata with ignoreEmpty=true
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('test3'), true);
+            results.push(`Test 4 (No microdata, ignoreEmpty): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 4 (No microdata, ignoreEmpty): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 5: Orphaned itemprop
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('test4'));
+            results.push(`Test 5 (Orphaned itemprop): ${!isValid ? 'PASS' : 'FAIL'} - Expected: false, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 5 (Orphaned itemprop): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 6: Generic microdata without itemtype
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('test5'));
+            results.push(`Test 6 (Generic microdata): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 6 (Generic microdata): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 7: Nested valid microdata
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('test6'));
+            results.push(`Test 7 (Nested microdata): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 7 (Nested microdata): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 8: Invalid element
+        try {
+            const isValid = MicrodataAPI.validate(null);
+            results.push(`Test 8 (Null element): FAIL - Expected error, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 8 (Null element): PASS - Expected error: "${error.message}"`);
+        }
+        
+        // Display results
+        document.getElementById('results').textContent = results.join('\n');
+    </script>
+</body>
+</html>

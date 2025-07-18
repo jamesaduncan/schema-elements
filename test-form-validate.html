@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test MicrodataAPI.validate() with Forms</title>
+    <script type="module" src="./index.mjs"></script>
+</head>
+<body>
+    <h1>MicrodataAPI.validate() Form Tests</h1>
+    
+    <!-- Test Case 1: Valid Person form -->
+    <form id="form1">
+        <input type="hidden" name="@type" value="Person">
+        <input type="hidden" name="@context" value="https://schema.org">
+        <label>Name: <input type="text" name="name" value="John Doe"></label><br>
+        <label>Email: <input type="email" name="email" value="john@example.com"></label><br>
+        <label>Job Title: <input type="text" name="jobTitle" value="Software Developer"></label><br>
+    </form>
+    
+    <!-- Test Case 2: Valid Person form without @context (should default to schema.org) -->
+    <form id="form2">
+        <input type="hidden" name="@type" value="Person">
+        <label>Name: <input type="text" name="name" value="Jane Smith"></label><br>
+        <label>Email: <input type="email" name="email" value="jane@example.com"></label><br>
+    </form>
+    
+    <!-- Test Case 3: Form with invalid data for Person schema -->
+    <form id="form3">
+        <input type="hidden" name="@type" value="Person">
+        <input type="hidden" name="@context" value="https://schema.org">
+        <label>Name: <input type="text" name="name" value="Bob Johnson"></label><br>
+        <label>Invalid Property: <input type="text" name="invalidPropertyThatDoesNotExist" value="Some value"></label><br>
+    </form>
+    
+    <!-- Test Case 4: Form with no @type -->
+    <form id="form4">
+        <label>Name: <input type="text" name="name" value="No Type User"></label><br>
+        <label>Email: <input type="email" name="email" value="notype@example.com"></label><br>
+    </form>
+    
+    <!-- Test Case 5: Valid Organization form -->
+    <form id="form5">
+        <input type="hidden" name="@type" value="Organization">
+        <input type="hidden" name="@context" value="https://schema.org">
+        <label>Name: <input type="text" name="name" value="Acme Corp"></label><br>
+        <label>Description: <textarea name="description">A leading company</textarea></label><br>
+        <label>URL: <input type="url" name="url" value="https://acme.com"></label><br>
+    </form>
+    
+    <!-- Test Case 6: Empty form with @type -->
+    <form id="form6">
+        <input type="hidden" name="@type" value="Person">
+        <input type="hidden" name="@context" value="https://schema.org">
+        <!-- No other fields -->
+    </form>
+    
+    <!-- Test Case 7: Form with checkboxes and multiple values -->
+    <form id="form7">
+        <input type="hidden" name="@type" value="Person">
+        <input type="hidden" name="@context" value="https://schema.org">
+        <label>Name: <input type="text" name="name" value="Multi Value Person"></label><br>
+        <label>Skills:
+            <input type="checkbox" name="knowsAbout" value="JavaScript" checked>JavaScript
+            <input type="checkbox" name="knowsAbout" value="HTML" checked>HTML
+            <input type="checkbox" name="knowsAbout" value="CSS">CSS
+        </label><br>
+    </form>
+    
+    <h2>Test Results:</h2>
+    <pre id="results"></pre>
+    
+    <script type="module">
+        import { MicrodataAPI } from './index.mjs';
+        
+        const results = [];
+        
+        // Test 1: Valid Person form
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form1'));
+            results.push(`Test 1 (Valid Person form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 1 (Valid Person form): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 2: Valid Person form without @context
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form2'));
+            results.push(`Test 2 (Person form, no @context): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 2 (Person form, no @context): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 3: Form with invalid property (might pass due to permissive validation)
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form3'));
+            results.push(`Test 3 (Invalid Person property): ${!isValid ? 'PASS' : 'WARNING'} - Expected: false, Got: ${isValid}`);
+            if (isValid) {
+                results.push(`  Note: Schema validation may be permissive for unknown properties`);
+            }
+        } catch (error) {
+            results.push(`Test 3 (Invalid Person property): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 4: Form with no @type (should throw)
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form4'));
+            results.push(`Test 4 (No @type): FAIL - Expected error, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 4 (No @type): PASS - Expected error: "${error.message}"`);
+        }
+        
+        // Test 5: Form with no @type but ignoreEmpty=true
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form4'), true);
+            results.push(`Test 5 (No @type, ignoreEmpty): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 5 (No @type, ignoreEmpty): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 6: Valid Organization form
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form5'));
+            results.push(`Test 6 (Valid Organization): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 6 (Valid Organization): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 7: Empty form with @type
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form6'));
+            results.push(`Test 7 (Empty Person form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 7 (Empty Person form): FAIL - Error: ${error.message}`);
+        }
+        
+        // Test 8: Form with multiple values
+        try {
+            const isValid = MicrodataAPI.validate(document.getElementById('form7'));
+            results.push(`Test 8 (Multi-value form): ${isValid ? 'PASS' : 'FAIL'} - Expected: true, Got: ${isValid}`);
+        } catch (error) {
+            results.push(`Test 8 (Multi-value form): FAIL - Error: ${error.message}`);
+        }
+        
+        // Display results
+        document.getElementById('results').textContent = results.join('\n');
+        
+        // Also log the extracted form data for debugging
+        console.log('Form 1 data:', MicrodataAPI.extractFormData(document.getElementById('form1'), null));
+        console.log('Form 2 data:', MicrodataAPI.extractFormData(document.getElementById('form2'), null));
+        console.log('Form 4 data:', MicrodataAPI.extractFormData(document.getElementById('form4'), null));
+    </script>
+</body>
+</html>

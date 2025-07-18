@@ -777,6 +777,128 @@ class MicrodataAPI {
     }
 
     /**
+     * Validate an element to check if it contains microdata and if it's valid
+     * @param {Element} element - The element to validate
+     * @param {boolean} [ignoreEmpty=false] - If true, don't throw error when no microdata found
+     * @returns {boolean} True if microdata exists and is valid, false if invalid
+     * @throws {Error} If element has no microdata and ignoreEmpty is false
+     */
+    static validate(element, ignoreEmpty = false) {
+        if (!element || !(element instanceof Element)) {
+            throw new Error('Invalid element provided');
+        }
+        
+        // Handle form elements specially
+        if (element.tagName === 'FORM') {
+            return MicrodataAPI.validateForm(element, ignoreEmpty);
+        }
+        
+        // Check if element or any descendant has microdata attributes
+        const hasMicrodata = element.hasAttribute('itemscope') || 
+                           element.hasAttribute('itemprop') ||
+                           element.querySelector('[itemscope], [itemprop]') !== null;
+        
+        if (!hasMicrodata) {
+            if (ignoreEmpty) {
+                return true; // No microdata is considered valid when ignoreEmpty is true
+            }
+            throw new Error('Element contains no microdata format data');
+        }
+        
+        // Find all itemscope elements (top-level microdata items)
+        const itemscopeElements = [];
+        if (element.hasAttribute('itemscope')) {
+            itemscopeElements.push(element);
+        }
+        itemscopeElements.push(...element.querySelectorAll('[itemscope]'));
+        
+        // If no itemscope elements found, check for orphaned itemprop elements
+        if (itemscopeElements.length === 0) {
+            const itempropElements = element.querySelectorAll('[itemprop]');
+            if (itempropElements.length > 0) {
+                // Orphaned itemprop elements without itemscope container
+                return false;
+            }
+        }
+        
+        // Validate each itemscope element
+        for (const itemElement of itemscopeElements) {
+            const itemType = itemElement.getAttribute('itemtype');
+            
+            // Skip validation if no itemtype specified (generic microdata)
+            if (!itemType) {
+                continue;
+            }
+            
+            try {
+                // Extract microdata from the element
+                const microdataData = MicrodataAPI.extractMicrodataFromElement(itemElement);
+                
+                // Get schema registry instance
+                const registry = window.microdataAPI ? window.microdataAPI.registry : new SchemaRegistry();
+                
+                // Validate the extracted data against the schema
+                const isValid = registry.validate(microdataData, itemType);
+                
+                if (!isValid) {
+                    return false;
+                }
+            } catch (error) {
+                // Validation error means invalid microdata
+                return false;
+            }
+        }
+        
+        // All microdata items are valid
+        return true;
+    }
+
+    /**
+     * Validate form data by extracting it and validating against schema
+     * @param {HTMLFormElement} form - The form element to validate
+     * @param {boolean} [ignoreEmpty=false] - If true, don't throw error when no schema type found
+     * @returns {boolean} True if form data is valid, false if invalid
+     * @throws {Error} If form has no schema type and ignoreEmpty is false
+     */
+    static validateForm(form, ignoreEmpty = false) {
+        // Extract form data using the same method as render()
+        const formData = MicrodataAPI.extractFormData(form, null);
+        
+        // Check if @type and @context are present
+        const schemaType = formData['@type'];
+        const schemaContext = formData['@context'];
+        
+        if (!schemaType) {
+            if (ignoreEmpty) {
+                return true; // No schema type is considered valid when ignoreEmpty is true
+            }
+            throw new Error('Form contains no @type field for schema validation');
+        }
+        
+        // Construct the full itemtype URL
+        let itemType;
+        if (schemaContext) {
+            itemType = `${schemaContext}/${schemaType}`;
+        } else {
+            // Default to schema.org if no context provided
+            itemType = `https://schema.org/${schemaType}`;
+        }
+        
+        try {
+            // Get schema registry instance
+            const registry = window.microdataAPI ? window.microdataAPI.registry : new SchemaRegistry();
+            
+            // Validate the form data against the schema
+            const isValid = registry.validate(formData, itemType);
+            
+            return isValid;
+        } catch (error) {
+            // Validation error means invalid form data
+            return false;
+        }
+    }
+
+    /**
      * Fetch microdata from a URL without requiring a template
      * @param {string} url - The URL to fetch microdata from
      * @param {string} [expectedType] - Optional expected itemtype to filter results
