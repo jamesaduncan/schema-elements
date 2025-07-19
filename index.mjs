@@ -2570,7 +2570,10 @@ class MicrodataAPI {
                 for (let i = 0; i < self.itemsWithoutId.length; i++) {
                     keys.push(String(i));
                 }
-                keys.push(...Array.from(self.items.keys()));
+                // Add keys from items map, removing # prefix if present
+                for (const key of self.items.keys()) {
+                    keys.push(key.startsWith('#') ? key.substring(1) : key);
+                }
                 return keys;
             },
             
@@ -2580,6 +2583,28 @@ class MicrodataAPI {
                     return index >= 0 && index < self.itemsWithoutId.length;
                 }
                 return self.items.has(prop) || self.items.has('#' + prop);
+            },
+            
+            getOwnPropertyDescriptor(target, prop) {
+                // Check if property exists
+                if (MicrodataAPI.isNumericIndex(prop)) {
+                    const index = parseInt(prop, 10);
+                    if (index >= 0 && index < self.itemsWithoutId.length) {
+                        return {
+                            configurable: true,
+                            enumerable: true,
+                            value: self.itemsWithoutId[index]
+                        };
+                    }
+                } else if (self.items.has(prop) || self.items.has('#' + prop)) {
+                    const value = self.items.has(prop) ? self.items.get(prop) : self.items.get('#' + prop);
+                    return {
+                        configurable: true,
+                        enumerable: true,
+                        value: value
+                    };
+                }
+                return undefined;
             }
         });
     }

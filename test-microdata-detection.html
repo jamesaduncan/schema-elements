@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Microdata Detection</title>
+    <script type="module" src="./index.mjs"></script>
+</head>
+<body>
+    <h1>Testing Microdata Detection</h1>
+    
+    <!-- Items with IDs -->
+    <div id="person1" itemscope itemtype="https://schema.org/Person">
+        <span itemprop="name">John Doe</span>
+    </div>
+    
+    <div itemid="org-123" itemscope itemtype="https://schema.org/Organization">
+        <span itemprop="name">Acme Corp</span>
+    </div>
+    
+    <!-- Items without IDs (accessed by numeric index) -->
+    <div itemscope itemtype="https://schema.org/Event">
+        <span itemprop="name">Event 1</span>
+    </div>
+    
+    <div itemscope itemtype="https://schema.org/Event">
+        <span itemprop="name">Event 2</span>
+    </div>
+    
+    <h2>Results:</h2>
+    <pre id="results"></pre>
+    
+    <script type="module">
+        const results = [];
+        
+        // Check DOM elements directly
+        results.push('DOM Element Check:');
+        const allItemscope = document.querySelectorAll('[itemscope]');
+        results.push(`  Found ${allItemscope.length} elements with itemscope`);
+        
+        allItemscope.forEach((elem, i) => {
+            const id = elem.id || elem.getAttribute('itemid') || 'no-id';
+            const type = elem.getAttribute('itemtype') || 'no-type';
+            const name = elem.querySelector('[itemprop="name"]')?.textContent || 'no-name';
+            results.push(`  ${i + 1}. ID: ${id}, Type: ${type}, Name: ${name}`);
+        });
+        
+        // Check at different times
+        results.push('\nChecking document.microdata at different times:');
+        
+        // Immediate check
+        results.push('\nImmediate (0ms):');
+        results.push(`  document.microdata exists: ${!!document.microdata}`);
+        if (document.microdata) {
+            results.push(`  Keys: ${Object.keys(document.microdata).join(', ') || 'none'}`);
+        }
+        
+        // After DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                results.push('\nAfter DOMContentLoaded:');
+                checkMicrodata();
+            });
+        } else {
+            results.push('\nDOM already loaded:');
+            checkMicrodata();
+        }
+        
+        // After timeout
+        setTimeout(() => {
+            results.push('\nAfter 100ms timeout:');
+            checkMicrodata();
+            
+            // Final display
+            document.getElementById('results').textContent = results.join('\n');
+        }, 100);
+        
+        // After longer timeout
+        setTimeout(() => {
+            results.push('\nAfter 500ms timeout:');
+            checkMicrodata();
+            
+            // Try manually accessing items
+            results.push('\nManual access test:');
+            results.push(`  document.microdata.person1: ${!!document.microdata.person1}`);
+            results.push(`  document.microdata["org-123"]: ${!!document.microdata["org-123"]}`);
+            results.push(`  document.microdata[0]: ${!!document.microdata[0]}`);
+            results.push(`  document.microdata[1]: ${!!document.microdata[1]}`);
+            
+            // Check the API
+            if (window.microdataAPI) {
+                results.push('\nAPI internals:');
+                results.push(`  items Map size: ${window.microdataAPI.items.size}`);
+                results.push(`  itemsWithoutId array length: ${window.microdataAPI.itemsWithoutId.length}`);
+                
+                // Try refresh
+                results.push('\nTrying manual refresh:');
+                window.microdataAPI.refresh().then(() => {
+                    results.push('  After refresh:');
+                    results.push(`    items: ${window.microdataAPI.items.size}`);
+                    results.push(`    itemsWithoutId: ${window.microdataAPI.itemsWithoutId.length}`);
+                    results.push(`    Keys: ${Object.keys(document.microdata).join(', ') || 'none'}`);
+                    
+                    document.getElementById('results').textContent = results.join('\n');
+                });
+            }
+            
+            document.getElementById('results').textContent = results.join('\n');
+        }, 500);
+        
+        function checkMicrodata() {
+            results.push(`  document.microdata exists: ${!!document.microdata}`);
+            if (document.microdata) {
+                const keys = Object.keys(document.microdata);
+                results.push(`  Object.keys() count: ${keys.length}`);
+                results.push(`  Keys: ${keys.join(', ') || 'none'}`);
+            }
+            if (window.microdataAPI) {
+                results.push(`  API items: ${window.microdataAPI.items.size}`);
+                results.push(`  API itemsWithoutId: ${window.microdataAPI.itemsWithoutId.length}`);
+            }
+        }
+    </script>
+</body>
+</html>
