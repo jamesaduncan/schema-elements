@@ -105,8 +105,7 @@ class MicrodataItem {
             const pathParts = url.pathname.split('/').filter(Boolean);
             return pathParts[pathParts.length - 1] || undefined;
         } catch (e) {
-            console.warn(`Invalid itemtype URL: ${itemtype}`, e);
-            // Try to extract type from malformed URL
+            // Silently handle invalid URLs - try to extract type from malformed URL
             const parts = itemtype.split('/').filter(Boolean);
             return parts[parts.length - 1] || undefined;
         }
@@ -121,8 +120,7 @@ class MicrodataItem {
             const url = new URL(itemtype);
             return url.origin + url.pathname.substring(0, url.pathname.lastIndexOf('/') + 1);
         } catch (e) {
-            console.warn(`Invalid itemtype URL: ${itemtype}`, e);
-            // Try to extract context from malformed URL
+            // Silently handle invalid URLs - try to extract context from malformed URL
             const lastSlash = itemtype.lastIndexOf('/');
             return lastSlash > 0 ? itemtype.substring(0, lastSlash + 1) : undefined;
         }
@@ -151,7 +149,7 @@ class MicrodataItem {
         
         for (const id of itemref.trim().split(/\s+/)) {
             if (seenIds.has(id)) {
-                console.warn(`Circular itemref detected for id: ${id}`);
+                // Skip circular references silently
                 continue;
             }
             
@@ -160,9 +158,8 @@ class MicrodataItem {
             
             if (element) {
                 refs.push(element);
-            } else {
-                console.warn(`itemref references non-existent id: ${id}`);
             }
+            // Silently skip non-existent IDs
         }
         
         return refs;
@@ -361,8 +358,7 @@ class MicrodataItem {
     _setValue(element, value) {
         // Handle nested microdata items
         if (element.hasAttribute('itemscope')) {
-            // Cannot directly set nested items
-            console.warn('Cannot directly set value on nested itemscope element');
+            // Cannot directly set nested items - silently skip
             return;
         }
         
@@ -859,7 +855,6 @@ class Schema {
         try {
             new URL(url);
         } catch (e) {
-            console.warn(`Invalid schema URL: ${url}`, e);
             // Still create schema but it won't be able to load
         }
         
@@ -957,8 +952,6 @@ class Schema {
             // Determine schema type and create appropriate instance
             return Schema._createSchemaInstance(url, data);
         } catch (error) {
-            console.warn(`Failed to load schema from ${url}:`, error);
-            
             // Fire error event
             const event = new CustomEvent('DOMSchemaError', {
                 detail: { 
@@ -1062,7 +1055,7 @@ class SchemaOrgSchema {
             
             // Just check if property is defined in schema (if we have schema data)
             if (this.properties.size > 0 && !this.properties.has(prop)) {
-                console.warn(`Property ${prop} not defined in schema ${this.url}`);
+                // Property not in schema but Schema.org is permissive - continue silently
             }
         }
         
@@ -1087,7 +1080,7 @@ class SchemaOrgSchema {
                 return true;
             }
         } catch (error) {
-            console.warn(`Failed to load schema ${this.url}:`, error);
+            // Schema load failed - continue without schema
         }
         
         this.loaded = true; // Mark as loaded even on error
@@ -1175,7 +1168,6 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
             
             // Check cardinality
             if (!this._validateCardinality(value, propDef.cardinality)) {
-                console.warn(`Property ${propName} fails cardinality ${propDef.cardinality}`);
                 isValid = false;
                 validationErrors.push({
                     property: propName,
@@ -1192,7 +1184,6 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
             if (value !== undefined && propDef.type) {
                 const dataType = this.dataTypes.get(propDef.type);
                 if (dataType && !this._validateDataType(value, dataType)) {
-                    console.warn(`Property ${propName} fails type validation`);
                     isValid = false;
                     validationErrors.push({
                         property: propName,
@@ -1258,7 +1249,7 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
                 return dataType;
             }
         } catch (error) {
-            console.warn(`Failed to load DataType ${typeUrl}:`, error);
+            // DataType load failed - continue without it
         }
         
         return null;
@@ -1707,7 +1698,6 @@ function loadAllSchemas() {
                 return schema;
             })
             .catch(err => {
-                console.warn(`Failed to load schema ${url}:`, err);
                 failedSchemas.push({ url, error: err });
                 
                 // Fire DOMSchemaError on elements that use this schema
@@ -1766,9 +1756,8 @@ MicrodataItem.prototype.validate = function() {
     // Get schema from cache
     const schema = schemaCache.get(itemtype);
     if (!schema || !schema.loaded) {
-        // Schema not loaded yet
-        console.warn(`Schema ${itemtype} not loaded yet. Call after DOMSchemasLoaded event.`);
-        return true; // Be permissive if schema not loaded
+        // Schema not loaded yet - be permissive
+        return true;
     }
     
     return schema.validate(this);
@@ -1904,7 +1893,7 @@ class TemplateSynchronizer {
         // Find template within container
         const template = container.querySelector('template');
         if (!template) {
-            console.warn('Container with data-contains has no template:', container);
+            // No template found - skip silently
             return;
         }
         
