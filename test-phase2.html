@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 2 Schema System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 2 Schema System Test</h1>
+    
+    <!-- Test Data -->
+    <div class="test-section">
+        <h2>Test Data</h2>
+        
+        <!-- Schema.org example -->
+        <div id="person1" itemscope itemtype="https://schema.org/Person">
+            <span itemprop="name">John Doe</span>
+            <span itemprop="email">john@example.com</span>
+            <span itemprop="jobTitle">Developer</span>
+        </div>
+        
+        <!-- RustyBeam example -->
+        <div id="credential1" itemscope itemtype="http://rustybeam.net/schema/Credential">
+            <span itemprop="username">johndoe</span>
+            <span itemprop="password">secret123</span>
+            <ul>
+                <li itemprop="role">admin</li>
+                <li itemprop="role">user</li>
+            </ul>
+        </div>
+        
+        <!-- Invalid form for testing -->
+        <form id="testForm">
+            <input type="text" name="username" value="testuser">
+            <input type="password" name="password" value="">
+            <input type="text" name="role" value="guest">
+        </form>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script type="module">
+        import { Microdata, Schema, RustyBeamNetSchema } from './index.mjs';
+        
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        let eventsFired = {
+            schemasLoaded: false,
+            schemaError: [],
+            invalidData: []
+        };
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                const result = fn();
+                if (result instanceof Promise) {
+                    result.then(() => {
+                        passCount++;
+                        testDiv.className = 'test-pass';
+                        testDiv.textContent = `✓ ${name}`;
+                    }).catch(e => {
+                        testDiv.className = 'test-fail';
+                        testDiv.textContent = `✗ ${name}: ${e.message}`;
+                        console.error(e);
+                    });
+                } else {
+                    passCount++;
+                    testDiv.className = 'test-pass';
+                    testDiv.textContent = `✓ ${name}`;
+                }
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        async function testAsync(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                await fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        // Set up event listeners
+        document.addEventListener('DOMSchemasLoaded', () => {
+            eventsFired.schemasLoaded = true;
+        });
+        
+        document.addEventListener('DOMSchemaError', (e) => {
+            eventsFired.schemaError.push(e.detail);
+        });
+        
+        document.addEventListener('DOMSchemaInvalidData', (e) => {
+            eventsFired.invalidData.push(e.detail);
+        });
+        
+        // Wait for initial schema loading
+        setTimeout(async () => {
+            results.innerHTML = '<h3>Running Schema System tests...</h3>';
+            
+            // Test Schema factory pattern
+            test('Schema factory creates instances', () => {
+                const schemaOrg = new Schema('https://schema.org/Person');
+                // Schema factory returns subclass instances, not Schema instances
+                assert(schemaOrg.constructor.name === 'SchemaOrgSchema', 'Should be SchemaOrgSchema');
+                
+                const rustyBeam = new Schema('http://rustybeam.net/schema/Credential');
+                assert(rustyBeam.constructor.name === 'RustyBeamNetSchema', 'Should be RustyBeamNetSchema');
+            });
+            
+            // Test schema loading
+            await testAsync('Schema load method', async () => {
+                const schema = new Microdata.Schema('https://schema.org/Person');
+                const loaded = await schema.load();
+                // Since we can't actually fetch schema.org, it should fail gracefully
+                assert(typeof loaded === 'boolean', 'load() should return boolean');
+            });
+            
+            // Test DOMSchemasLoaded event
+            test('DOMSchemasLoaded event fired', () => {
+                assert(eventsFired.schemasLoaded === true, 'DOMSchemasLoaded should have fired');
+            });
+            
+            // Test MicrodataItem validation
+            await testAsync('MicrodataItem validate method', async () => {
+                const person = document.microdata.person1;
+                assert(person !== undefined, 'Should find person1');
+                const isValid = await person.validate();
+                assert(typeof isValid === 'boolean', 'validate() should return boolean');
+            });
+            
+            // Test form validation
+            await testAsync('Form validation', async () => {
+                const schema = new Microdata.Schema('http://rustybeam.net/schema/Credential');
+                await schema.load();
+                
+                const form = document.getElementById('testForm');
+                const isValid = schema.validate(form);
+                assert(typeof isValid === 'boolean', 'Form validation should return boolean');
+            });
+            
+            // Test plain object validation
+            await testAsync('Plain object validation', async () => {
+                const schema = new Microdata.Schema('https://schema.org/Person');
+                await schema.load();
+                
+                const obj = {
+                    name: 'Test User',
+                    email: 'test@example.com',
+                    unknownProp: 'value'
+                };
+                
+                const isValid = schema.validate(obj);
+                assert(isValid === true, 'Schema.org should be permissive');
+            });
+            
+            // Test validation with cardinality (mock)
+            await testAsync('RustyBeamNet cardinality validation', async () => {
+                const schema = new RustyBeamNetSchema('http://rustybeam.net/schema/Test', {
+                    properties: [{
+                        '@type': 'Property',
+                        name: 'required',
+                        cardinality: '1',
+                        type: 'Text'
+                    }, {
+                        '@type': 'Property',
+                        name: 'optional',
+                        cardinality: '0..1',
+                        type: 'Text'
+                    }]
+                });
+                
+                // Mark as loaded since we're creating it with data
+                schema.loaded = true;
+                
+                // Test missing required property
+                let isValid = schema.validate({ optional: 'test' });
+                assert(isValid === false, 'Should fail with missing required property');
+                
+                // Test valid object
+                isValid = schema.validate({ required: 'test', optional: 'test' });
+                assert(isValid === true, 'Should pass with all required properties');
+                
+                // Test too many optional
+                isValid = schema.validate({ required: 'test', optional: ['one', 'two'] });
+                assert(isValid === false, 'Should fail with too many optional values');
+            });
+            
+            // Test validation throws when not loaded
+            test('Validation requires loaded schema', () => {
+                const schema = new Microdata.Schema('https://schema.org/Thing');
+                try {
+                    schema.validate({ name: 'test' });
+                    assert(false, 'Should throw error when not loaded');
+                } catch (e) {
+                    assert(e.message.includes('must be loaded'), 'Error message should mention loading');
+                }
+            });
+            
+            // Test Schema.clearCache
+            test('Schema cache operations', () => {
+                Schema.clearCache();
+                assert(true, 'clearCache should not throw');
+            });
+            
+            // Test constructor name property
+            test('Schema constructor names from API example', () => {
+                const hostschema = new Schema('http://rustybeam.net/schema/HostConfig');
+                assert(hostschema.constructor.name === 'RustyBeamNetSchema', 
+                       'Constructor name should match API example');
+            });
+            
+            // Test validation events
+            await testAsync('DOMSchemaInvalidData event', async () => {
+                const initialCount = eventsFired.invalidData.length;
+                
+                // Create a schema with strict validation
+                const schema = new RustyBeamNetSchema('http://test.com/TestSchema', {
+                    properties: [{
+                        '@type': 'Property',
+                        name: 'requiredProp',
+                        cardinality: '1',
+                        type: 'Text'
+                    }]
+                });
+                
+                // Mark as loaded
+                schema.loaded = true;
+                
+                // Create test element
+                const div = document.createElement('div');
+                div.setAttribute('itemscope', '');
+                div.setAttribute('itemtype', 'http://test.com/TestSchema');
+                document.body.appendChild(div);
+                
+                // Validate - should fail and fire event
+                schema.validate(div);
+                
+                // Clean up
+                div.remove();
+                
+                assert(eventsFired.invalidData.length > initialCount, 
+                       'Should fire DOMSchemaInvalidData event');
+            });
+            
+            // Display summary
+            setTimeout(() => {
+                const summary = document.getElementById('summary');
+                summary.innerHTML = `
+                    <h2>Test Summary</h2>
+                    <div>Total Tests: ${testCount}</div>
+                    <div>Passed: ${passCount}</div>
+                    <div>Failed: ${testCount - passCount}</div>
+                    <div>${passCount === testCount ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
+                    <hr>
+                    <div>Events Fired:</div>
+                    <div>- DOMSchemasLoaded: ${eventsFired.schemasLoaded ? 'Yes' : 'No'}</div>
+                    <div>- DOMSchemaError: ${eventsFired.schemaError.length} times</div>
+                    <div>- DOMSchemaInvalidData: ${eventsFired.invalidData.length} times</div>
+                `;
+            }, 500);
+            
+        }, 500); // Wait for initial schema loading
+    </script>
+</body>
+</html>
