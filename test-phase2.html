@@ -27,7 +27,7 @@
         </div>
         
         <!-- RustyBeam example -->
-        <div id="credential1" itemscope itemtype="http://rustybeam.net/schema/Credential">
+        <div id="credential1" itemscope itemtype="https://rustybeam.net/schema/Credential">
             <span itemprop="username">johndoe</span>
             <span itemprop="password">secret123</span>
             <ul>
@@ -135,7 +135,7 @@
                 // Schema factory returns subclass instances, not Schema instances
                 assert(schemaOrg.constructor.name === 'SchemaOrgSchema', 'Should be SchemaOrgSchema');
                 
-                const rustyBeam = new Schema('http://rustybeam.net/schema/Credential');
+                const rustyBeam = new Schema('https://rustybeam.net/schema/Credential');
                 assert(rustyBeam.constructor.name === 'RustyBeamNetSchema', 'Should be RustyBeamNetSchema');
             });
             
@@ -162,7 +162,7 @@
             
             // Test form validation
             await testAsync('Form validation', async () => {
-                const schema = new Microdata.Schema('http://rustybeam.net/schema/Credential');
+                const schema = new Microdata.Schema('https://rustybeam.net/schema/Credential');
                 await schema.load();
                 
                 const form = document.getElementById('testForm');
@@ -187,7 +187,7 @@
             
             // Test validation with cardinality (mock)
             await testAsync('RustyBeamNet cardinality validation', async () => {
-                const schema = new RustyBeamNetSchema('http://rustybeam.net/schema/Test', {
+                const schema = new RustyBeamNetSchema('https://rustybeam.net/schema/Test', {
                     properties: [{
                         '@type': 'Property',
                         name: 'required',
@@ -236,7 +236,7 @@
             
             // Test constructor name property
             test('Schema constructor names from API example', () => {
-                const hostschema = new Schema('http://rustybeam.net/schema/HostConfig');
+                const hostschema = new Schema('https://rustybeam.net/schema/HostConfig');
                 assert(hostschema.constructor.name === 'RustyBeamNetSchema', 
                        'Constructor name should match API example');
             });
@@ -246,7 +246,7 @@
                 const initialCount = eventsFired.invalidData.length;
                 
                 // Create a schema with strict validation
-                const schema = new RustyBeamNetSchema('http://test.com/TestSchema', {
+                const schema = new RustyBeamNetSchema('https://test.com/TestSchema', {
                     properties: [{
                         '@type': 'Property',
                         name: 'requiredProp',

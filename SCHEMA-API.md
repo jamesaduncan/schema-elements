@@ -8,7 +8,7 @@ as an Array (document.microdata[n], document.microdata.forEach( ... ), etc), and
 The microdata property's children always look and feel like JSON-LD objects.
 
 ```html
-    <div id="johndoe" itemref="enc" itemscope itemtype="http://rustybeam.net/schema/Credential">
+    <div id="johndoe" itemref="enc" itemscope itemtype="https://rustybeam.net/schema/Credential">
         <p>
             The users' username is <span itemprop="username">johndoe</username>. They
             have the following roles:
@@ -29,7 +29,7 @@ The microdata property's children always look and feel like JSON-LD objects.
         console.log( document.microdata[0]['@type'] );        
         // 'Credential'
         console.log( document.microdata[0]['@context'] )
-        // 'http://rustybeam.net/schema/'
+        // 'https://rustybeam.net/schema/'
         console.log( document.microdata[0].role )
         // [ 'editor', 'writer' ]
         console.log( document.microdata[0].username )
@@ -46,7 +46,7 @@ The microdata property's children always look and feel like JSON-LD objects.
         // true
 
         console.log( JSON.stringify( document.microdata[0] ) )
-        // { "@type": "Credential", "@context": "http://rustybeam.net/schema/", "username": "johndoe", "role": ["editor", "writer"], "password": "secret", "encryption": "plaintext" }
+        // { "@type": "Credential", "@context": "https://rustybeam.net/schema/", "username": "johndoe", "role": ["editor", "writer"], "password": "secret", "encryption": "plaintext" }
     </script>
 ```
 
@@ -62,7 +62,7 @@ returns the microdata object:
 Microdata isn't just key value or key list pairs. It can also have complex types:
 
 ```html
-    <div id="ahost" itemscope itemtype="http://rustybeam.net/schema/HostConfig">
+    <div id="ahost" itemscope itemtype="https://rustybeam.net/schema/HostConfig">
         <p>
             This is the host configuration for <span itemprop="hostname">rustybeam.net</span>.
         </p>
@@ -73,7 +73,7 @@ Microdata isn't just key value or key list pairs. It can also have complex types
         <p>
             It's plugin configuration is pretty straightforward:
             <ol>
-                <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/FileHandlerPlugin">
+                <li itemprop="plugin" itemscope itemtype="https://rustybeam.net/schema/FileHandlerPlugin">
                     The FileHandler library is located at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_filehandler.so</span>
                 </li>
                 <li itemprop="plugin" itemscope itemtype="https://rustybeam.net/schema/ErrorHandlerPlugin">
@@ -116,11 +116,11 @@ Because Microdata objects have a schema, they can be validated.
 ```javascript
     import { Microdata } from "./index.mjs";
 
-    const schema = new Microdata.Schema( "http://rustybeam.net/schema/Credential" );
+    const schema = new Microdata.Schema( "https://rustybeam.net/schema/Credential" );
     const ok = await schema.load(); // returns true or false, depending on if it is fetched and processed from the internet or not
     if ( ok ) {
         console.log( schema.validate( anObject ) );
-        // true or false, depending on whether or not the object matches the http://rustybeam.net/schema/Credential schema
+        // true or false, depending on whether or not the object matches the https://rustybeam.net/schema/Credential schema
     }
 ```
 
@@ -130,7 +130,7 @@ When the page loads, any schema that the MicrodataAPI identifies in the document
 background automatically. Microdata objects from a page can also be validated:
 
     ```html
-    <div id="johndoe" itemref="enc" itemscope itemtype="http://rustybeam.net/schema/Credential">
+    <div id="johndoe" itemref="enc" itemscope itemtype="https://rustybeam.net/schema/Credential">
         <p>
             The users' username is <span itemprop="username">johndoe</username>. They
             have the following roles:
@@ -168,7 +168,7 @@ HTML Forms can be validated too:
         import { Microdata } from './index.mjs';
 
         document.addEventListener('DOMSchemasLoaded', async () => {
-            const schema = new Microdata.Schema( `http://rustybeam.net/schema/Credential` );
+            const schema = new Microdata.Schema( `https://rustybeam.net/schema/Credential` );
             const ok = await schema.load(); // returns true or false, depending on if it is fetched and processed from the internet or not
             if ( ok ) {
                 console.log( schema.validate( document.forms[0] ) );
@@ -207,7 +207,7 @@ by subclassing the Microdata.Schema class.
 
     ```javascript
     
-    const hostschema = new Schema('http://rustybeam.net/schema/HostConfig');
+    const hostschema = new Schema('https://rustybeam.net/schema/HostConfig');
     const ok = hostschema.load();
     if ( ok ) {
         console.log( hostschema.constructor.name === 'RustyBeamNetSchema' );
@@ -363,7 +363,7 @@ For example,
             </tr>
         </thead>
         <tbody>
-            <tr id="johndoe" itemscope itemtype="http://rustybeam.net/schema/Credential">
+            <tr id="johndoe" itemscope itemtype="https://rustybeam.net/schema/Credential">
                 <td itemprop="username">johndoe</td>
                 <td itemprop="password">secret</td>
                 <td>
@@ -374,7 +374,7 @@ For example,
                 </td>
                 <td itemprop="encryption">plaintext</td>
             </tr>
-            <tr id="janedoe" itemscope itemtype="http://rustybeam.net/schema/Credential">
+            <tr id="janedoe" itemscope itemtype="https://rustybeam.net/schema/Credential">
                 <td itemprop="username">janedoe</td>
                 <td itemprop="password">sneaky</td>
                 <td>
@@ -384,7 +384,7 @@ For example,
                 </td>
                 <td itemprop="encryption">plaintext</td>
             </tr>
-            <tr id="billdoe" itemscope itemtype="http://rustybeam.net/schema/Credential">
+            <tr id="billdoe" itemscope itemtype="https://rustybeam.net/schema/Credential">
                 <td itemprop="username">billdoe</td>
                 <td itemprop="password">topsecret</td>
                 <td>
@@ -397,9 +397,9 @@ For example,
         </tbody>
     </table>
 
-    <section id="user-cards" data-contains="http://rustybeam.net/schema/Credential">
+    <section id="user-cards" data-contains="https://rustybeam.net/schema/Credential">
         <template>
-            <div itemscope itemtype="http://rustybeam.net/schema/Credential">
+            <div itemscope itemtype="https://rustybeam.net/schema/Credential">
                 <p>
                     The users' username is <span itemprop="username"></span>. They
                     have the following roles:
@@ -415,9 +415,9 @@ For example,
 When the document loads, the Microdata System will transform the section#user-cards into:
 
     ```html
-    <section id="user-cards" data-for-items="http://rustybeam.net/schema/Credential">
+    <section id="user-cards" data-for-items="https://rustybeam.net/schema/Credential">
         <template>
-            <div itemscope itemtype="http://rustybeam.net/schema/Credential" itemid="http://this.document.url/#johndoe">
+            <div itemscope itemtype="https://rustybeam.net/schema/Credential" itemid="http://this.document.url/#johndoe">
                 <p>
                     The users' username is <span itemprop="username">johndoe</span>. They
                     have the following roles:
@@ -428,7 +428,7 @@ When the document loads, the Microdata System will transform the section#user-ca
                 </p>
             </div>
         </template>
-        <div itemscope itemtype="http://rustybeam.net/schema/Credential" itemid="http://this.document.url/#janedoe">
+        <div itemscope itemtype="https://rustybeam.net/schema/Credential" itemid="http://this.document.url/#janedoe">
             <p>
                 The users' username is <span itemprop="username">janedoe</span>. They
                 have the following roles:
@@ -437,7 +437,7 @@ When the document loads, the Microdata System will transform the section#user-ca
                 </ul>
             </p>
         </div>
-        <div itemscope itemtype="http://rustybeam.net/schema/Credential" itemid="http://this.document.url/#billdoe">
+        <div itemscope itemtype="https://rustybeam.net/schema/Credential" itemid="http://this.document.url/#billdoe">
             <p>
                 The users' username is <span itemprop="username">billdoe</span>. They
                 have the following roles:

@@ -9,7 +9,7 @@
     <h1>MicrodataItem Test Suite</h1>
     
     <!-- Test Case 1: Basic Microdata -->
-    <div id="johndoe" itemref="enc" itemscope itemtype="http://rustybeam.net/schema/Credential">
+    <div id="johndoe" itemref="enc" itemscope itemtype="https://rustybeam.net/schema/Credential">
         <p>
             The users' username is <span itemprop="username">johndoe</span>. They
             have the following roles:
@@ -26,7 +26,7 @@
     </p>
     
     <!-- Test Case 2: Complex Types -->
-    <div id="ahost" itemscope itemtype="http://rustybeam.net/schema/HostConfig">
+    <div id="ahost" itemscope itemtype="https://rustybeam.net/schema/HostConfig">
         <p>
             This is the host configuration for <span itemprop="hostname">rustybeam.net</span>.
         </p>
@@ -34,10 +34,10 @@
             The root directory is at <span itemprop="hostRoot">/var/www/rustybeam.net</span>.
         </p>
         <ol>
-            <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/FileHandlerPlugin">
+            <li itemprop="plugin" itemscope itemtype="https://rustybeam.net/schema/FileHandlerPlugin">
                 The FileHandler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_filehandler.so</span>
             </li>
-            <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/ErrorHandlerPlugin">
+            <li itemprop="plugin" itemscope itemtype="https://rustybeam.net/schema/ErrorHandlerPlugin">
                 The Error Handler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_errorhandler.so</span>
             </li>
         </ol>

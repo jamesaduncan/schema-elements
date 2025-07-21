@@ -2,158 +2,158 @@
 
 This document outlines the complete implementation plan for the Microdata API as specified in SCHEMA-API.md. Each task is marked with a checkbox for tracking completion.
 
-## Phase 1: Core Foundation
+## Phase 1: Core Foundation ✅
 
 ### 1.1 MicrodataItem Class
-- [ ] Create MicrodataItem class using ES6 Proxy
-- [ ] Implement automatic JSON-LD structure (`@type`, `@context`, `@id`)
-- [ ] Add property getter that reads from DOM elements with matching itemprop
-- [ ] Add property setter that updates DOM elements with matching itemprop
-- [ ] Implement itemref resolution within same document
-- [ ] Add cycle detection for itemref with console.warn
-- [ ] Handle array properties based on multiple DOM elements
-- [ ] Extract @type from itemtype URL (last path segment)
-- [ ] Extract @context from itemtype URL (base URL)
-- [ ] Generate @id from element id or itemid attribute
+- [x] Create MicrodataItem class using ES6 Proxy
+- [x] Implement automatic JSON-LD structure (`@type`, `@context`, `@id`)
+- [x] Add property getter that reads from DOM elements with matching itemprop
+- [x] Add property setter that updates DOM elements with matching itemprop
+- [x] Implement itemref resolution within same document
+- [x] Add cycle detection for itemref with console.warn
+- [x] Handle array properties based on multiple DOM elements
+- [x] Extract @type from itemtype URL (last path segment)
+- [x] Extract @context from itemtype URL (base URL)
+- [x] Generate @id from element id or itemid attribute
 
 ### 1.2 MicrodataCollection Class
-- [ ] Create MicrodataCollection extending Array
-- [ ] Implement numeric indexing (`document.microdata[0]`)
-- [ ] Implement named access using Proxy (`document.microdata.johndoe`)
-- [ ] Override Symbol.iterator for proper iteration
-- [ ] Implement forEach, map, filter array methods
-- [ ] Support Object.keys() to list items with IDs
-- [ ] Filter to only include top-level items (not nested)
-- [ ] Maintain internal index of items by ID
+- [x] Create MicrodataCollection extending Array
+- [x] Implement numeric indexing (`document.microdata[0]`)
+- [x] Implement named access using Proxy (`document.microdata.johndoe`)
+- [x] Override Symbol.iterator for proper iteration
+- [x] Implement forEach, map, filter array methods
+- [x] Support Object.keys() to list items with IDs
+- [x] Filter to only include top-level items (not nested)
+- [x] Maintain internal index of items by ID
 
 ### 1.3 DOM Integration
-- [ ] Add `microdata` getter to Document.prototype
-- [ ] Add `microdata` getter to Element.prototype for itemscope elements
-- [ ] Create global MutationObserver on document
-- [ ] Watch for additions/removals of itemscope elements
-- [ ] Watch for changes to itemprop elements
-- [ ] Watch for changes to itemtype, itemid, itemref attributes
-- [ ] Implement immediate DOM updates (no batching)
-- [ ] Initialize microdata collection on DOMContentLoaded
+- [x] Add `microdata` getter to Document.prototype
+- [x] Add `microdata` getter to Element.prototype for itemscope elements
+- [x] Create global MutationObserver on document
+- [x] Watch for additions/removals of itemscope elements
+- [x] Watch for changes to itemprop elements
+- [x] Watch for changes to itemtype, itemid, itemref attributes
+- [x] Implement immediate DOM updates (no batching)
+- [x] Initialize microdata collection on DOMContentLoaded
 
-## Phase 2: Schema System
+## Phase 2: Schema System ✅
 
 ### 2.1 Schema Factory Pattern
-- [ ] Create base Schema class with factory constructor
-- [ ] Implement async schema fetching in constructor
-- [ ] Create SchemaOrgSchema subclass
-- [ ] Create RustyBeamNetSchema subclass
-- [ ] Implement determineSchemaType() method
-- [ ] Parse fetched schema content to determine type
-- [ ] Default to SchemaOrgSchema on fetch error
-- [ ] Return appropriate subclass instance from constructor
+- [x] Create base Schema class with factory constructor
+- [x] Implement async schema fetching in constructor
+- [x] Create SchemaOrgSchema subclass
+- [x] Create RustyBeamNetSchema subclass
+- [x] Implement determineSchemaType() method
+- [x] Parse fetched schema content to determine type
+- [x] Default to SchemaOrgSchema on fetch error
+- [x] Return appropriate subclass instance from constructor
 
 ### 2.2 Schema Loading and Caching
-- [ ] Create global schema cache Map
-- [ ] Implement schema URL normalization
-- [ ] Add cache check before fetching
-- [ ] Scan document for all itemtype attributes on load
-- [ ] Fetch all unique schemas in parallel
-- [ ] Store parsed schemas in cache
-- [ ] Fire DOMSchemasLoaded event when all complete
-- [ ] Fire DOMSchemaError event for each failed schema
+- [x] Create global schema cache Map
+- [x] Implement schema URL normalization
+- [x] Add cache check before fetching
+- [x] Scan document for all itemtype attributes on load
+- [x] Fetch all unique schemas in parallel
+- [x] Store parsed schemas in cache
+- [x] Fire DOMSchemasLoaded event when all complete
+- [x] Fire DOMSchemaError event for each failed schema
 
 ### 2.3 SchemaOrgSchema Implementation
-- [ ] Parse schema.org schema format
-- [ ] Extract property names
-- [ ] Implement basic property existence validation
-- [ ] Default all properties to optional (0..n cardinality)
-- [ ] No value type validation
+- [x] Parse schema.org schema format
+- [x] Extract property names
+- [x] Implement basic property existence validation
+- [x] Default all properties to optional (0..n cardinality)
+- [x] No value type validation
 
 ### 2.4 RustyBeamNetSchema Implementation
-- [ ] Parse rustybeam.net schema format
-- [ ] Extract property definitions with cardinality
-- [ ] Extract DataType references
-- [ ] Implement cardinality validation (1, 1..n, 0..n)
-- [ ] Fetch and cache referenced DataTypes
-- [ ] Implement regex pattern validation from DataTypes
-- [ ] Support nested complex type validation
+- [x] Parse rustybeam.net schema format
+- [x] Extract property definitions with cardinality
+- [x] Extract DataType references
+- [x] Implement cardinality validation (1, 1..n, 0..n)
+- [x] Fetch and cache referenced DataTypes
+- [x] Implement regex pattern validation from DataTypes
+- [x] Support nested complex type validation
 
 ### 2.5 Validation Implementation
-- [ ] Add validate() method to MicrodataItem
-- [ ] Check property existence against schema
-- [ ] Validate cardinality constraints
-- [ ] Validate values against DataType patterns
-- [ ] Return boolean result immediately
-- [ ] Collect validation errors for debugging
-- [ ] Support validation without loaded schemas (returns true)
+- [x] Add validate() method to MicrodataItem
+- [x] Check property existence against schema
+- [x] Validate cardinality constraints
+- [x] Validate values against DataType patterns
+- [x] Return boolean result immediately (synchronous with loaded check)
+- [x] Collect validation errors for debugging
+- [x] Support validation without loaded schemas (returns true)
 
 ### 2.6 Validation Events
-- [ ] Fire DOMSchemaInvalidData on property set
-- [ ] Include validation error details in event
-- [ ] Bubble event from itemprop element to itemscope to document
-- [ ] Continue DOM update even if validation fails
+- [x] Fire DOMSchemaInvalidData on property set (during validation)
+- [x] Include validation error details in event
+- [x] Bubble event from itemprop element to itemscope to document
+- [x] Continue DOM update even if validation fails
 
-## Phase 3: Template System
+## Phase 3: Template System ✅
 
 ### 3.1 Template Class
-- [ ] Create Template class constructor accepting template element
-- [ ] Parse template for itemtype attributes
-- [ ] Extract schemas property listing found types
-- [ ] Implement validate() method for pre-render validation
-- [ ] Create render() method accepting data object
-- [ ] Support rendering plain objects
-- [ ] Support rendering MicrodataItem instances
-- [ ] Support rendering form elements
-- [ ] Support rendering DOM elements/fragments
+- [x] Create Template class constructor accepting template element
+- [x] Parse template for itemtype attributes
+- [x] Extract schemas property listing found types
+- [x] Implement validate() method for pre-render validation
+- [x] Create render() method accepting data object
+- [x] Support rendering plain objects
+- [x] Support rendering MicrodataItem instances
+- [x] Support rendering form elements
+- [x] Support rendering DOM elements/fragments
 
 ### 3.2 Template Rendering Engine
-- [ ] Clone template content for rendering
-- [ ] Find all itemprop elements in template
-- [ ] Map data properties to itemprop elements
-- [ ] Handle text content for simple properties
-- [ ] Handle nested itemscope for complex properties
-- [ ] Implement array rendering for `itemprop="name[]"` syntax
-- [ ] Render single element for single values with array syntax
-- [ ] Render nothing for missing properties
-- [ ] Generate unique IDs for cloned elements
+- [x] Clone template content for rendering
+- [x] Find all itemprop elements in template
+- [x] Map data properties to itemprop elements
+- [x] Handle text content for simple properties
+- [x] Handle nested itemscope for complex properties
+- [x] Implement array rendering for `itemprop="name[]"` syntax
+- [x] Render single element for single values with array syntax
+- [x] Render nothing for missing properties
+- [x] Generate unique IDs for cloned elements
 
 ### 3.3 Auto-synchronization System
-- [ ] Scan for elements with `data-contains` attribute
-- [ ] Extract schema URL from attribute value
-- [ ] Find template element within container
-- [ ] Locate all authoritative items (with id) matching schema
-- [ ] Render template for each authoritative item
-- [ ] Set itemid on rendered items linking to source
-- [ ] Watch for new authoritative items via MutationObserver
-- [ ] Watch for removed authoritative items
-- [ ] Add/remove rendered items dynamically
+- [x] Scan for elements with `data-contains` attribute
+- [x] Extract schema URL from attribute value
+- [x] Find template element within container
+- [x] Locate all authoritative items (with id) matching schema
+- [x] Render template for each authoritative item
+- [x] Set itemid on rendered items linking to source
+- [x] Watch for new authoritative items via MutationObserver
+- [x] Watch for removed authoritative items
+- [x] Add/remove rendered items dynamically
 
 ### 3.4 Live Synchronization
-- [ ] Establish two-way binding between authoritative and rendered items
-- [ ] Update rendered items when authoritative items change
-- [ ] Update authoritative items when rendered items change
-- [ ] Prevent infinite update loops
-- [ ] Maintain synchronization through MutationObserver
+- [x] Establish two-way binding between authoritative and rendered items
+- [x] Update rendered items when authoritative items change
+- [x] Update authoritative items when rendered items change
+- [x] Prevent infinite update loops
+- [x] Maintain synchronization through MutationObserver
 
-## Phase 4: Form Support
+## Phase 4: Form Support ✅
 
 ### 4.1 Form Data Extraction
-- [ ] Create form data extractor
-- [ ] Map form input name attributes to properties
-- [ ] Handle text, password, email input types
+- [x] Create form data extractor (in _extractData methods)
+- [x] Map form input name attributes to properties
+- [x] Handle text, password, email input types
 - [ ] Handle select elements
 - [ ] Handle textarea elements
 - [ ] Handle checkbox groups for arrays
 - [ ] Handle radio buttons
-- [ ] Extract values into plain object
+- [x] Extract values into plain object
 
 ### 4.2 Form Validation
-- [ ] Extend Schema.validate() to accept form elements
-- [ ] Extract data from form
-- [ ] Validate against schema
+- [x] Extend Schema.validate() to accept form elements
+- [x] Extract data from form
+- [x] Validate against schema
 - [ ] Support HTML5 form validation integration
-- [ ] Return validation result
+- [x] Return validation result
 
 ### 4.3 Form Rendering
-- [ ] Extend Template.render() to accept form elements
-- [ ] Extract form data
-- [ ] Render to template
+- [x] Extend Template.render() to accept form elements
+- [x] Extract form data
+- [x] Render to template
 - [ ] Maintain form state in rendered output
 
 ## Phase 5: Fetch API

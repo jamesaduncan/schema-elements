@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 3 Template System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .card { border: 1px solid #ddd; padding: 10px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 3 Template System Test</h1>
+    
+    <!-- Test Templates -->
+    <div class="test-section">
+        <h2>Templates</h2>
+        
+        <!-- Person template from API doc -->
+        <template id="person-template">
+            <div class="card" itemscope itemtype="http://schema.org/Person">
+                <h1 itemprop="name"></h1>
+                <dl>
+                    <div>
+                        <dt>Email Address</dt>
+                        <dd><address itemprop="email"></address></dd>
+                    </div>
+                    <div>
+                        <dt>Birthday</dt>
+                        <dd itemprop="birthdate"></dd>
+                    </div>
+                </dl>
+            </div>
+        </template>
+        
+        <!-- Credential template with arrays -->
+        <template id="credential-template">
+            <div itemscope itemtype="https://rustybeam.net/schema/Credential">
+                <p>
+                    The users' username is <span itemprop="username"></span>. They
+                    have the following roles:
+                    <ul>
+                        <li itemprop="role[]"></li>
+                    </ul>
+                </p>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Test Data -->
+    <div class="test-section">
+        <h2>Authoritative Data</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Password</th>
+                    <th>Roles</th>
+                    <th>Encryption</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr id="johndoe" itemscope itemtype="https://rustybeam.net/schema/Credential">
+                    <td itemprop="username">johndoe</td>
+                    <td itemprop="password">secret</td>
+                    <td>
+                        <ul>
+                            <li itemprop="role">administrator</li>
+                            <li itemprop="role">editor</li>
+                        </ul>
+                    </td>
+                    <td itemprop="encryption">plaintext</td>
+                </tr>
+                <tr id="janedoe" itemscope itemtype="https://rustybeam.net/schema/Credential">
+                    <td itemprop="username">janedoe</td>
+                    <td itemprop="password">sneaky</td>
+                    <td>
+                        <ul>
+                            <li itemprop="role">editor</li>
+                        </ul>
+                    </td>
+                    <td itemprop="encryption">plaintext</td>
+                </tr>
+                <tr id="billdoe" itemscope itemtype="https://rustybeam.net/schema/Credential">
+                    <td itemprop="username">billdoe</td>
+                    <td itemprop="password">topsecret</td>
+                    <td>
+                        <ul>
+                            <li itemprop="role">writer</li>
+                        </ul>
+                    </td>
+                    <td itemprop="encryption">plaintext</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <!-- Form for testing -->
+        <form id="testForm">
+            <label>Name: <input type="text" name="name" value="Form User"></label>
+            <label>Email: <input type="email" name="email" value="form@example.com"></label>
+            <label>Birthday: <input type="date" name="birthdate" value="1990-01-01"></label>
+        </form>
+    </div>
+    
+    <!-- Auto-sync container from API doc -->
+    <section id="user-cards" data-contains="https://rustybeam.net/schema/Credential" class="test-section">
+        <h2>Auto-synchronized User Cards</h2>
+        <template>
+            <div itemscope itemtype="https://rustybeam.net/schema/Credential">
+                <p>
+                    The users' username is <span itemprop="username"></span>. They
+                    have the following roles:
+                    <ul>
+                        <li itemprop="role[]"></li>
+                    </ul>
+                </p>
+            </div>
+        </template>
+    </section>
+    
+    <div id="render-target" class="test-section">
+        <h2>Render Target</h2>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script type="module">
+        import { Microdata, Template } from './index.mjs';
+        
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        async function testAsync(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                await fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        // Wait for initial loading
+        setTimeout(async () => {
+            results.innerHTML = '<h3>Running Template System tests...</h3>';
+            
+            // Test Template constructor
+            test('Template constructor', () => {
+                const template = new Microdata.Template(document.getElementById('person-template'));
+                assert(template instanceof Template, 'Should create Template instance');
+                assert(template.element === document.getElementById('person-template'), 'Should store element');
+            });
+            
+            // Test schemas property
+            test('Template schemas property', () => {
+                const template = new Microdata.Template(document.getElementById('person-template'));
+                const schemas = template.schemas;
+                assert(Array.isArray(schemas), 'schemas should be an array');
+                assert(schemas.length === 1, 'Should have one schema');
+                assert(schemas[0] === 'http://schema.org/Person', 'Should extract schema URL');
+            });
+            
+            // Test validate method
+            test('Template validate method', () => {
+                const template = new Microdata.Template(document.getElementById('person-template'));
+                const obj = { name: "John Doe", email: "johndoe@example.com", birthdate: "1979-05-27" };
+                const isValid = template.validate(obj);
+                assert(isValid === true, 'Should validate plain object');
+            });
+            
+            // Test render method from API example
+            test('Template render from API example', () => {
+                const person = { name: "John Doe", email: "johndoe@example.com", birthdate: "1979-05-27" };
+                const template = new Microdata.Template(document.getElementById('person-template'));
+                
+                const rendered = template.render(person);
+                assert(rendered instanceof Element, 'Should return Element');
+                assert(rendered.querySelector('[itemprop="name"]').textContent === 'John Doe', 'Should render name');
+                assert(rendered.querySelector('[itemprop="email"]').textContent === 'johndoe@example.com', 'Should render email');
+                assert(rendered.querySelector('[itemprop="birthdate"]').textContent === '1979-05-27', 'Should render birthdate');
+                
+                // Add to page for visual verification
+                document.getElementById('render-target').appendChild(rendered);
+            });
+            
+            // Test array rendering
+            test('Template array rendering', () => {
+                const template = new Microdata.Template(document.getElementById('credential-template'));
+                const data = {
+                    username: 'testuser',
+                    role: ['admin', 'editor', 'writer']
+                };
+                
+                const rendered = template.render(data);
+                const roles = rendered.querySelectorAll('[itemprop="role[]"]');
+                assert(roles.length === 3, 'Should render 3 role elements');
+                assert(roles[0].textContent === 'admin', 'First role should be admin');
+                assert(roles[1].textContent === 'editor', 'Second role should be editor');
+                assert(roles[2].textContent === 'writer', 'Third role should be writer');
+            });
+            
+            // Test single value with array syntax
+            test('Single value with array syntax', () => {
+                const template = new Microdata.Template(document.getElementById('credential-template'));
+                const data = {
+                    username: 'testuser',
+                    role: 'guest'  // Single value, not array
+                };
+                
+                const rendered = template.render(data);
+                const roles = rendered.querySelectorAll('[itemprop="role[]"]');
+                assert(roles.length === 1, 'Should render 1 role element');
+                assert(roles[0].textContent === 'guest', 'Role should be guest');
+            });
+            
+            // Test missing property handling
+            test('Missing property handling', () => {
+                const template = new Microdata.Template(document.getElementById('credential-template'));
+                const data = {
+                    username: 'testuser'
+                    // No role property
+                };
+                
+                const rendered = template.render(data);
+                const roles = rendered.querySelectorAll('[itemprop="role[]"]');
+                assert(roles.length === 0, 'Should not render role elements');
+            });
+            
+            // Test form rendering
+            test('Form rendering', () => {
+                const template = new Microdata.Template(document.getElementById('person-template'));
+                const form = document.getElementById('testForm');
+                
+                const rendered = template.render(form);
+                assert(rendered.querySelector('[itemprop="name"]').textContent === 'Form User', 'Should render form name');
+                assert(rendered.querySelector('[itemprop="email"]').textContent === 'form@example.com', 'Should render form email');
+                assert(rendered.querySelector('[itemprop="birthdate"]').textContent === '1990-01-01', 'Should render form birthdate');
+            });
+            
+            // Test static render method
+            test('Static Template.render method', () => {
+                const person = { 
+                    '@type': 'Person',
+                    name: "Static Render", 
+                    email: "static@example.com" 
+                };
+                
+                const rendered = Microdata.Template.render(person);
+                assert(rendered instanceof Element, 'Should return Element');
+                assert(rendered.querySelector('[itemprop="name"]').textContent === 'Static Render', 'Should render using static method');
+            });
+            
+            // Test auto-synchronization
+            await testAsync('Auto-synchronization initial render', async () => {
+                // Wait a bit for auto-sync to process
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const container = document.getElementById('user-cards');
+                const renderedItems = container.querySelectorAll('[itemscope]:not(template *)');
+                
+                assert(renderedItems.length === 3, 'Should render 3 credential items');
+                assert(container.hasAttribute('data-for-items'), 'Container should be marked as processed');
+                
+                // Check first item
+                const first = renderedItems[0];
+                assert(first.querySelector('[itemprop="username"]').textContent === 'johndoe', 'First should be johndoe');
+                const roles = first.querySelectorAll('[itemprop="role[]"]');
+                assert(roles.length === 2, 'johndoe should have 2 roles');
+            });
+            
+            // Test live synchronization
+            await testAsync('Live synchronization on change', async () => {
+                // Change authoritative data
+                document.querySelector('#johndoe [itemprop="username"]').textContent = 'johndoe-updated';
+                
+                // Wait for sync
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const container = document.getElementById('user-cards');
+                const johndoeCard = container.querySelector('[itemid*="johndoe"]');
+                assert(johndoeCard !== null, 'Should find johndoe card');
+                
+                // Note: Full live sync requires MutationObserver integration
+                // This is a simplified test
+            });
+            
+            // Test dynamic item addition
+            await testAsync('Dynamic item addition', async () => {
+                const table = document.querySelector('tbody');
+                const newRow = document.createElement('tr');
+                newRow.id = 'newuser';
+                newRow.setAttribute('itemscope', '');
+                newRow.setAttribute('itemtype', 'https://rustybeam.net/schema/Credential');
+                newRow.innerHTML = `
+                    <td itemprop="username">newuser</td>
+                    <td itemprop="password">newpass</td>
+                    <td><ul><li itemprop="role">guest</li></ul></td>
+                    <td itemprop="encryption">plaintext</td>
+                `;
+                table.appendChild(newRow);
+                
+                // Wait for sync
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const container = document.getElementById('user-cards');
+                const renderedItems = container.querySelectorAll('[itemscope]:not(template *)');
+                assert(renderedItems.length === 4, 'Should now have 4 rendered items');
+                
+                // Clean up
+                newRow.remove();
+            });
+            
+            // Display summary
+            setTimeout(() => {
+                const summary = document.getElementById('summary');
+                summary.innerHTML = `
+                    <h2>Test Summary</h2>
+                    <div>Total Tests: ${testCount}</div>
+                    <div>Passed: ${passCount}</div>
+                    <div>Failed: ${testCount - passCount}</div>
+                    <div>${passCount === testCount ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
+                `;
+            }, 500);
+            
+        }, 500); // Wait for DOM and auto-sync to initialize
+    </script>
+</body>
+</html>

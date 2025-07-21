@@ -646,12 +646,7 @@ const Microdata = {
     // Schema classes will be defined below
     Schema: null, // Will be set after class definitions
     
-    Template: class Template {
-        constructor(element) {
-            this.element = element;
-            // TODO: Implement in Phase 3
-        }
-    },
+    Template: null, // Will be set after class definition
     
     fetch: async function(url) {
         // TODO: Implement in Phase 5
@@ -1066,6 +1061,303 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
 // Set the Schema class on Microdata
 Microdata.Schema = Schema;
 
+/**
+ * Template Class - Handles rendering of microdata to templates
+ */
+class Template {
+    constructor(element) {
+        if (!element || !(element instanceof HTMLTemplateElement)) {
+            throw new Error('Template requires an HTMLTemplateElement');
+        }
+        
+        this.element = element;
+        this._schemas = null;
+        this._parsedTemplate = null;
+        this._parse();
+    }
+    
+    _parse() {
+        // Clone template content for parsing
+        const content = this.element.content.cloneNode(true);
+        
+        // Find all itemscope elements with itemtype
+        const schemaElements = content.querySelectorAll('[itemscope][itemtype]');
+        this._schemas = new Set();
+        
+        schemaElements.forEach(el => {
+            const itemtype = el.getAttribute('itemtype');
+            if (itemtype) {
+                this._schemas.add(itemtype);
+            }
+        });
+        
+        // Store parsed template structure
+        this._parsedTemplate = {
+            rootElement: content.firstElementChild,
+            itemProps: this._findItemProps(content),
+            arrayProps: this._findArrayProps(content)
+        };
+    }
+    
+    _findItemProps(root) {
+        const props = new Map();
+        const walker = document.createTreeWalker(
+            root,
+            NodeFilter.SHOW_ELEMENT,
+            {
+                acceptNode: (node) => {
+                    if (node.hasAttribute('itemprop')) {
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                    return NodeFilter.FILTER_SKIP;
+                }
+            }
+        );
+        
+        let node;
+        while (node = walker.nextNode()) {
+            const itemprop = node.getAttribute('itemprop');
+            if (!props.has(itemprop)) {
+                props.set(itemprop, []);
+            }
+            props.get(itemprop).push(node);
+        }
+        
+        return props;
+    }
+    
+    _findArrayProps(root) {
+        const arrayProps = new Set();
+        const elements = root.querySelectorAll('[itemprop]');
+        
+        elements.forEach(el => {
+            const itemprop = el.getAttribute('itemprop');
+            if (itemprop.endsWith('[]')) {
+                arrayProps.add(itemprop.slice(0, -2)); // Remove [] suffix
+            }
+        });
+        
+        return arrayProps;
+    }
+    
+    get schemas() {
+        return Array.from(this._schemas);
+    }
+    
+    validate(obj) {
+        // Extract data from object
+        const data = this._extractData(obj);
+        
+        // For now, basic validation - just check if object has properties
+        // In full implementation, would validate against schemas
+        return data !== null && typeof data === 'object';
+    }
+    
+    render(obj) {
+        const data = this._extractData(obj);
+        if (!data) {
+            throw new Error('Cannot render null or undefined data');
+        }
+        
+        // Clone the template
+        const fragment = this.element.content.cloneNode(true);
+        const root = fragment.firstElementChild;
+        
+        if (!root) {
+            throw new Error('Template has no root element');
+        }
+        
+        // Render data to template
+        this._renderData(root, data);
+        
+        return root;
+    }
+    
+    _extractData(obj) {
+        if (obj instanceof MicrodataItem) {
+            return obj.toJSON();
+        }
+        
+        if (obj instanceof HTMLFormElement) {
+            // Extract form data
+            const data = {};
+            const formData = new FormData(obj);
+            for (const [key, value] of formData.entries()) {
+                if (data[key]) {
+                    // Convert to array if multiple values
+                    if (!Array.isArray(data[key])) {
+                        data[key] = [data[key]];
+                    }
+                    data[key].push(value);
+                } else {
+                    data[key] = value;
+                }
+            }
+            return data;
+        }
+        
+        if (obj instanceof Element && obj.hasAttribute('itemscope')) {
+            const item = new MicrodataItem(obj);
+            return item.toJSON();
+        }
+        
+        // Plain object
+        return obj;
+    }
+    
+    _renderData(element, data) {
+        // Set JSON-LD properties if this is an itemscope
+        if (element.hasAttribute('itemscope')) {
+            if (data['@id']) {
+                element.setAttribute('itemid', data['@id']);
+            }
+        }
+        
+        // Find all itemprop elements within this scope
+        const walker = document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_ELEMENT,
+            {
+                acceptNode: (node) => {
+                    // Don't descend into nested itemscopes
+                    if (node !== element && node.hasAttribute('itemscope')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    
+                    if (node.hasAttribute('itemprop')) {
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                    
+                    return NodeFilter.FILTER_SKIP;
+                }
+            }
+        );
+        
+        const propElements = [];
+        let node;
+        while (node = walker.nextNode()) {
+            propElements.push(node);
+        }
+        
+        // Group elements by property name
+        const propGroups = new Map();
+        propElements.forEach(el => {
+            let propName = el.getAttribute('itemprop');
+            const isArray = propName.endsWith('[]');
+            if (isArray) {
+                propName = propName.slice(0, -2);
+            }
+            
+            if (!propGroups.has(propName)) {
+                propGroups.set(propName, { elements: [], isArray });
+            }
+            propGroups.get(propName).elements.push(el);
+        });
+        
+        // Render each property
+        for (const [propName, group] of propGroups) {
+            const value = data[propName];
+            
+            if (value === undefined || value === null) {
+                // Remove elements for missing properties
+                group.elements.forEach(el => el.remove());
+                continue;
+            }
+            
+            if (group.isArray || Array.isArray(value)) {
+                this._renderArrayProperty(propName, group.elements, value);
+            } else {
+                this._renderSingleProperty(propName, group.elements[0], value);
+                // Remove extra elements
+                for (let i = 1; i < group.elements.length; i++) {
+                    group.elements[i].remove();
+                }
+            }
+        }
+    }
+    
+    _renderArrayProperty(propName, elements, value) {
+        const values = Array.isArray(value) ? value : [value];
+        
+        if (elements.length === 0) return;
+        
+        const template = elements[0];
+        const parent = template.parentElement;
+        
+        // Remove all existing elements
+        elements.forEach(el => el.remove());
+        
+        // Create new elements for each value
+        values.forEach(val => {
+            const newElement = template.cloneNode(true);
+            this._renderSingleProperty(propName, newElement, val);
+            parent.appendChild(newElement);
+        });
+    }
+    
+    _renderSingleProperty(propName, element, value) {
+        if (value && typeof value === 'object' && value['@type']) {
+            // Nested microdata item
+            if (element.hasAttribute('itemscope')) {
+                this._renderData(element, value);
+            }
+        } else {
+            // Simple value
+            this._setElementValue(element, value);
+        }
+    }
+    
+    _setElementValue(element, value) {
+        const stringValue = String(value);
+        
+        if (element.hasAttribute('content')) {
+            element.setAttribute('content', stringValue);
+        } else if (element.tagName === 'A' && element.hasAttribute('href')) {
+            element.href = stringValue;
+        } else if (element.tagName === 'IMG' && element.hasAttribute('src')) {
+            element.src = stringValue;
+        } else if (element.tagName === 'TIME' && element.hasAttribute('datetime')) {
+            element.setAttribute('datetime', stringValue);
+            if (!element.textContent) {
+                element.textContent = stringValue;
+            }
+        } else {
+            element.textContent = stringValue;
+        }
+    }
+    
+    static render(obj) {
+        // Find appropriate template based on object type
+        let template = null;
+        
+        if (obj && obj['@type']) {
+            // Look for template with matching itemtype
+            const templates = document.querySelectorAll('template');
+            for (const t of templates) {
+                const content = t.content;
+                const itemtypeEl = content.querySelector('[itemtype]');
+                if (itemtypeEl) {
+                    const itemtype = itemtypeEl.getAttribute('itemtype');
+                    if (itemtype && itemtype.endsWith('/' + obj['@type'])) {
+                        template = t;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!template) {
+            throw new Error('No suitable template found for object');
+        }
+        
+        const templateInstance = new Template(template);
+        return templateInstance.render(obj);
+    }
+}
+
+// Set the Template class on Microdata
+Microdata.Template = Template;
+
 // Initialize schema loading on DOM ready
 let schemasLoading = false;
 
@@ -1119,8 +1411,188 @@ MicrodataItem.prototype.validate = async function() {
     }
 };
 
+/**
+ * Auto-synchronization system for templates with data-contains
+ */
+class TemplateSynchronizer {
+    constructor() {
+        this.syncedContainers = new Map();
+        this.observer = null;
+    }
+    
+    start() {
+        // Initial scan for containers
+        this._scanForContainers();
+        
+        // Set up mutation observer
+        this.observer = new MutationObserver((mutations) => {
+            this._handleMutations(mutations);
+        });
+        
+        this.observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-contains', 'id']
+        });
+    }
+    
+    stop() {
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+    }
+    
+    _scanForContainers() {
+        const containers = document.querySelectorAll('[data-contains]');
+        containers.forEach(container => this._processContainer(container));
+    }
+    
+    _processContainer(container) {
+        const schemaUrl = container.getAttribute('data-contains');
+        if (!schemaUrl) return;
+        
+        // Find template within container
+        const template = container.querySelector('template');
+        if (!template) {
+            console.warn('Container with data-contains has no template:', container);
+            return;
+        }
+        
+        // Store container info
+        this.syncedContainers.set(container, {
+            schemaUrl,
+            template,
+            renderedItems: new Map()
+        });
+        
+        // Initial render
+        this._renderAuthoritativeItems(container);
+        
+        // Mark container as processed
+        container.setAttribute('data-for-items', schemaUrl);
+    }
+    
+    _renderAuthoritativeItems(container) {
+        const containerInfo = this.syncedContainers.get(container);
+        if (!containerInfo) return;
+        
+        const { schemaUrl, template, renderedItems } = containerInfo;
+        
+        // Find all authoritative items matching schema
+        const items = document.querySelectorAll(`[itemtype="${schemaUrl}"][id]`);
+        
+        // Remove items that no longer exist
+        const currentIds = new Set(Array.from(items).map(el => el.id));
+        for (const [id, element] of renderedItems) {
+            if (!currentIds.has(id)) {
+                element.remove();
+                renderedItems.delete(id);
+            }
+        }
+        
+        // Add or update items
+        items.forEach(itemElement => {
+            const id = itemElement.id;
+            const item = new MicrodataItem(itemElement);
+            
+            if (renderedItems.has(id)) {
+                // Update existing
+                this._updateRenderedItem(renderedItems.get(id), item);
+            } else {
+                // Create new
+                const rendered = this._renderItem(template, item);
+                container.appendChild(rendered);
+                renderedItems.set(id, rendered);
+                
+                // Set up synchronization
+                this._setupSynchronization(itemElement, rendered);
+            }
+        });
+    }
+    
+    _renderItem(template, item) {
+        const templateInstance = new Template(template);
+        const rendered = templateInstance.render(item);
+        
+        // Set itemid to link back to source
+        const itemid = item['@id'];
+        if (itemid && rendered.hasAttribute('itemscope')) {
+            rendered.setAttribute('itemid', itemid);
+        }
+        
+        return rendered;
+    }
+    
+    _updateRenderedItem(element, item) {
+        // Re-render in place
+        const templateEl = element.parentElement.querySelector('template');
+        if (templateEl) {
+            const templateInstance = new Template(templateEl);
+            const newElement = templateInstance.render(item);
+            element.replaceWith(newElement);
+            return newElement;
+        }
+        return element;
+    }
+    
+    _setupSynchronization(sourceElement, renderedElement) {
+        // The MutationObserver will handle updates automatically
+        // since both elements have microdata that updates through the same system
+    }
+    
+    _handleMutations(mutations) {
+        const containersToUpdate = new Set();
+        const modifiedItems = new Set();
+        
+        for (const mutation of mutations) {
+            if (mutation.type === 'attributes' && mutation.target.hasAttribute('data-contains')) {
+                // New or modified container
+                this._processContainer(mutation.target);
+            } else if (mutation.type === 'childList') {
+                // Check for added/removed authoritative items
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE && 
+                        node.hasAttribute('itemscope') && 
+                        node.hasAttribute('id')) {
+                        modifiedItems.add(node);
+                    }
+                });
+                
+                mutation.removedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE && 
+                        node.hasAttribute('itemscope') && 
+                        node.hasAttribute('id')) {
+                        modifiedItems.add(node);
+                    }
+                });
+            }
+        }
+        
+        // Update affected containers
+        if (modifiedItems.size > 0) {
+            this.syncedContainers.forEach((info, container) => {
+                this._renderAuthoritativeItems(container);
+            });
+        }
+    }
+}
+
+// Initialize template synchronizer
+const templateSynchronizer = new TemplateSynchronizer();
+
+// Start synchronizer when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        templateSynchronizer.start();
+    });
+} else {
+    templateSynchronizer.start();
+}
+
 // Export for use
-export { Microdata, MicrodataItem, MicrodataCollection, Schema, SchemaOrgSchema, RustyBeamNetSchema };
+export { Microdata, MicrodataItem, MicrodataCollection, Schema, SchemaOrgSchema, RustyBeamNetSchema, Template };
 export default Microdata;
 
 // Set up globals

@@ -20,7 +20,7 @@
         <h2>Test Data</h2>
         
         <!-- Basic example from API doc -->
-        <div id="johndoe" itemref="enc" itemscope itemtype="http://rustybeam.net/schema/Credential">
+        <div id="johndoe" itemref="enc" itemscope itemtype="https://rustybeam.net/schema/Credential">
             <p>
                 The users' username is <span itemprop="username">johndoe</span>. They
                 have the following roles:
@@ -37,7 +37,7 @@
         </p>
         
         <!-- Complex example -->
-        <div id="ahost" itemscope itemtype="http://rustybeam.net/schema/HostConfig">
+        <div id="ahost" itemscope itemtype="https://rustybeam.net/schema/HostConfig">
             <p>
                 This is the host configuration for <span itemprop="hostname">rustybeam.net</span>.
             </p>
@@ -47,7 +47,7 @@
             <p>
                 It's plugin configuration:
                 <ol>
-                    <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/FileHandlerPlugin">
+                    <li itemprop="plugin" itemscope itemtype="https://rustybeam.net/schema/FileHandlerPlugin">
                         The FileHandler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_filehandler.so</span>
                     </li>
                     <li itemprop="plugin" itemscope itemtype="https://rustybeam.net/schema/ErrorHandlerPlugin">
@@ -130,7 +130,7 @@
             test('Basic property access from API examples', () => {
                 const item = document.microdata[0];
                 assert(item['@type'] === 'Credential', '@type should be Credential');
-                assert(item['@context'] === 'http://rustybeam.net/schema/', '@context should be correct');
+                assert(item['@context'] === 'https://rustybeam.net/schema/', '@context should be correct');
                 assert(Array.isArray(item.role), 'role should be array');
                 assert(item.role[0] === 'editor' && item.role[1] === 'writer', 'roles should be correct');
                 assert(item.username === 'johndoe', 'username should be johndoe');
@@ -147,7 +147,7 @@
                 const json = JSON.stringify(document.microdata[0]);
                 const parsed = JSON.parse(json);
                 assert(parsed['@type'] === 'Credential', 'JSON should have @type');
-                assert(parsed['@context'] === 'http://rustybeam.net/schema/', 'JSON should have @context');
+                assert(parsed['@context'] === 'https://rustybeam.net/schema/', 'JSON should have @context');
                 assert(parsed.username === 'johndoe', 'JSON should have username');
                 assert(Array.isArray(parsed.role), 'JSON should have role array');
                 assert(parsed.password === 'secret', 'JSON should have password');
@@ -177,7 +177,7 @@
                 assert(element.microdata === document.microdata.johndoe, 'Should return same instance');
             });
             
-            test('Dynamic element addition', (done) => {
+            test('Dynamic element addition', () => {
                 const div = document.createElement('div');
                 div.id = 'dynamic-test';
                 div.setAttribute('itemscope', '');
@@ -189,17 +189,31 @@
                 
                 // Wait for mutation observer
                 setTimeout(() => {
-                    assert(document.microdata.length > initialLength, 'Collection should grow');
-                    assert(document.microdata['dynamic-test'] !== undefined, 'Should be accessible by ID');
-                    assert(document.microdata['dynamic-test'].name === 'Dynamic Item', 'Should have correct data');
-                    
-                    // Clean up
-                    div.remove();
-                    done();
+                    try {
+                        assert(document.microdata.length > initialLength, 'Collection should grow');
+                        assert(document.microdata['dynamic-test'] !== undefined, 'Should be accessible by ID');
+                        assert(document.microdata['dynamic-test'].name === 'Dynamic Item', 'Should have correct data');
+                        
+                        // Mark test as passed
+                        const testDiv = document.createElement('div');
+                        testDiv.className = 'test-pass';
+                        testDiv.textContent = '✓ Dynamic element addition (async)';
+                        results.appendChild(testDiv);
+                        passCount++;
+                    } catch (e) {
+                        const testDiv = document.createElement('div');
+                        testDiv.className = 'test-fail';
+                        testDiv.textContent = `✗ Dynamic element addition (async): ${e.message}`;
+                        results.appendChild(testDiv);
+                        console.error(e);
+                    } finally {
+                        // Clean up
+                        div.remove();
+                    }
                 }, 50);
             });
             
-            test('Dynamic element removal', (done) => {
+            test('Dynamic element removal', () => {
                 const div = document.createElement('div');
                 div.id = 'removal-test';
                 div.setAttribute('itemscope', '');
@@ -211,9 +225,23 @@
                     div.remove();
                     
                     setTimeout(() => {
-                        assert(document.microdata.length < lengthBefore, 'Collection should shrink');
-                        assert(document.microdata['removal-test'] === undefined, 'Should not be accessible');
-                        done();
+                        try {
+                            assert(document.microdata.length < lengthBefore, 'Collection should shrink');
+                            assert(document.microdata['removal-test'] === undefined, 'Should not be accessible');
+                            
+                            // Mark test as passed
+                            const testDiv = document.createElement('div');
+                            testDiv.className = 'test-pass';
+                            testDiv.textContent = '✓ Dynamic element removal (async)';
+                            results.appendChild(testDiv);
+                            passCount++;
+                        } catch (e) {
+                            const testDiv = document.createElement('div');
+                            testDiv.className = 'test-fail';
+                            testDiv.textContent = `✗ Dynamic element removal (async): ${e.message}`;
+                            results.appendChild(testDiv);
+                            console.error(e);
+                        }
                     }, 50);
                 }, 50);
             });
@@ -238,15 +266,16 @@
                 assert(!hasNestedItems, 'Collection should not include nested items');
             });
             
-            // Display summary
+            // Display summary (wait for async tests)
             setTimeout(() => {
                 const summary = document.getElementById('summary');
+                const totalTests = testCount + 2; // Add 2 for async tests
                 summary.innerHTML = `
                     <h2>Test Summary</h2>
-                    <div>Total Tests: ${testCount}</div>
+                    <div>Total Tests: ${totalTests}</div>
                     <div>Passed: ${passCount}</div>
-                    <div>Failed: ${testCount - passCount}</div>
-                    <div>${passCount === testCount ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
+                    <div>Failed: ${totalTests - passCount}</div>
+                    <div>${passCount === totalTests ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
                 `;
             }, 500);
             
