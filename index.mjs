@@ -79,19 +79,33 @@ class MicrodataItem {
         const itemtype = this._element.getAttribute('itemtype');
         if (!itemtype) return undefined;
         
-        // Extract the last segment of the URL as the type
-        const url = new URL(itemtype);
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        return pathParts[pathParts.length - 1] || undefined;
+        try {
+            // Extract the last segment of the URL as the type
+            const url = new URL(itemtype);
+            const pathParts = url.pathname.split('/').filter(Boolean);
+            return pathParts[pathParts.length - 1] || undefined;
+        } catch (e) {
+            console.warn(`Invalid itemtype URL: ${itemtype}`, e);
+            // Try to extract type from malformed URL
+            const parts = itemtype.split('/').filter(Boolean);
+            return parts[parts.length - 1] || undefined;
+        }
     }
     
     _getContext() {
         const itemtype = this._element.getAttribute('itemtype');
         if (!itemtype) return undefined;
         
-        // Extract the base URL as context
-        const url = new URL(itemtype);
-        return url.origin + url.pathname.substring(0, url.pathname.lastIndexOf('/') + 1);
+        try {
+            // Extract the base URL as context
+            const url = new URL(itemtype);
+            return url.origin + url.pathname.substring(0, url.pathname.lastIndexOf('/') + 1);
+        } catch (e) {
+            console.warn(`Invalid itemtype URL: ${itemtype}`, e);
+            // Try to extract context from malformed URL
+            const lastSlash = itemtype.lastIndexOf('/');
+            return lastSlash > 0 ? itemtype.substring(0, lastSlash + 1) : undefined;
+        }
     }
     
     _getId() {
@@ -652,6 +666,14 @@ const schemaLoadingPromises = new Map();
  */
 class Schema {
     constructor(url) {
+        // Validate URL
+        try {
+            new URL(url);
+        } catch (e) {
+            console.warn(`Invalid schema URL: ${url}`, e);
+            // Still create schema but it won't be able to load
+        }
+        
         // Factory pattern - create and return appropriate subclass
         // This is a synchronous factory that returns an unloaded schema
         

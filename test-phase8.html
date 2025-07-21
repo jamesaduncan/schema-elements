@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 8 Edge Cases and Polish Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .console-output { background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace; font-size: 12px; }
+        .warning { color: orange; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 8 Edge Cases and Polish Test</h1>
+    
+    <!-- Test Data for Edge Cases -->
+    <div class="test-section">
+        <h2>Edge Case Test Data</h2>
+        
+        <!-- Missing itemtype -->
+        <div id="no-itemtype" itemscope>
+            <span itemprop="name">Item without type</span>
+        </div>
+        
+        <!-- Malformed itemtype URL -->
+        <div id="malformed-url" itemscope itemtype="not-a-valid-url/Person">
+            <span itemprop="name">Invalid URL Person</span>
+        </div>
+        
+        <!-- Invalid itemref -->
+        <div id="invalid-ref" itemscope itemtype="https://schema.org/Person" itemref="doesnotexist">
+            <span itemprop="name">Person with invalid ref</span>
+        </div>
+        
+        <!-- Circular itemref -->
+        <div id="circular-ref" itemscope itemtype="https://schema.org/Person" itemref="ref1">
+            <span itemprop="name">Circular Person</span>
+        </div>
+        <div id="ref1" itemref="ref2" itemprop="address">Address 1</div>
+        <div id="ref2" itemref="ref1" itemprop="telephone">Phone 1</div>
+        
+        <!-- Multiple same itemrefs -->
+        <div id="duplicate-ref" itemscope itemtype="https://schema.org/Person" itemref="shared shared">
+            <span itemprop="name">Duplicate Ref Person</span>
+        </div>
+        <div id="shared" itemprop="email">shared@example.com</div>
+        
+        <!-- Empty itemtype -->
+        <div id="empty-itemtype" itemscope itemtype="">
+            <span itemprop="name">Empty type</span>
+        </div>
+        
+        <!-- Whitespace in itemtype -->
+        <div id="whitespace-itemtype" itemscope itemtype="  https://schema.org/Person  ">
+            <span itemprop="name">Whitespace Person</span>
+        </div>
+        
+        <!-- Schema that will fail to load -->
+        <div id="failing-schema" itemscope itemtype="https://nonexistent.example.com/Schema">
+            <span itemprop="name">Failing Schema Item</span>
+        </div>
+    </div>
+    
+    <!-- Console output capture -->
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <div id="console-output" class="console-output"></div>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script>
+        const results = document.getElementById('test-results');
+        const consoleOutput = document.getElementById('console-output');
+        let testCount = 0;
+        let passCount = 0;
+        const capturedLogs = [];
+        
+        // Capture console warnings and errors
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ');
+            capturedLogs.push({ type: 'warning', message });
+            const div = document.createElement('div');
+            div.className = 'warning';
+            div.textContent = `⚠️ ${message}`;
+            consoleOutput.appendChild(div);
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ');
+            capturedLogs.push({ type: 'error', message });
+            const div = document.createElement('div');
+            div.className = 'error';
+            div.textContent = `❌ ${message}`;
+            consoleOutput.appendChild(div);
+        };
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        function findWarning(pattern) {
+            return capturedLogs.some(log => 
+                log.type === 'warning' && log.message.includes(pattern)
+            );
+        }
+    </script>
+    
+    <script type="module">
+        import { Microdata, Schema, MicrodataItem } from './index.mjs';
+        
+        // Wait for DOMContentLoaded and schema loading
+        setTimeout(() => {
+            results.innerHTML = '<h3>Running Edge Case tests...</h3>';
+            
+            // Test 8.1: Error Handling
+            test('Missing itemtype handled gracefully', () => {
+                const item = document.getElementById('no-itemtype').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                assert(item['@type'] === undefined, 'Type should be undefined');
+                assert(item['@context'] === undefined, 'Context should be undefined');
+            });
+            
+            test('Malformed itemtype URL handled', () => {
+                const item = document.getElementById('malformed-url').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                assert(item['@type'] === 'Person', 'Should extract type from malformed URL');
+                assert(findWarning('Invalid itemtype URL'), 'Should warn about invalid URL');
+            });
+            
+            test('Invalid itemref handled', () => {
+                const item = document.getElementById('invalid-ref').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                assert(findWarning('non-existent id: doesnotexist'), 'Should warn about missing itemref');
+            });
+            
+            test('Circular itemref detected', () => {
+                const item = document.getElementById('circular-ref').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                // Check that circular reference warning was logged
+                assert(findWarning('Circular itemref'), 'Should warn about circular itemref');
+            });
+            
+            test('Duplicate itemref handled', () => {
+                const item = document.getElementById('duplicate-ref').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                assert(item.email === 'shared@example.com', 'Should include shared property only once');
+            });
+            
+            test('Empty itemtype handled', () => {
+                const item = document.getElementById('empty-itemtype').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                assert(item['@type'] === undefined, 'Type should be undefined for empty itemtype');
+            });
+            
+            test('Whitespace in itemtype trimmed', () => {
+                const item = document.getElementById('whitespace-itemtype').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                assert(item['@type'] === 'Person', 'Should handle whitespace in itemtype');
+            });
+            
+            test('Schema load failure handled', () => {
+                const item = document.getElementById('failing-schema').microdata;
+                assert(item !== null, 'Should create MicrodataItem');
+                // Schema loading is async, but item creation should not fail
+                assert(item['@type'] === 'Schema', 'Should extract type even if schema fails to load');
+            });
+            
+            // Test validation with missing schema
+            test('Validation with unloaded schema', () => {
+                const item = document.getElementById('failing-schema').microdata;
+                const isValid = item.validate();
+                assert(isValid === true, 'Should return true when schema not loaded');
+            });
+            
+            // Test Schema URL validation
+            test('Schema constructor with invalid URL', () => {
+                const schema = new Schema('not-a-valid-url');
+                assert(schema !== null, 'Should create schema instance');
+                assert(findWarning('Invalid schema URL'), 'Should warn about invalid schema URL');
+            });
+            
+            // Test property access edge cases
+            test('Property access on item without type', () => {
+                const item = document.getElementById('no-itemtype').microdata;
+                assert(item.name === 'Item without type', 'Should access properties normally');
+                assert(Object.keys(item).includes('name'), 'Should enumerate properties');
+            });
+            
+            // Test JSON serialization
+            test('JSON serialization of edge cases', () => {
+                const item = document.getElementById('malformed-url').microdata;
+                const json = JSON.stringify(item);
+                const parsed = JSON.parse(json);
+                assert(parsed.name === 'Invalid URL Person', 'Should serialize and parse correctly');
+                assert(parsed['@type'] === 'Person', 'Should include @type in JSON');
+            });
+            
+            // Performance test - many items
+            test('Performance with many items', () => {
+                const start = performance.now();
+                const items = document.microdata;
+                const end = performance.now();
+                assert(end - start < 100, 'Should enumerate items quickly');
+                assert(items.length > 0, 'Should find multiple items');
+            });
+            
+            // Test browser compatibility features
+            test('Browser compatibility checks', () => {
+                assert(typeof Proxy !== 'undefined', 'Proxy support required');
+                assert(typeof MutationObserver !== 'undefined', 'MutationObserver support required');
+                assert(Array.isArray(document.microdata), 'MicrodataCollection should be array-like');
+            });
+            
+            // Show summary
+            const summary = document.getElementById('summary');
+            summary.textContent = `Tests completed: ${passCount}/${testCount} passed`;
+            summary.className = passCount === testCount ? 'test-pass' : 'test-fail';
+            
+            // Show warning/error count
+            const warningCount = capturedLogs.filter(l => l.type === 'warning').length;
+            const errorCount = capturedLogs.filter(l => l.type === 'error').length;
+            const logSummary = document.createElement('div');
+            logSummary.textContent = `Console: ${warningCount} warnings, ${errorCount} errors`;
+            summary.appendChild(logSummary);
+            
+        }, 1000); // Wait for schema loading attempts
+    </script>
+</body>
+</html>
