@@ -1545,14 +1545,21 @@ class Template {
             // Look for template with matching itemtype
             const templates = document.querySelectorAll('template');
             for (const t of templates) {
-                const content = t.content;
-                const itemtypeEl = content.querySelector('[itemtype]');
-                if (itemtypeEl) {
-                    const itemtype = itemtypeEl.getAttribute('itemtype');
-                    if (itemtype && itemtype.endsWith('/' + obj['@type'])) {
-                        template = t;
-                        break;
+                // Check if template element itself has itemtype
+                let itemtype = t.getAttribute('itemtype');
+                
+                // If not, check inside template content
+                if (!itemtype) {
+                    const content = t.content;
+                    const itemtypeEl = content.querySelector('[itemtype]');
+                    if (itemtypeEl) {
+                        itemtype = itemtypeEl.getAttribute('itemtype');
                     }
+                }
+                
+                if (itemtype && (itemtype === obj['@type'] || itemtype.endsWith('/' + obj['@type']))) {
+                    template = t;
+                    break;
                 }
             }
         }
@@ -1755,7 +1762,13 @@ class TemplateSynchronizer {
             
             if (renderedItems.has(id)) {
                 // Update existing
-                this._updateRenderedItem(renderedItems.get(id), item);
+                const existingElement = renderedItems.get(id);
+                if (existingElement && existingElement.parentElement) {
+                    this._updateRenderedItem(existingElement, item);
+                } else {
+                    // Element was removed, clean up
+                    renderedItems.delete(id);
+                }
             } else {
                 // Create new
                 const rendered = this._renderItem(template, item);
@@ -1783,6 +1796,11 @@ class TemplateSynchronizer {
     
     _updateRenderedItem(element, item) {
         // Re-render in place
+        if (!element.parentElement) {
+            // Element has been removed from DOM
+            return element;
+        }
+        
         const templateEl = element.parentElement.querySelector('template');
         if (templateEl) {
             const templateInstance = new Template(templateEl);

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 7 Module Structure Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .code-block { background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 7 Module Structure Test</h1>
+    
+    <!-- Test Data -->
+    <div class="test-section">
+        <h2>Test Data</h2>
+        
+        <div id="person1" itemscope itemtype="https://schema.org/Person">
+            <span itemprop="name">Test Person</span>
+            <span itemprop="email">test@example.com</span>
+        </div>
+        
+        <template id="person-template" itemscope itemtype="https://schema.org/Person">
+            <div class="person-card">
+                <h3 itemprop="name"></h3>
+                <p>Email: <span itemprop="email"></span></p>
+            </div>
+        </template>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script>
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+    </script>
+    
+    <script type="module">
+        // Test ES Module imports
+        import Microdata, { Microdata as NamedMicrodata, Schema, Template, MicrodataItem, MicrodataCollection } from './index.mjs';
+        
+        // Run tests after module loads
+        setTimeout(() => {
+            results.innerHTML = '<h3>Running Module Structure tests...</h3>';
+            
+            // Test 7.1: ES Module Exports
+            test('Default export is Microdata', () => {
+                assert(Microdata !== undefined, 'Default export should exist');
+                assert(typeof Microdata === 'function', 'Microdata should be a constructor');
+            });
+            
+            test('Named export Microdata', () => {
+                assert(NamedMicrodata !== undefined, 'Named export should exist');
+                assert(NamedMicrodata === Microdata, 'Named and default exports should be the same');
+            });
+            
+            test('Named export Schema', () => {
+                assert(Schema !== undefined, 'Schema should be exported');
+                assert(typeof Schema === 'function', 'Schema should be a constructor');
+            });
+            
+            test('Named export Template', () => {
+                assert(Template !== undefined, 'Template should be exported');
+                assert(typeof Template === 'function', 'Template should be a constructor');
+            });
+            
+            test('Named export MicrodataItem', () => {
+                assert(MicrodataItem !== undefined, 'MicrodataItem should be exported');
+                assert(typeof MicrodataItem === 'function', 'MicrodataItem should be a constructor');
+            });
+            
+            test('Named export MicrodataCollection', () => {
+                assert(MicrodataCollection !== undefined, 'MicrodataCollection should be exported');
+                assert(typeof MicrodataCollection === 'function', 'MicrodataCollection should be a constructor');
+            });
+            
+            // Test window globals
+            test('window.Microdata global', () => {
+                assert(window.Microdata !== undefined, 'window.Microdata should exist');
+                assert(window.Microdata === Microdata, 'window.Microdata should match the export');
+            });
+            
+            test('window.Microdata.Schema global', () => {
+                assert(window.Microdata.Schema !== undefined, 'window.Microdata.Schema should exist');
+                assert(window.Microdata.Schema === Schema, 'window.Microdata.Schema should match the export');
+            });
+            
+            test('window.Microdata.Template global', () => {
+                assert(window.Microdata.Template !== undefined, 'window.Microdata.Template should exist');
+                assert(window.Microdata.Template === Template, 'window.Microdata.Template should match the export');
+            });
+            
+            // Test 7.2: Static Methods
+            test('Microdata.fetch() static method', () => {
+                assert(typeof Microdata.fetch === 'function', 'Microdata.fetch should be a function');
+            });
+            
+            test('Template.render() static method', () => {
+                assert(typeof Template.render === 'function', 'Template.render should be a function');
+            });
+            
+            test('Schema.clearCache() static method', () => {
+                assert(typeof Schema.clearCache === 'function', 'Schema.clearCache should be a function');
+            });
+            
+            // Test static method functionality
+            test('Template.render() shorthand works', () => {
+                const data = {
+                    '@type': 'https://schema.org/Person',
+                    name: 'Static Test',
+                    email: 'static@example.com'
+                };
+                
+                const rendered = Template.render(data);
+                assert(rendered !== null, 'Should render something');
+                // The template exists and should match Person type
+                assert(rendered.querySelector('[itemprop="name"]').textContent === 'Static Test', 'Should render name');
+                assert(rendered.querySelector('[itemprop="email"]').textContent === 'static@example.com', 'Should render email');
+            });
+            
+            test('Schema.clearCache() clears cache', () => {
+                // This is hard to test without access to internals, but we can verify it doesn't throw
+                Schema.clearCache();
+                assert(true, 'clearCache should not throw');
+            });
+            
+            // Test Microdata is a static class
+            test('Microdata is a static class', () => {
+                assert(typeof Microdata === 'function', 'Microdata should be a constructor function');
+                assert(typeof Microdata.fetch === 'function', 'Should have static fetch method');
+                // Microdata is a static class and shouldn't be instantiated
+            });
+            
+            test('Can access document.microdata', () => {
+                assert(document.microdata !== undefined, 'document.microdata should exist');
+                assert(document.microdata instanceof MicrodataCollection, 'document.microdata should be MicrodataCollection instance');
+                assert(Array.isArray(document.microdata), 'Should be array-like');
+                assert(document.microdata.length >= 0, 'Should have length property');
+            });
+            
+            test('Can access element.microdata', () => {
+                const person = document.getElementById('person1');
+                assert(person.microdata !== undefined, 'element.microdata should exist');
+                assert(person.microdata instanceof MicrodataItem, 'element.microdata should be MicrodataItem instance');
+            });
+            
+            // Show summary
+            const summary = document.getElementById('summary');
+            summary.textContent = `Tests completed: ${passCount}/${testCount} passed`;
+            summary.className = passCount === testCount ? 'test-pass' : 'test-fail';
+            
+        }, 1000); // Wait for DOMContentLoaded and schema loading
+    </script>
+</body>
+</html>

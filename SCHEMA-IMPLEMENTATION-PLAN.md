@@ -198,18 +198,18 @@ This document outlines the complete implementation plan for the Microdata API as
 ## Phase 7: Module Structure
 
 ### 7.1 ES Module Exports
-- [ ] Export Microdata as named export
-- [ ] Export Schema as named export
-- [ ] Export Template as named export
-- [ ] Export Microdata as default export
-- [ ] Set window.Microdata global
-- [ ] Set window.Microdata.Schema
-- [ ] Set window.Microdata.Template
+- [x] Export Microdata as named export
+- [x] Export Schema as named export
+- [x] Export Template as named export
+- [x] Export Microdata as default export
+- [x] Set window.Microdata global
+- [x] Set window.Microdata.Schema
+- [x] Set window.Microdata.Template
 
 ### 7.2 Static Methods
-- [ ] Implement Microdata.fetch() static method
-- [ ] Implement Template.render() static shorthand
-- [ ] Add Schema.clearCache() for testing
+- [x] Implement Microdata.fetch() static method
+- [x] Implement Template.render() static shorthand
+- [x] Add Schema.clearCache() for testing
 
 ## Phase 8: Edge Cases and Polish
 
