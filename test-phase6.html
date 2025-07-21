@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 6 Event System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .event-log { background: #f9f9f9; padding: 10px; margin: 10px 0; max-height: 200px; overflow-y: auto; }
+        .event-item { margin: 2px 0; padding: 2px 5px; background: #fff; border-left: 3px solid #ccc; }
+        .event-item.error { border-color: #f00; }
+        .event-item.loaded { border-color: #0a0; }
+        .event-item.invalid { border-color: #fa0; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 6 Event System Test</h1>
+    
+    <!-- Test Data with various schemas -->
+    <div class="test-section">
+        <h2>Test Data</h2>
+        
+        <!-- Valid schema.org items -->
+        <div id="person1" itemscope itemtype="https://schema.org/Person">
+            <span itemprop="name">John Doe</span>
+            <span itemprop="email">john@example.com</span>
+        </div>
+        
+        <!-- Invalid schema URL (should trigger error) -->
+        <div id="invalid1" itemscope itemtype="https://invalid.example.com/DoesNotExist">
+            <span itemprop="foo">bar</span>
+        </div>
+        
+        <!-- Valid rustybeam.net schema for validation testing -->
+        <div id="credential1" itemscope itemtype="https://rustybeam.net/schema/Credential">
+            <span itemprop="username">testuser</span>
+            <span itemprop="password">secret</span>
+            <span itemprop="role">admin</span>
+            <span itemprop="encryption">plaintext</span>
+        </div>
+        
+        <!-- Invalid data for validation testing -->
+        <div id="credential2" itemscope itemtype="https://rustybeam.net/schema/Credential">
+            <span itemprop="username">baduser</span>
+            <!-- Missing required password property -->
+            <span itemprop="role">guest</span>
+        </div>
+        
+        <!-- Another invalid schema URL -->
+        <div id="invalid2" itemscope itemtype="http://404.example.com/NotFound">
+            <span itemprop="test">value</span>
+        </div>
+    </div>
+    
+    <!-- Event Log -->
+    <div class="test-section">
+        <h2>Event Log</h2>
+        <div id="event-log" class="event-log"></div>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script>
+        // Set up event tracking BEFORE loading the module
+        const results = document.getElementById('test-results');
+        const eventLog = document.getElementById('event-log');
+        let testCount = 0;
+        let passCount = 0;
+        
+        // Event tracking
+        const events = {
+            DOMSchemasLoaded: [],
+            DOMSchemaError: [],
+            DOMSchemaInvalidData: []
+        };
+        
+        function logEvent(type, detail, target) {
+            console.log(`Event: ${type}`, detail); // Debug logging
+            const item = document.createElement('div');
+            item.className = 'event-item';
+            
+            if (type === 'DOMSchemaError') {
+                item.className += ' error';
+            } else if (type === 'DOMSchemasLoaded') {
+                item.className += ' loaded';
+            } else if (type === 'DOMSchemaInvalidData') {
+                item.className += ' invalid';
+            }
+            
+            const targetInfo = target === document ? 'document' : 
+                             target.id ? `#${target.id}` : 
+                             target.tagName ? target.tagName.toLowerCase() : 'unknown';
+            
+            item.textContent = `${type} on ${targetInfo}: ${JSON.stringify(detail)}`;
+            eventLog.appendChild(item);
+            
+            events[type].push({ detail, target: targetInfo, timestamp: Date.now() });
+        }
+        
+        // Set up event listeners BEFORE loading the module
+        document.addEventListener('DOMSchemasLoaded', (e) => {
+            logEvent('DOMSchemasLoaded', e.detail, e.target);
+        });
+        
+        document.addEventListener('DOMSchemaError', (e) => {
+            logEvent('DOMSchemaError', e.detail, e.target);
+        });
+        
+        document.addEventListener('DOMSchemaInvalidData', (e) => {
+            logEvent('DOMSchemaInvalidData', e.detail, e.target);
+        });
+        
+        // Also listen on specific elements
+        document.querySelectorAll('[itemscope]').forEach(el => {
+            el.addEventListener('DOMSchemaError', (e) => {
+                logEvent('DOMSchemaError', e.detail, e.target);
+                e.stopPropagation(); // Prevent double logging
+            });
+            
+            el.addEventListener('DOMSchemaInvalidData', (e) => {
+                logEvent('DOMSchemaInvalidData', e.detail, e.target);
+                e.stopPropagation(); // Prevent double logging
+            });
+        });
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        async function testAsync(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                await fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        // Wait for schemas to load
+        let schemasLoaded = false;
+        document.addEventListener('DOMSchemasLoaded', () => {
+            schemasLoaded = true;
+        });
+    </script>
+    
+    <script type="module">
+        // Import module after event listeners are set up
+        import { Microdata, Schema, RustyBeamNetSchema } from './index.mjs';
+        
+        // Make imports available globally for tests
+        window.Microdata = Microdata;
+        window.Schema = Schema;
+        window.RustyBeamNetSchema = RustyBeamNetSchema;
+        
+        // Run tests after a delay to capture all events
+        setTimeout(async () => {
+            results.innerHTML = '<h3>Running Event System tests...</h3>';
+            
+            // Test 6.1: DOMSchemasLoaded event
+            test('DOMSchemasLoaded event fired', () => {
+                assert(schemasLoaded, 'DOMSchemasLoaded should have fired');
+                assert(events.DOMSchemasLoaded.length > 0, 'Should have captured DOMSchemasLoaded event');
+            });
+            
+            test('DOMSchemasLoaded event detail', () => {
+                const event = events.DOMSchemasLoaded[0];
+                assert(event.detail !== undefined, 'Event should have detail');
+                assert(event.detail.loaded !== undefined, 'Detail should have loaded array');
+                assert(event.detail.failed !== undefined, 'Detail should have failed array');
+                assert(event.detail.total !== undefined, 'Detail should have total count');
+                assert(event.detail.total === 4, 'Should have detected 4 unique schemas');
+            });
+            
+            test('DOMSchemasLoaded loaded schemas', () => {
+                const event = events.DOMSchemasLoaded[0];
+                const loadedUrls = event.detail.loaded.map(s => s.url);
+                assert(loadedUrls.includes('https://schema.org/Person'), 'Should have loaded Person schema');
+                assert(loadedUrls.includes('https://rustybeam.net/schema/Credential'), 'Should have loaded Credential schema');
+            });
+            
+            // Test 6.2: DOMSchemaError events
+            test('DOMSchemaError events fired', () => {
+                assert(events.DOMSchemaError.length > 0, 'Should have captured DOMSchemaError events');
+                const errorUrls = events.DOMSchemaError.map(e => e.detail.schemaURL);
+                assert(errorUrls.includes('https://invalid.example.com/DoesNotExist'), 'Should have error for invalid schema');
+                assert(errorUrls.includes('http://404.example.com/NotFound'), 'Should have error for 404 schema');
+            });
+            
+            test('DOMSchemaError event detail', () => {
+                const errorEvent = events.DOMSchemaError.find(e => 
+                    e.detail.schemaURL === 'https://invalid.example.com/DoesNotExist'
+                );
+                assert(errorEvent !== undefined, 'Should find error event');
+                assert(errorEvent.detail.error !== undefined, 'Should have error object');
+                assert(errorEvent.detail.message !== undefined, 'Should have error message');
+            });
+            
+            test('DOMSchemaError bubbling', () => {
+                // Check that errors were fired on both elements and document
+                const elementErrors = events.DOMSchemaError.filter(e => e.target !== 'document');
+                const documentErrors = events.DOMSchemaError.filter(e => e.target === 'document');
+                
+                assert(elementErrors.length > 0, 'Should have errors on elements');
+                assert(documentErrors.length > 0, 'Should have errors on document');
+            });
+            
+            // Test 6.3: Validation after schemas loaded
+            test('MicrodataItem validate method', () => {
+                const validItem = document.getElementById('person1').microdata;
+                const result = validItem.validate();
+                assert(typeof result === 'boolean', 'validate() should return boolean');
+                assert(result === true, 'Valid item should pass validation');
+            });
+            
+            // Test 6.4: DOMSchemaInvalidData events
+            await testAsync('DOMSchemaInvalidData on validation', async () => {
+                // Clear previous events
+                events.DOMSchemaInvalidData = [];
+                
+                // Create a RustyBeamNet schema with strict validation
+                const schema = new window.RustyBeamNetSchema('https://rustybeam.net/schema/Credential', {
+                    '@type': 'Schema',
+                    '@context': 'https://rustybeam.net/schema/',
+                    'username': {
+                        '@type': 'Property',
+                        'name': 'username',
+                        'type': 'https://rustybeam.net/schema/Text',
+                        'cardinality': '1'
+                    },
+                    'password': {
+                        '@type': 'Property',
+                        'name': 'password',
+                        'type': 'https://rustybeam.net/schema/Text',
+                        'cardinality': '1'  // Required
+                    }
+                });
+                schema.loaded = true;
+                
+                // Validate invalid item
+                const invalidItem = document.getElementById('credential2').microdata;
+                const isValid = schema.validate(invalidItem);
+                
+                assert(isValid === false, 'Invalid item should fail validation');
+                
+                // Wait for events to propagate
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                assert(events.DOMSchemaInvalidData.length > 0, 'Should have fired DOMSchemaInvalidData');
+            });
+            
+            test('DOMSchemaInvalidData event detail', () => {
+                const invalidEvent = events.DOMSchemaInvalidData[0];
+                if (invalidEvent) {
+                    assert(invalidEvent.detail.property === 'password', 'Should identify missing property');
+                    assert(invalidEvent.detail.type === 'cardinality', 'Should identify cardinality error');
+                    assert(invalidEvent.detail.expected === '1', 'Should show expected cardinality');
+                    assert(invalidEvent.detail.schema !== undefined, 'Should include schema URL');
+                }
+            });
+            
+            // Test 6.5: Event timing
+            test('Events fired in correct order', () => {
+                // Schema errors should fire before DOMSchemasLoaded
+                const firstError = events.DOMSchemaError[0];
+                const schemasLoaded = events.DOMSchemasLoaded[0];
+                
+                if (firstError && schemasLoaded) {
+                    assert(firstError.timestamp <= schemasLoaded.timestamp, 
+                        'Schema errors should fire before DOMSchemasLoaded');
+                }
+            });
+            
+            // Display summary
+            setTimeout(() => {
+                const summary = document.getElementById('summary');
+                summary.innerHTML = `
+                    <h2>Test Summary</h2>
+                    <div>Total Tests: ${testCount}</div>
+                    <div>Passed: ${passCount}</div>
+                    <div>Failed: ${testCount - passCount}</div>
+                    <div>${passCount === testCount ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
+                    <h3>Event Summary</h3>
+                    <div>DOMSchemasLoaded: ${events.DOMSchemasLoaded.length}</div>
+                    <div>DOMSchemaError: ${events.DOMSchemaError.length}</div>
+                    <div>DOMSchemaInvalidData: ${events.DOMSchemaInvalidData.length}</div>
+                `;
+            }, 500);
+            
+        }, 1000); // Wait for initial schema loading
+    </script>
+</body>
+</html>

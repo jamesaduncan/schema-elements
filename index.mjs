@@ -325,11 +325,6 @@ class MicrodataItem {
         }
     }
     
-    validate() {
-        // TODO: Implement validation once Schema class is ready
-        return true;
-    }
-    
     toJSON() {
         const json = {
             '@type': this['@type'],
@@ -722,7 +717,11 @@ class Schema {
             
             // Fire error event
             const event = new CustomEvent('DOMSchemaError', {
-                detail: { url, error },
+                detail: { 
+                    schemaURL: url, 
+                    error: error,
+                    message: error.message || 'Failed to load schema'
+                },
                 bubbles: true
             });
             
@@ -734,8 +733,8 @@ class Schema {
                 document.dispatchEvent(event);
             }
             
-            // Default to SchemaOrgSchema
-            return new SchemaOrgSchema(url, {});
+            // Re-throw the error instead of defaulting
+            throw error;
         }
     }
     
@@ -963,6 +962,7 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
     _parseSchemaData(data) {
         // Parse property definitions from rustybeam.net schema format
         if (data.properties && Array.isArray(data.properties)) {
+            // Handle array format
             for (const prop of data.properties) {
                 if (prop['@type'] === 'Property' && prop.name) {
                     this.propertyDefinitions.set(prop.name, {
@@ -970,6 +970,19 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
                         type: prop.type,
                         cardinality: prop.cardinality || '0..n',
                         description: prop.description
+                    });
+                }
+            }
+        } else {
+            // Handle object format where properties are defined as keys
+            for (const [key, value] of Object.entries(data)) {
+                if (key.startsWith('@')) continue; // Skip metadata
+                if (value && value['@type'] === 'Property') {
+                    this.propertyDefinitions.set(key, {
+                        name: value.name || key,
+                        type: value.type,
+                        cardinality: value.cardinality || '0..n',
+                        description: value.description
                     });
                 }
             }
@@ -1117,13 +1130,22 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
         });
         
         // Find the element with this itemprop
+        let targetElement = null;
+        
         if (obj instanceof Element) {
-            const propElement = obj.querySelector(`[itemprop~="${property}"]`);
+            targetElement = obj;
+        } else if (obj && obj._element instanceof Element) {
+            // Handle MicrodataItem objects
+            targetElement = obj._element;
+        }
+        
+        if (targetElement) {
+            const propElement = targetElement.querySelector(`[itemprop~="${property}"]`);
             if (propElement) {
                 propElement.dispatchEvent(event);
                 return;
             }
-            obj.dispatchEvent(event);
+            targetElement.dispatchEvent(event);
         } else {
             document.dispatchEvent(event);
         }
@@ -1553,24 +1575,70 @@ function loadAllSchemas() {
     
     // Find all unique itemtype URLs
     const itemtypes = new Set();
+    const itemtypeElements = new Map(); // Track which elements use which schemas
+    
     document.querySelectorAll('[itemtype]').forEach(el => {
         const itemtype = el.getAttribute('itemtype');
         if (itemtype) {
             itemtypes.add(itemtype);
+            if (!itemtypeElements.has(itemtype)) {
+                itemtypeElements.set(itemtype, []);
+            }
+            itemtypeElements.get(itemtype).push(el);
         }
     });
     
+    // Track loaded schemas
+    const loadedSchemas = [];
+    const failedSchemas = [];
+    
     // Load all schemas
     const promises = Array.from(itemtypes).map(url => 
-        Schema.load(url).catch(err => {
-            console.warn(`Failed to load schema ${url}:`, err);
-            return null;
-        })
+        Schema.load(url)
+            .then(schema => {
+                loadedSchemas.push({ url, schema });
+                return schema;
+            })
+            .catch(err => {
+                console.warn(`Failed to load schema ${url}:`, err);
+                failedSchemas.push({ url, error: err });
+                
+                // Fire DOMSchemaError on elements that use this schema
+                const elements = itemtypeElements.get(url) || [];
+                elements.forEach(element => {
+                    const event = new CustomEvent('DOMSchemaError', {
+                        detail: {
+                            schemaURL: url,
+                            error: err,
+                            message: err.message || 'Failed to load schema'
+                        },
+                        bubbles: true
+                    });
+                    element.dispatchEvent(event);
+                });
+                
+                // Also fire on document
+                document.dispatchEvent(new CustomEvent('DOMSchemaError', {
+                    detail: {
+                        schemaURL: url,
+                        error: err,
+                        message: err.message || 'Failed to load schema'
+                    }
+                }));
+                
+                return null;
+            })
     );
     
     // Fire event when all loaded
     Promise.all(promises).then(() => {
-        document.dispatchEvent(new Event('DOMSchemasLoaded'));
+        document.dispatchEvent(new CustomEvent('DOMSchemasLoaded', {
+            detail: {
+                loaded: loadedSchemas,
+                failed: failedSchemas,
+                total: itemtypes.size
+            }
+        }));
     });
 }
 
@@ -1582,19 +1650,21 @@ if (document.readyState === 'loading') {
 }
 
 // Update MicrodataItem validate method
-MicrodataItem.prototype.validate = async function() {
+MicrodataItem.prototype.validate = function() {
     const itemtype = this._element.getAttribute('itemtype');
     if (!itemtype) {
         return true; // No schema to validate against
     }
     
-    try {
-        const schema = await Schema.load(itemtype);
-        return schema.validate(this);
-    } catch (error) {
-        console.warn(`Failed to validate against schema ${itemtype}:`, error);
-        return true; // Be permissive on error
+    // Get schema from cache
+    const schema = schemaCache.get(itemtype);
+    if (!schema || !schema.loaded) {
+        // Schema not loaded yet
+        console.warn(`Schema ${itemtype} not loaded yet. Call after DOMSchemasLoaded event.`);
+        return true; // Be permissive if schema not loaded
     }
+    
+    return schema.validate(this);
 };
 
 /**

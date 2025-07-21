@@ -175,25 +175,25 @@ This document outlines the complete implementation plan for the Microdata API as
 - [x] Maintain isolation from main document
 - [x] Support microdata operations on fetched content
 
-## Phase 6: Event System
+## Phase 6: Event System ✅
 
 ### 6.1 Document Events
-- [ ] Implement DOMSchemasLoaded event
-- [ ] Fire when all schemas loaded on initial page load
-- [ ] Include loaded schemas in event detail
-- [ ] Implement DOMSchemaError event
-- [ ] Fire for each schema that fails to load
-- [ ] Include schema URL and error in event detail
+- [x] Implement DOMSchemasLoaded event
+- [x] Fire when all schemas loaded on initial page load
+- [x] Include loaded schemas in event detail
+- [x] Implement DOMSchemaError event
+- [x] Fire for each schema that fails to load
+- [x] Include schema URL and error in event detail
 
 ### 6.2 Element Events
-- [ ] Implement DOMSchemaInvalidData event
-- [ ] Fire on itemprop element for invalid value
-- [ ] Bubble to itemscope element
-- [ ] Bubble to document
-- [ ] Include validation details in event
-- [ ] Implement DOMSchemaError on elements
-- [ ] Fire on itemtype element for schema load failure
-- [ ] Then fire on document
+- [x] Implement DOMSchemaInvalidData event
+- [x] Fire on itemprop element for invalid value
+- [x] Bubble to itemscope element
+- [x] Bubble to document
+- [x] Include validation details in event
+- [x] Implement DOMSchemaError on elements
+- [x] Fire on itemtype element for schema load failure
+- [x] Then fire on document
 
 ## Phase 7: Module Structure
 
