@@ -7,8 +7,28 @@
 
 /**
  * MicrodataItem - Represents a single microdata item with live DOM binding
+ * 
+ * @class MicrodataItem
+ * @description Provides a proxy-based interface for accessing and manipulating microdata properties
+ *              with automatic DOM synchronization. Supports JSON-LD compatible property access.
+ * 
+ * @example
+ * // Access microdata from an element
+ * const person = document.getElementById('person').microdata;
+ * console.log(person.name); // "John Doe"
+ * person.email = "john@example.com"; // Updates DOM
+ * 
+ * @example
+ * // Convert to JSON-LD
+ * const jsonld = person.toJSON();
+ * // { "@type": "Person", "@context": "https://schema.org/", "name": "John Doe", ... }
  */
 class MicrodataItem {
+    /**
+     * Creates a new MicrodataItem instance
+     * @param {HTMLElement} element - DOM element with itemscope attribute
+     * @throws {Error} If element is missing or lacks itemscope attribute
+     */
     constructor(element) {
         if (!element || !element.hasAttribute('itemscope')) {
             throw new Error('MicrodataItem requires an element with itemscope attribute');
@@ -215,15 +235,26 @@ class MicrodataItem {
         const elements = this._getPropertyElements(name);
         
         if (Array.isArray(value)) {
-            // Setting array value
+            // Update existing elements
             elements.forEach((el, index) => {
                 if (index < value.length) {
                     this._setValue(el, value[index]);
                 }
             });
             
-            // TODO: Handle case where value.length > elements.length
-            // This would require creating new elements
+            // Create new elements if needed
+            if (value.length > elements.length) {
+                for (let i = elements.length; i < value.length; i++) {
+                    this._createPropertyElement(name, value[i]);
+                }
+            }
+            
+            // Remove excess elements
+            if (value.length < elements.length) {
+                for (let i = value.length; i < elements.length; i++) {
+                    elements[i].remove();
+                }
+            }
         } else {
             // Setting single value
             if (elements.length > 0) {
@@ -233,12 +264,21 @@ class MicrodataItem {
                 for (let i = 1; i < elements.length; i++) {
                     elements[i].remove();
                 }
+            } else {
+                // Create new element
+                this._createPropertyElement(name, value);
             }
-            // TODO: Handle case where no elements exist
-            // This would require creating new elements
         }
         
         return true;
+    }
+    
+    _createPropertyElement(name, value) {
+        const element = document.createElement('span');
+        element.setAttribute('itemprop', name);
+        this._setValue(element, value);
+        this._element.appendChild(element);
+        return element;
     }
     
     _hasProperty(name) {
@@ -341,6 +381,10 @@ class MicrodataItem {
         }
     }
     
+    /**
+     * Converts the microdata item to JSON-LD format
+     * @returns {Object} JSON-LD representation of the microdata item
+     */
     toJSON() {
         const json = {
             '@type': this['@type'],
@@ -369,6 +413,21 @@ class MicrodataItem {
 
 /**
  * MicrodataCollection - Collection that supports both array and object access
+ * 
+ * @class MicrodataCollection
+ * @extends Array
+ * @description Provides a hybrid array/object interface for accessing microdata items.
+ *              Items can be accessed by numeric index or by element ID.
+ * 
+ * @example
+ * // Access by index
+ * const firstPerson = document.microdata[0];
+ * 
+ * // Access by ID
+ * const johnDoe = document.microdata.person1;
+ * 
+ * // Iterate as array
+ * document.microdata.forEach(item => console.log(item.name));
  */
 class MicrodataCollection extends Array {
     constructor() {
@@ -493,6 +552,11 @@ class MicrodataCollection extends Array {
 
 /**
  * MicrodataObserver - Handles DOM mutations and updates microdata collections
+ * 
+ * @class MicrodataObserver
+ * @description Internal class that monitors DOM changes and maintains synchronization
+ *              between the DOM and microdata collections.
+ * @private
  */
 class MicrodataObserver {
     constructor(collection) {
@@ -607,6 +671,11 @@ class MicrodataObserver {
 
 /**
  * Initialize microdata API on document
+ * 
+ * @function initializeMicrodataAPI
+ * @description Sets up the microdata API on the document and Element prototype.
+ *              Adds document.microdata collection and element.microdata property.
+ * @private
  */
 function initializeMicrodataAPI() {
     if (typeof document === 'undefined') {
@@ -626,6 +695,9 @@ function initializeMicrodataAPI() {
         },
         configurable: true
     });
+    
+    // Store observer reference for cleanup
+    microdataCollection._observer = observer;
     
     // Add microdata property to elements
     Object.defineProperty(Element.prototype, 'microdata', {
@@ -658,6 +730,106 @@ function initializeMicrodataAPI() {
 initializeMicrodataAPI();
 
 /**
+ * Utility function to extract data from various object types
+ * @param {MicrodataItem|HTMLFormElement|Element|Object} obj - Object to extract data from
+ * @returns {Object} Extracted data as plain object
+ * @private
+ */
+function extractMicrodataData(obj) {
+    if (obj instanceof MicrodataItem) {
+        return obj.toJSON();
+    }
+    
+    if (obj instanceof HTMLFormElement) {
+        // Extract form data with enhanced support for all form elements
+        const data = {};
+        
+        // Process all form elements
+        const elements = obj.elements;
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i];
+            if (!element.name) continue;
+            
+            const name = element.name;
+            let value;
+            
+            switch (element.type) {
+                case 'checkbox':
+                    if (element.checked) {
+                        value = element.value || 'on';
+                        // Handle checkbox groups for arrays
+                        if (name.endsWith('[]')) {
+                            const baseName = name.slice(0, -2);
+                            if (!data[baseName]) data[baseName] = [];
+                            data[baseName].push(value);
+                        } else {
+                            if (data[name]) {
+                                // Convert to array if multiple checkboxes with same name
+                                if (!Array.isArray(data[name])) {
+                                    data[name] = [data[name]];
+                                }
+                                data[name].push(value);
+                            } else {
+                                data[name] = value;
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'radio':
+                    if (element.checked) {
+                        data[name] = element.value;
+                    }
+                    break;
+                    
+                case 'select-multiple':
+                    const selectedOptions = [];
+                    for (let j = 0; j < element.options.length; j++) {
+                        if (element.options[j].selected) {
+                            selectedOptions.push(element.options[j].value);
+                        }
+                    }
+                    data[name] = selectedOptions;
+                    break;
+                    
+                case 'select-one':
+                    data[name] = element.value;
+                    break;
+                    
+                case 'textarea':
+                    data[name] = element.value;
+                    break;
+                    
+                case 'text':
+                case 'password':
+                case 'email':
+                case 'number':
+                case 'tel':
+                case 'url':
+                case 'date':
+                case 'time':
+                case 'datetime-local':
+                case 'color':
+                case 'range':
+                case 'hidden':
+                    data[name] = element.value;
+                    break;
+            }
+        }
+        
+        return data;
+    }
+    
+    if (obj instanceof Element && obj.hasAttribute('itemscope')) {
+        const item = new MicrodataItem(obj);
+        return item.toJSON();
+    }
+    
+    // Plain object
+    return obj;
+}
+
+/**
  * Schema Loading and Caching System
  */
 const schemaCache = new Map();
@@ -665,6 +837,21 @@ const schemaLoadingPromises = new Map();
 
 /**
  * Base Schema class - Factory that returns appropriate subclass
+ * 
+ * @class Schema
+ * @description Factory class for creating and loading schema definitions.
+ *              Automatically returns the appropriate subclass (SchemaOrgSchema or RustyBeamNetSchema)
+ *              based on the schema URL.
+ * 
+ * @example
+ * // Load a schema
+ * const personSchema = await Schema.load('https://schema.org/Person');
+ * 
+ * // Validate an object
+ * const isValid = personSchema.validate(microdataItem);
+ * 
+ * // Clear cache
+ * Schema.clearCache();
  */
 class Schema {
     constructor(url) {
@@ -688,6 +875,12 @@ class Schema {
         return new SchemaOrgSchema(url, {});
     }
     
+    /**
+     * Loads a schema from a URL with caching
+     * @param {string} url - The schema URL
+     * @returns {Promise<Schema>} The loaded schema instance
+     * @static
+     */
     static async load(url) {
         // Check cache first
         if (schemaCache.has(url)) {
@@ -816,6 +1009,10 @@ class Schema {
         return new SchemaOrgSchema(url, data);
     }
     
+    /**
+     * Clears all cached schemas
+     * @static
+     */
     static clearCache() {
         schemaCache.clear();
         schemaLoadingPromises.clear();
@@ -824,6 +1021,11 @@ class Schema {
 
 /**
  * Schema.org Schema - Basic property validation only
+ * 
+ * @class SchemaOrgSchema
+ * @description Handles Schema.org schemas with permissive validation.
+ *              Validates property existence but allows any valid microdata.
+ * @private
  */
 class SchemaOrgSchema {
     constructor(url, data) {
@@ -868,97 +1070,7 @@ class SchemaOrgSchema {
     }
     
     _extractData(obj) {
-        if (obj instanceof MicrodataItem) {
-            return obj.toJSON();
-        }
-        
-        if (obj instanceof HTMLFormElement) {
-            // Extract form data with enhanced support for all form elements
-            const data = {};
-            
-            // Process all form elements
-            const elements = obj.elements;
-            for (let i = 0; i < elements.length; i++) {
-                const element = elements[i];
-                if (!element.name) continue;
-                
-                const name = element.name;
-                let value;
-                
-                switch (element.type) {
-                    case 'checkbox':
-                        if (element.checked) {
-                            value = element.value || 'on';
-                            // Handle checkbox groups for arrays
-                            if (name.endsWith('[]')) {
-                                const baseName = name.slice(0, -2);
-                                if (!data[baseName]) data[baseName] = [];
-                                data[baseName].push(value);
-                            } else {
-                                if (data[name]) {
-                                    // Convert to array if multiple checkboxes with same name
-                                    if (!Array.isArray(data[name])) {
-                                        data[name] = [data[name]];
-                                    }
-                                    data[name].push(value);
-                                } else {
-                                    data[name] = value;
-                                }
-                            }
-                        }
-                        break;
-                        
-                    case 'radio':
-                        if (element.checked) {
-                            data[name] = element.value;
-                        }
-                        break;
-                        
-                    case 'select-multiple':
-                        const selectedOptions = [];
-                        for (let j = 0; j < element.options.length; j++) {
-                            if (element.options[j].selected) {
-                                selectedOptions.push(element.options[j].value);
-                            }
-                        }
-                        data[name] = selectedOptions;
-                        break;
-                        
-                    case 'select-one':
-                        data[name] = element.value;
-                        break;
-                        
-                    case 'textarea':
-                        data[name] = element.value;
-                        break;
-                        
-                    case 'text':
-                    case 'password':
-                    case 'email':
-                    case 'number':
-                    case 'tel':
-                    case 'url':
-                    case 'date':
-                    case 'time':
-                    case 'datetime-local':
-                    case 'color':
-                    case 'range':
-                    case 'hidden':
-                        data[name] = element.value;
-                        break;
-                }
-            }
-            
-            return data;
-        }
-        
-        if (obj instanceof Element && obj.hasAttribute('itemscope')) {
-            const item = new MicrodataItem(obj);
-            return item.toJSON();
-        }
-        
-        // Plain object
-        return obj;
+        return extractMicrodataData(obj);
     }
     
     async load() {
@@ -985,6 +1097,12 @@ class SchemaOrgSchema {
 
 /**
  * RustyBeam.net Schema - Full validation with cardinality and patterns
+ * 
+ * @class RustyBeamNetSchema
+ * @extends SchemaOrgSchema
+ * @description Handles RustyBeam.net schemas with strict validation including
+ *              cardinality constraints and data type pattern matching.
+ * @private
  */
 class RustyBeamNetSchema extends SchemaOrgSchema {
     constructor(url, data) {
@@ -1230,6 +1348,20 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
 
 /**
  * Template Class - Handles rendering of microdata to templates
+ * 
+ * @class Template
+ * @description Manages HTML templates for rendering microdata items.
+ *              Supports bidirectional data binding and automatic synchronization.
+ * 
+ * @example
+ * // Create template from element
+ * const template = new Template(document.querySelector('template'));
+ * 
+ * // Render microdata to template
+ * const rendered = template.render(microdataItem);
+ * 
+ * // Static rendering
+ * const element = Template.render({ '@type': 'Person', name: 'John' });
  */
 class Template {
     constructor(element) {
@@ -1341,97 +1473,7 @@ class Template {
     }
     
     _extractData(obj) {
-        if (obj instanceof MicrodataItem) {
-            return obj.toJSON();
-        }
-        
-        if (obj instanceof HTMLFormElement) {
-            // Extract form data with enhanced support for all form elements
-            const data = {};
-            
-            // Process all form elements
-            const elements = obj.elements;
-            for (let i = 0; i < elements.length; i++) {
-                const element = elements[i];
-                if (!element.name) continue;
-                
-                const name = element.name;
-                let value;
-                
-                switch (element.type) {
-                    case 'checkbox':
-                        if (element.checked) {
-                            value = element.value || 'on';
-                            // Handle checkbox groups for arrays
-                            if (name.endsWith('[]')) {
-                                const baseName = name.slice(0, -2);
-                                if (!data[baseName]) data[baseName] = [];
-                                data[baseName].push(value);
-                            } else {
-                                if (data[name]) {
-                                    // Convert to array if multiple checkboxes with same name
-                                    if (!Array.isArray(data[name])) {
-                                        data[name] = [data[name]];
-                                    }
-                                    data[name].push(value);
-                                } else {
-                                    data[name] = value;
-                                }
-                            }
-                        }
-                        break;
-                        
-                    case 'radio':
-                        if (element.checked) {
-                            data[name] = element.value;
-                        }
-                        break;
-                        
-                    case 'select-multiple':
-                        const selectedOptions = [];
-                        for (let j = 0; j < element.options.length; j++) {
-                            if (element.options[j].selected) {
-                                selectedOptions.push(element.options[j].value);
-                            }
-                        }
-                        data[name] = selectedOptions;
-                        break;
-                        
-                    case 'select-one':
-                        data[name] = element.value;
-                        break;
-                        
-                    case 'textarea':
-                        data[name] = element.value;
-                        break;
-                        
-                    case 'text':
-                    case 'password':
-                    case 'email':
-                    case 'number':
-                    case 'tel':
-                    case 'url':
-                    case 'date':
-                    case 'time':
-                    case 'datetime-local':
-                    case 'color':
-                    case 'range':
-                    case 'hidden':
-                        data[name] = element.value;
-                        break;
-                }
-            }
-            
-            return data;
-        }
-        
-        if (obj instanceof Element && obj.hasAttribute('itemscope')) {
-            const item = new MicrodataItem(obj);
-            return item.toJSON();
-        }
-        
-        // Plain object
-        return obj;
+        return extractMicrodataData(obj);
     }
     
     _renderData(element, data) {
@@ -1588,6 +1630,13 @@ class Template {
         }
     }
     
+    /**
+     * Static method to render an object using an appropriate template
+     * @param {Object} obj - Object to render (must have @type property)
+     * @returns {HTMLElement} The rendered element
+     * @throws {Error} If no suitable template is found
+     * @static
+     */
     static render(obj) {
         // Find appropriate template based on object type
         let template = null;
@@ -1725,8 +1774,87 @@ MicrodataItem.prototype.validate = function() {
     return schema.validate(this);
 };
 
+// Document cache for fetch operations
+const fetchedDocumentCache = new Map();
+
+/**
+ * Fetches the microdata element this item references
+ * @returns {Promise<Element>} The fetched element or this element if authoritative
+ * @throws {Error} If fetch fails or element not found
+ */
+MicrodataItem.prototype.fetch = async function() {
+    // Check if this is an authoritative item (has id attribute)
+    if (this._element.hasAttribute('id')) {
+        // Return the element itself for authoritative items
+        return Promise.resolve(this._element);
+    }
+    
+    // For non-authoritative items, check for itemid
+    const itemid = this._element.getAttribute('itemid');
+    if (!itemid) {
+        throw new Error('Non-authoritative item must have itemid attribute to fetch');
+    }
+    
+    try {
+        // Parse the itemid URL
+        let url;
+        try {
+            url = new URL(itemid, document.baseURI);
+        } catch (urlError) {
+            throw new Error(`Invalid itemid URL: ${itemid}`);
+        }
+        const baseUrl = url.origin + url.pathname;
+        const fragmentId = url.hash.substring(1); // Remove the #
+        
+        if (!fragmentId) {
+            throw new Error('itemid must include a fragment identifier (#id)');
+        }
+        
+        // Check cache first
+        let doc = fetchedDocumentCache.get(baseUrl);
+        
+        if (!doc) {
+            // Fetch the document
+            const response = await fetch(baseUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch ${baseUrl}: ${response.status} ${response.statusText}`);
+            }
+            
+            const html = await response.text();
+            
+            // Parse the HTML
+            const parser = new DOMParser();
+            doc = parser.parseFromString(html, 'text/html');
+            
+            // Cache the document
+            fetchedDocumentCache.set(baseUrl, doc);
+        }
+        
+        // Find the element with the matching ID
+        const element = doc.getElementById(fragmentId);
+        if (!element) {
+            throw new Error(`Element with id "${fragmentId}" not found in ${baseUrl}`);
+        }
+        
+        // Ensure the element has microdata property if it has itemscope & itemtype
+        if (element.hasAttribute('itemscope') && element.hasAttribute('itemtype') && !element.microdata) {
+            // Create MicrodataItem for the fetched element
+            element.microdata = new MicrodataItem(element);
+        }
+        
+        return element;
+    } catch (error) {
+        throw error;
+    }
+};
+
 /**
  * Auto-synchronization system for templates with data-contains
+ * 
+ * @class TemplateSynchronizer
+ * @description Manages automatic rendering and synchronization of templates
+ *              with microdata items based on data-contains attributes.
+ * @private
  */
 class TemplateSynchronizer {
     constructor() {
@@ -1949,6 +2077,11 @@ const templateSynchronizer = new TemplateSynchronizer();
 
 /**
  * FetchedDocument - Wrapper for fetched documents with microdata support
+ * 
+ * @class FetchedDocument
+ * @description Provides microdata access to documents fetched via Microdata.fetch().
+ *              Maintains isolated microdata collection for the fetched document.
+ * @private
  */
 class FetchedDocument {
     constructor(document, url) {
@@ -1986,6 +2119,10 @@ class FetchedDocument {
 
 /**
  * FetchedElement - Wrapper for elements from fetched documents
+ * 
+ * @class FetchedElement
+ * @description Provides microdata access to elements within fetched documents.
+ * @private
  */
 class FetchedElement {
     constructor(element, document) {
@@ -2026,6 +2163,11 @@ class FetchedElement {
 
 /**
  * FetchedDocumentObserver - Handles microdata for fetched documents
+ * 
+ * @class FetchedDocumentObserver
+ * @extends MicrodataObserver
+ * @description Specialized observer for static fetched documents.
+ * @private
  */
 class FetchedDocumentObserver extends MicrodataObserver {
     constructor(collection, document) {
@@ -2073,6 +2215,19 @@ class FetchedDocumentObserver extends MicrodataObserver {
 
 /**
  * Microdata namespace
+ * 
+ * @class Microdata
+ * @description Static namespace providing utility methods for the Microdata API.
+ *              Cannot be instantiated.
+ * 
+ * @example
+ * // Fetch microdata from URL
+ * const doc = await Microdata.fetch('https://example.com/page.html');
+ * const items = doc.microdata;
+ * 
+ * // Access schemas and templates
+ * const PersonSchema = await Microdata.Schema.load('https://schema.org/Person');
+ * const rendered = Microdata.Template.render(data);
  */
 class Microdata {
     constructor() {
@@ -2081,8 +2236,19 @@ class Microdata {
     
     /**
      * Fetch microdata from a remote URL
-     * @param {string} url - The URL to fetch
-     * @returns {Promise<Object>} Document-like or element-like object with microdata
+     * @param {string} url - The URL to fetch (optionally with fragment for specific element)
+     * @returns {Promise<FetchedDocument|FetchedElement>} Document or element wrapper with microdata access
+     * @throws {Error} If fetch fails or fragment not found
+     * 
+     * @example
+     * // Fetch entire document
+     * const doc = await Microdata.fetch('https://example.com/page.html');
+     * const people = doc.microdata; // All microdata items
+     * 
+     * @example
+     * // Fetch specific element by fragment
+     * const element = await Microdata.fetch('https://example.com/page.html#person1');
+     * const person = element.microdata; // Microdata for that element
      */
     static async fetch(url) {
         // Parse URL to check for fragment
@@ -2115,6 +2281,15 @@ class Microdata {
         
         return docWrapper;
     }
+    
+    /**
+     * Clear the fetched document cache
+     * @static
+     * @description Clears all cached documents from fetch operations. Useful for testing.
+     */
+    static clearFetchCache() {
+        fetchedDocumentCache.clear();
+    }
 }
 
 // Set Microdata static properties
@@ -2128,6 +2303,22 @@ if (document.readyState === 'loading') {
     });
 } else {
     templateSynchronizer.start();
+}
+
+// Cleanup on unload
+if (typeof window !== 'undefined') {
+    window.addEventListener('unload', () => {
+        // Stop all observers to prevent memory leaks
+        if (templateSynchronizer.observer) {
+            templateSynchronizer.stop();
+        }
+        
+        // Stop microdata observer if it exists
+        const microdataObserver = document.microdata?._observer;
+        if (microdataObserver?.stop) {
+            microdataObserver.stop();
+        }
+    });
 }
 
 // Export for use

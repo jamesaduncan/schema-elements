@@ -1,724 +1,686 @@
-# Schema Elements - Live Microdata API
+# SchemaElements - Live Microdata API for JavaScript
 
-Schema Elements provides a live, reactive JavaScript API for HTML microdata. It treats microdata embedded in your HTML as a live data layer, automatically synchronizing between the DOM and JavaScript objects.
+SchemaElements is a vanilla JavaScript library that transforms HTML microdata into a live, reactive data layer. It provides seamless two-way data binding between the DOM and JavaScript objects, automatic schema validation, template rendering, and remote data fetching - all without any dependencies.
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Core Concepts](#core-concepts)
+- [API Reference](#api-reference)
+- [Advanced Usage](#advanced-usage)
+- [Schema Support](#schema-support)
+- [Events](#events)
+- [Browser Compatibility](#browser-compatibility)
+- [Examples](#examples)
+- [License](#license)
 
 ## Features
 
-- **Live Data Binding**: Access and modify microdata through `document.microdata` with automatic DOM synchronization
-- **Array Operations**: Full support for array methods (push, pop, splice) on collections
-- **Multi-View Synchronization**: Automatically updates data across multiple views (lists, tables, cards)
-- **Template Rendering**: Render microdata, JSON-LD, forms, or URL content to HTML templates
-- **Apply to DOM**: Apply rendered microdata to existing DOM elements while preserving structure
-- **Direct Data Fetching**: Fetch microdata directly from URLs without requiring templates
-- **Array Repetition**: Use `[]` syntax in templates to automatically repeat elements for arrays
-- **URL Fetching**: Fetch and render data from JSON-LD or HTML URLs
-- **Form Integration**: Extract data from HTML forms and render to templates
-- **Schema Validation**: Built-in support for Schema.org and organised.team schemas with dynamic enumeration validation
-- **Iterator Protocol**: Iterate over microdata items using for...of loops
-- **DOM-to-Microdata Sync**: Changes to the DOM automatically update the microdata objects
-- **Data Source Fetching**: Populate templates from external JSON-LD or HTML microdata files
-- **JSON Serialization**: Easy conversion of microdata to JSON format
+### 🔄 Live Data Binding
+Access and modify microdata through `document.microdata` with automatic DOM synchronization. Changes to JavaScript objects instantly update the DOM, and DOM mutations are reflected in the JavaScript layer.
+
+### 📋 Template System
+Powerful template rendering with auto-synchronization. Templates automatically update when data changes, support array repetition with `[]` syntax, and can render from multiple data sources.
+
+### 🌐 Remote Data Fetching
+Fetch microdata from external URLs, supporting both JSON-LD and HTML with embedded microdata. Individual microdata items can fetch their referenced remote counterparts through the `fetch()` method.
+
+### ✅ Schema Validation
+Built-in support for Schema.org and custom schema validation. Ensures data integrity with type checking, cardinality validation, and custom validation rules.
+
+### 🎯 Form Integration
+Extract data from HTML forms and render to templates. Supports all standard form controls with automatic type conversion.
+
+### 🔍 Advanced Querying
+Full array support with push, pop, splice operations. Iterator protocol support for easy data traversal. Named and indexed access to microdata items.
 
 ## Installation
 
-Include the module in your HTML:
-
+### Via GitHub Pages
 ```html
-<script type="module" src="http://jamesaduncan.github.io/schema-elements/index.mjs"></script>
+<script type="module">
+  import { Microdata, Schema, Template } from 'https://jamesaduncan.github.io/schema-elements/index.mjs';
+</script>
 ```
 
-## Basic Usage
-
-### Accessing Microdata
-
-Given this HTML with microdata:
-
+### Local Installation
 ```html
-<div id="company" itemscope itemtype="https://organised.team/Organization">
-  <h1 itemprop="name">Acme Corporation</h1>
-  <p itemprop="description">A leading provider of innovative solutions</p>
-</div>
+<script type="module" src="./index.mjs"></script>
 ```
 
-Access it via JavaScript:
+## Quick Start
 
-```javascript
-// Access by ID
-const company = document.microdata.company;
-console.log(company.name); // "Acme Corporation"
-console.log(company.description); // "A leading provider of innovative solutions"
-
-// Modify data - DOM updates automatically
-company.name = "Acme Corp";
-```
-
-### Working with Arrays
-
-For properties that can have multiple values:
-
-```html
-<div id="org" itemscope itemtype="https://organised.team/Organization">
-  <h2 itemprop="name">Tech Company</h2>
-  <ul>
-    <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
-      <span itemprop="name">John Doe</span>
-      <span itemprop="email">john@example.com</span>
-    </li>
-    <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
-      <span itemprop="name">Jane Smith</span>
-      <span itemprop="email">jane@example.com</span>
-    </li>
-  </ul>
-</div>
-```
-
-```javascript
-// Access employees array
-const employees = document.microdata.org.employee;
-console.log(employees.length); // 2
-
-// Add new employee - DOM updates automatically
-employees.push({
-  name: "Bob Wilson",
-  email: "bob@example.com"
-});
-
-// Remove last employee
-employees.pop();
-
-// Modify specific employee
-employees[0].name = "John A. Doe";
-```
-
-### Multi-View Synchronization
-
-Define templates for different views that automatically sync:
-
-```html
-<!-- List view template -->
-<ul>
-  <template itemtype="https://schema.org/Person">
-    <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
-      <span itemprop="name"></span> - <span itemprop="email"></span>
-    </li>
-  </template>
-</ul>
-
-<!-- Table view template -->
-<table>
-  <template itemtype="https://schema.org/Person">
-    <tr itemprop="employee" itemscope itemtype="https://schema.org/Person">
-      <td itemprop="name"></td>
-      <td itemprop="email"></td>
-    </tr>
-  </template>
-</table>
-
-<!-- Card view template -->
-<div class="cards">
-  <template itemtype="https://schema.org/Person">
-    <div itemprop="employee" itemscope itemtype="https://schema.org/Person" class="card">
-      <h3 itemprop="name"></h3>
-      <p itemprop="email"></p>
-    </div>
-  </template>
-</div>
-```
-
-When you modify the data, all views update automatically.
-
-### Items Without IDs
-
-Items without an ID are accessible by numeric index:
-
-```html
-<div itemscope itemtype="https://schema.org/Book">
-  <h2 itemprop="name">The Great Gatsby</h2>
-  <span itemprop="author">F. Scott Fitzgerald</span>
-</div>
-```
-
-```javascript
-// Access by index
-const book = document.microdata[0];
-console.log(book.name); // "The Great Gatsby"
-```
-
-### Iterator Protocol
-
-Iterate over all microdata items:
-
-```javascript
-// Using for...of
-for (const item of document.microdata) {
-  console.log(item);
-}
-
-// Using forEach
-document.microdata.forEach((item, key) => {
-  console.log(key, item);
-});
-```
-
-### DOM-to-Microdata Synchronization
-
-Changes to the DOM automatically update the microdata:
-
+### 1. Add Microdata to Your HTML
 ```html
 <div id="person" itemscope itemtype="https://schema.org/Person">
-  <span itemprop="name" contenteditable="true">Click to edit</span>
+  <h1 itemprop="name">John Doe</h1>
+  <p itemprop="email">john@example.com</p>
+  <span itemprop="jobTitle">Software Engineer</span>
 </div>
 ```
 
+### 2. Access and Modify Data
 ```javascript
-// Initial value
-console.log(document.microdata.person.name); // "Click to edit"
+// Access microdata
+const person = document.microdata.person;
+console.log(person.name); // "John Doe"
 
-// User edits the text in the browser...
+// Modify data - DOM updates automatically
+person.name = "Jane Doe";
+person.email = "jane@example.com";
 
-// Value is automatically updated
-console.log(document.microdata.person.name); // "New name"
+// Add new properties
+person.telephone = "555-1234";
 ```
 
-### Data Source Fetching
-
-You can populate templates from external data sources using the `data-microdata-source` attribute:
-
+### 3. Use Templates for Dynamic Content
 ```html
-<!-- Fetch from JSON-LD file -->
-<div data-microdata-source="users.json">
-  <template itemtype="https://schema.org/Person">
-    <div itemscope itemtype="https://schema.org/Person">
-      <span itemprop="name"></span>
-      <span itemprop="email"></span>
+<div data-contains="https://schema.org/Person">
+  <template itemscope itemtype="https://schema.org/Person">
+    <div class="person-card">
+      <h3 itemprop="name"></h3>
+      <p>Email: <span itemprop="email"></span></p>
+      <p>Phone: <span itemprop="telephone"></span></p>
     </div>
   </template>
 </div>
-
-<!-- Fetch from HTML with microdata -->
-<div data-microdata-source="people.html">
-  <template itemtype="https://schema.org/Person">
-    <li itemscope itemtype="https://schema.org/Person">
-      <span itemprop="name"></span>
-    </li>
-  </template>
-</div>
 ```
 
-**JSON-LD Data Source (users.json):**
-```json
-[
-  {
-    "@context": "https://schema.org",
-    "@type": "Person",
-    "name": "John Doe",
-    "email": "john@example.com"
-  },
-  {
-    "@context": "https://schema.org", 
-    "@type": "Person",
-    "name": "Jane Smith",
-    "email": "jane@example.com"
-  }
-]
-```
+## Core Concepts
 
-**HTML Data Source (people.html):**
-```html
-<div itemscope itemtype="https://schema.org/Person">
-  <span itemprop="name">Bob Wilson</span>
-  <span itemprop="email">bob@example.com</span>
-</div>
-```
+### MicrodataItem
+Each element with `itemscope` becomes a MicrodataItem - a proxy object that provides:
+- Direct property access (`item.propertyName`)
+- Automatic DOM synchronization
+- JSON-LD metadata (`@type`, `@context`, `@id`)
+- Schema validation
+- Event notifications
 
-The library will automatically:
-- Fetch the data source when the page loads
-- Parse JSON-LD or extract microdata from HTML
-- Populate the appropriate templates based on item types
-- Insert the populated items into the DOM
+### MicrodataCollection
+The `document.microdata` object is a hybrid array/object that allows:
+- Numeric indexing for items without IDs
+- Named access for items with IDs
+- Full array method support (forEach, map, filter)
+- Iterator protocol support
 
-### JSON-LD Serialization
-
-The library automatically serializes microdata to JSON-LD format:
-
-```javascript
-// Serialize a single item
-const person = document.microdata.person;
-console.log(JSON.stringify(person, null, 2));
-// Output:
-// {
-//   "@context": "https://schema.org",
-//   "@type": "Person",
-//   "@id": "#person",
-//   "name": "John Doe",
-//   "email": "john@example.com"
-// }
-
-// Serialize an organization with employees
-const org = document.microdata.company;
-console.log(JSON.stringify(org, null, 2));
-// Output:
-// {
-//   "@context": "https://organised.team",
-//   "@type": "Organization",
-//   "@id": "#company",
-//   "name": "Acme Corp",
-//   "employee": [
-//     {
-//       "@context": "https://schema.org",
-//       "@type": "Person",
-//       "name": "Jane Smith",
-//       "email": "jane@example.com"
-//     }
-//   ]
-// }
-
-// Serialize all microdata (mixed items)
-const allData = JSON.stringify(document.microdata);
-// Output when there are items with IDs:
-// {
-//   "company": {
-//     "@context": "https://organised.team",
-//     "@type": "Organization",
-//     "@id": "#company",
-//     "name": "Acme Corp",
-//     "employee": [...]
-//   },
-//   "person": {
-//     "@context": "https://schema.org",
-//     "@type": "Person", 
-//     "@id": "#person",
-//     "name": "John Doe",
-//     "email": "john@example.com"
-//   }
-// }
-
-// When only items without IDs exist, returns an array:
-const usersData = JSON.stringify(document.microdata);
-// Output:
-// [
-//   {
-//     "@context": "https://rustybeam.net/schema",
-//     "@type": "Credential",
-//     "username": "user1@example.com",
-//     "role": "admin"
-//   },
-//   {
-//     "@context": "https://rustybeam.net/schema",
-//     "@type": "Credential",
-//     "username": "user2@example.com", 
-//     "role": "user"
-//   }
-// ]
-```
-
-## Schema Support
-
-### Schema Validation
-
-The library validates data against schema definitions, ensuring:
-
-- Correct property types (Text, URL, Boolean, Number, etc.)
-- Proper cardinality (0..1, 0..n, 1..n)
-- Required properties are present
-
-### Custom Schemas
-
-You can extend the schema registry with custom schemas:
-
-```javascript
-import { SchemaRegistry } from './index.mjs';
-
-const registry = new SchemaRegistry();
-await registry.loadSchema('https://example.com/MySchema');
-```
+### Live Synchronization
+Two-way data binding ensures:
+- JavaScript changes update the DOM immediately
+- DOM mutations update JavaScript objects
+- Multiple views stay synchronized
+- No manual DOM manipulation needed
 
 ## API Reference
 
 ### document.microdata
 
-The main entry point for accessing microdata.
+The main entry point for accessing all microdata in the document.
 
-#### Properties
-
-- `document.microdata[id]` - Access item by ID
-- `document.microdata[index]` - Access item by numeric index (for items without IDs)
-- `document.microdata.length` - Total number of microdata items
-
-#### Methods
-
-- `forEach(callback)` - Iterate over all items
-- `[Symbol.iterator]` - Makes microdata iterable with for...of
-
-### Item Properties
-
-Each microdata item is a proxy object with:
-
-- Direct property access: `item.propertyName`
-- Special properties:
-  - `_element` - The underlying DOM element
-  - `_type` - The item's type (from itemtype)
-  - `_id` - The item's ID (from itemid or id attribute)
-
-### Array Methods
-
-For properties with multiple values:
-
-- `push(...items)` - Add items to the end
-- `pop()` - Remove and return the last item
-- `splice(start, deleteCount, ...items)` - Add/remove items at any position
-- Standard array properties: `length`, numeric indices
-
-### Template Rendering
-
-The library provides static methods for rendering microdata items, JSON-LD objects, form data, or URL content to HTML templates, and for applying microdata to existing DOM elements.
-
-#### MicrodataAPI.render(template, data)
-
-Renders microdata items, JSON-LD objects, form data, or URL content to a template element.
-
-**Parameters:**
-- `template` (HTMLTemplateElement) - The template element to render to
-- `data` (Object|HTMLFormElement|string) - Either a microdata proxy object, JSON-LD object, HTML form element, or URL string
-
-**Returns:**
-- `DocumentFragment` - The populated template content ready to insert into the DOM (for synchronous calls)
-- `Promise<DocumentFragment>` - Promise resolving to populated template content (for URL calls)
-
-**Example Usage:**
+#### Accessing Items
 
 ```javascript
-import { MicrodataAPI } from './index.mjs';
+// By ID (for elements with id attribute)
+const company = document.microdata.company;
 
-// Get a template element
-const template = document.querySelector('template#person-card');
+// By index (for elements without id)
+const firstItem = document.microdata[0];
 
-// Render existing microdata item
-const rendered1 = MicrodataAPI.render(template, document.microdata.person1);
-document.body.appendChild(rendered1);
-
-// Render JSON-LD object
-const jsonData = {
-  "@context": "https://schema.org",
-  "@type": "Person",
-  "name": "John Doe",
-  "email": "john@example.com",
-  "jobTitle": "Software Developer"
-};
-const rendered2 = MicrodataAPI.render(template, jsonData);
-document.body.appendChild(rendered2);
-
-// Render form data to template
-const form = document.querySelector('#person-form');
-const rendered3 = MicrodataAPI.render(template, form);
-document.body.appendChild(rendered3);
-
-// Render from URL (returns Promise)
-const rendered4 = await MicrodataAPI.render(template, './data.json');
-document.body.appendChild(rendered4);
-
-// Render from HTML URL
-const rendered5 = await MicrodataAPI.render(template, './data.html');
-document.body.appendChild(rendered5);
+// Check if item exists
+if ('company' in document.microdata) {
+  // Item exists
+}
 ```
 
-**Template Structure:**
-
-Templates must contain an element with `itemscope` and appropriate `itemprop` attributes:
-
-```html
-<template id="person-card">
-  <div class="card" itemscope itemtype="https://schema.org/Person">
-    <h3 itemprop="name"></h3>
-    <p>Email: <span itemprop="email"></span></p>
-    <p>Job: <span itemprop="jobTitle"></span></p>
-  </div>
-</template>
-```
-
-**Smart Element Handling:**
-
-The render method intelligently populates different element types:
-- Elements with `content` attribute: Sets the `content` attribute value
-- Input elements: Sets the `value` property
-- Link elements (`<a>`): Sets `href` and optionally text content
-- Image elements (`<img>`): Sets `src` and `alt` attributes
-- Other elements: Sets `textContent`
-
-**Nested Objects:**
-
-The method supports nested microdata structures:
-
-```html
-<template id="book-template">
-  <div itemscope itemtype="https://schema.org/Book">
-    <h3 itemprop="name"></h3>
-    <div itemprop="author" itemscope itemtype="https://schema.org/Person">
-      <span>by <span itemprop="name"></span></span>
-    </div>
-  </div>
-</template>
-```
-
-**Array Properties:**
-
-For properties that contain arrays, the first array element is used for template population.
-
-**Form Rendering:**
-
-The `render` method can extract data from HTML forms and render it to templates. Form element `name` attributes are mapped to `itemprop` properties in the template.
-
-```html
-<!-- Form with various input types -->
-<form id="person-form">
-  <input type="hidden" name="@context" value="https://schema.org">
-  <input type="hidden" name="@type" value="Person">
-  
-  <input type="text" name="name" value="John Doe">
-  <input type="email" name="email" value="john@example.com">
-  <input type="number" name="age" value="30">
-  
-  <!-- Checkboxes create arrays for multiple values -->
-  <input type="checkbox" name="skills" value="JavaScript" checked>
-  <input type="checkbox" name="skills" value="Python" checked>
-  
-  <!-- Radio buttons return single values -->
-  <input type="radio" name="contactMethod" value="email" checked>
-  <input type="radio" name="contactMethod" value="phone">
-  
-  <!-- Select elements -->
-  <select name="department">
-    <option value="Engineering" selected>Engineering</option>
-    <option value="Design">Design</option>
-  </select>
-  
-  <!-- Multi-select creates arrays -->
-  <select name="languages" multiple>
-    <option value="English" selected>English</option>
-    <option value="Spanish" selected>Spanish</option>
-  </select>
-  
-  <textarea name="bio">Software developer with 5+ years experience.</textarea>
-</form>
-```
+#### Collection Methods
 
 ```javascript
-// Render form data to template
-const form = document.querySelector('#person-form');
-const template = document.querySelector('#person-template');
-const rendered = MicrodataAPI.render(template, form);
-document.body.appendChild(rendered);
+// Iterate with forEach
+document.microdata.forEach((item, key) => {
+  console.log(key, item['@type'], item);
+});
+
+// Use for...of loop
+for (const item of document.microdata) {
+  console.log(item);
+}
+
+// Filter items
+const people = document.microdata.filter(item => 
+  item['@type'] === 'Person'
+);
+
+// Map to extract data
+const names = document.microdata.map(item => item.name);
 ```
 
-**Form Element Support:**
+### Element.microdata
 
-- **Text inputs** (`text`, `email`, `url`, `hidden`, etc.): Uses `value` property
-- **Number inputs**: Converts strings to numbers automatically
-- **Checkboxes**: Creates arrays for multiple checked values with same name
-- **Radio buttons**: Returns single selected value
-- **Select elements**: Handles both single and multi-select (arrays for multiple)
-- **Textarea**: Uses `value` property
-- **File inputs**: Currently skipped (not processed)
-
-**JSON-LD Metadata:**
-
-Forms can include JSON-LD metadata using hidden inputs:
-
-```html
-<input type="hidden" name="@context" value="https://schema.org">
-<input type="hidden" name="@type" value="Person">
-```
-
-If not provided, the method will attempt to infer the type from the template's `itemtype` attribute.
-
-**URL Rendering:**
-
-The `render` method can fetch data from URLs and render it to templates. It supports both JSON-LD and HTML with microdata.
+Access microdata for any element with `itemscope`:
 
 ```javascript
-// Render from JSON-LD URL
-const rendered = await MicrodataAPI.render(template, './person.json');
-
-// Render from HTML URL (extracts matching microdata)
-const rendered = await MicrodataAPI.render(template, './person.html');
-
-// Render from relative path
-const rendered = await MicrodataAPI.render(template, '/api/person/123');
+const element = document.querySelector('[itemscope]');
+const item = element.microdata;
 ```
 
-**URL Processing:**
-- **JSON files** (`application/json`, `application/ld+json`): Parsed as JSON-LD
-- **HTML files** (`text/html`): Microdata is extracted from elements matching the template's `itemtype`
-- **Relative URLs**: Resolved using `document.baseURI`
-- **Error handling**: Network errors and missing data result in Promise rejection
+### MicrodataItem Properties
 
-**Array Repetition:**
+#### Standard Properties
+```javascript
+const person = document.microdata.person;
 
-Templates can use the `[]` syntax to automatically repeat elements for array values:
+// Access properties
+console.log(person.name);        // Get property value
+person.name = "New Name";        // Set property value
 
-```html
-<template id="person-template">
-  <div itemscope itemtype="https://schema.org/Person">
-    <h3 itemprop="name"></h3>
-    <p><strong>Skills:</strong></p>
-    <ul>
-      <li itemprop="skills[]"></li>
-    </ul>
-  </div>
-</template>
+// Array properties
+person.skills.push("JavaScript"); // Add to array
+person.skills[0] = "TypeScript"; // Modify array item
+
+// Check property existence
+if ('email' in person) {
+  console.log(person.email);
+}
 ```
 
-When rendered with data like `{"name": "John", "skills": ["HTML", "CSS", "JavaScript"]}`, this creates:
+#### Special Properties
+```javascript
+// JSON-LD metadata
+console.log(person['@type']);    // "Person"
+console.log(person['@context']); // "https://schema.org/"
+console.log(person['@id']);      // "#person"
+
+// Access DOM element
+const element = person._element;
+```
+
+### Static Methods
+
+#### Microdata.fetch(url, options?)
+Fetch microdata from a URL:
+
+```javascript
+// Fetch from same origin
+const data = await Microdata.fetch('./data.html#person');
+
+// With options
+const items = await Microdata.fetch('https://example.com/data.html', {
+  expectedType: 'https://schema.org/Person'
+});
+```
+
+#### Schema.load(url)
+Load and cache a schema:
+
+```javascript
+const schema = await Schema.load('https://schema.org/Person');
+if (schema.validate(person)) {
+  console.log('Valid person data');
+}
+```
+
+#### Schema.clearCache()
+Clear the schema cache (useful for testing):
+
+```javascript
+Schema.clearCache();
+```
+
+#### Microdata.clearFetchCache()
+Clear the fetched document cache (useful for testing):
+
+```javascript
+Microdata.clearFetchCache();
+```
+
+#### Template.render(data, templateSelector?)
+Render data to a template:
+
+```javascript
+// Using a specific template
+const rendered = Template.render(person, '#person-template');
+
+// Auto-select template by type
+const rendered = Template.render(person);
+
+// Render plain object
+const rendered = Template.render({
+  '@type': 'https://schema.org/Person',
+  name: 'John Doe',
+  email: 'john@example.com'
+});
+```
+
+### Instance Methods
+
+#### item.validate()
+Validate an item against its schema:
+
+```javascript
+const person = document.microdata.person;
+if (person.validate()) {
+  console.log('Person data is valid');
+} else {
+  console.log('Validation failed');
+}
+```
+
+#### item.toJSON()
+Convert to JSON-LD format:
+
+```javascript
+const jsonld = JSON.stringify(person);
+// {
+//   "@context": "https://schema.org/",
+//   "@type": "Person",
+//   "@id": "#person",
+//   "name": "John Doe",
+//   "email": "john@example.com"
+// }
+```
+
+#### item.fetch()
+Fetch the microdata element this item references. Returns a Promise that resolves to an Element.
+
+```javascript
+// For authoritative items (with id attribute)
+const person = document.microdata.person;
+const element = await person.fetch();
+// Returns the same element (document.getElementById('person'))
+
+// For non-authoritative items (with itemid attribute)
+// <meta itemscope itemtype="https://schema.org/Person" itemid="https://example.com/data.html#person1">
+const meta = document.querySelector('meta[itemid]');
+const remotePerson = await meta.microdata.fetch();
+// Fetches https://example.com/data.html and returns the element with id="person1"
+console.log(remotePerson.microdata.name); // Access remote microdata
+
+// Error cases:
+try {
+  // Missing itemid on non-authoritative item
+  await nonAuthItem.fetch();
+} catch (e) {
+  // Error: Non-authoritative item must have itemid attribute to fetch
+}
+
+try {
+  // Invalid URL in itemid
+  // <meta itemscope itemtype="..." itemid="http://[invalid]:port/path">
+  await invalidUrlItem.fetch();
+} catch (e) {
+  // Error: Invalid itemid URL: http://[invalid]:port/path
+}
+
+try {
+  // Missing fragment identifier
+  // <meta itemscope itemtype="..." itemid="https://example.com/data.html">
+  await noFragmentItem.fetch();
+} catch (e) {
+  // Error: itemid must include a fragment identifier (#id)
+}
+
+try {
+  // Element not found in remote document
+  // <meta itemscope itemtype="..." itemid="https://example.com/data.html#nonexistent">
+  await notFoundItem.fetch();
+} catch (e) {
+  // Error: Element with id "nonexistent" not found in https://example.com/data.html
+}
+
+// Caching
+// Fetched documents are cached to avoid repeated network requests
+// Clear the cache when needed:
+Microdata.clearFetchCache();
+```
+
+## Advanced Usage
+
+### Working with Arrays
 
 ```html
-<div itemscope itemtype="https://schema.org/Person">
-  <h3 itemprop="name">John</h3>
-  <p><strong>Skills:</strong></p>
+<div id="company" itemscope itemtype="https://schema.org/Organization">
+  <h2 itemprop="name">Tech Corp</h2>
   <ul>
-    <li itemprop="skills">HTML</li>
-    <li itemprop="skills">CSS</li>
-    <li itemprop="skills">JavaScript</li>
+    <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
+      <span itemprop="name">Alice</span>
+    </li>
+    <li itemprop="employee" itemscope itemtype="https://schema.org/Person">
+      <span itemprop="name">Bob</span>
+    </li>
   </ul>
 </div>
 ```
 
-The `[]` syntax works with any property that contains an array, automatically creating the correct number of elements.
-
-#### MicrodataAPI.apply(target, source)
-
-Applies microdata from a rendered template, element, or data object to existing DOM elements.
-
-**Parameters:**
-- `target` (Element) - The DOM element to apply microdata to
-- `source` (DocumentFragment|Element|Object) - The source of microdata
-
-**Returns:**
-- `void` - Modifies the target element in place
-
-**Example Usage:**
-
 ```javascript
-// Apply from rendered template
-const rendered = MicrodataAPI.render(template, data);
-MicrodataAPI.apply(document.querySelector('nav'), rendered);
+const company = document.microdata.company;
+const employees = company.employee; // Array of employees
 
-// Apply from data object directly
-const data = { name: "John Doe", email: "john@example.com" };
-MicrodataAPI.apply(document.querySelector('nav'), data);
+// Add new employee
+employees.push({
+  '@type': 'https://schema.org/Person',
+  name: 'Charlie',
+  email: 'charlie@example.com'
+});
 
-// Apply from existing element
-const sourceElement = document.querySelector('#person-card');
-MicrodataAPI.apply(document.querySelector('nav'), sourceElement);
+// Remove employee
+employees.splice(1, 1); // Remove Bob
+
+// Modify employee
+employees[0].name = 'Alice Smith';
 ```
 
-**Use Cases:**
-- Populating navigation elements with user data
-- Updating existing DOM elements without replacing them
-- Applying template-rendered data to persistent page elements
-- Maintaining DOM structure while updating content
+### Template Auto-Synchronization
 
-**Example - Populating Navigation:**
+Templates with `data-contains` automatically sync with matching microdata:
 
 ```html
-<!-- Target element (preserves structure) -->
-<nav itemscope itemtype="https://schema.org/Person">
-    <div itemprop="name">[Name will appear here]</div>
-    <menu>
-        <li><a href="/">← Home</a></li>
-        <li><a href="/demos/">← Demos</a></li>
-    </menu>
-</nav>
+<!-- Template container -->
+<div id="employee-list" data-contains="https://schema.org/Person">
+  <template itemscope itemtype="https://schema.org/Person">
+    <div class="employee-card">
+      <h3 itemprop="name"></h3>
+      <p itemprop="email"></p>
+      <p itemprop="jobTitle"></p>
+    </div>
+  </template>
+</div>
 
-<!-- After applying data -->
-<nav itemscope itemtype="https://schema.org/Person">
-    <div itemprop="name">John Doe</div>
-    <menu>
-        <li><a href="/">← Home</a></li>
-        <li><a href="/demos/">← Demos</a></li>
-    </menu>
-</nav>
+<!-- Source data (can be hidden) -->
+<div style="display: none">
+  <div id="emp1" itemscope itemtype="https://schema.org/Person">
+    <span itemprop="name">Alice</span>
+    <span itemprop="email">alice@example.com</span>
+    <span itemprop="jobTitle">Developer</span>
+  </div>
+</div>
 ```
 
-The `apply` method preserves the existing DOM structure while populating microdata properties, making it perfect for updating persistent page elements like navigation, headers, or sidebars.
+The template automatically renders for each matching item and updates when data changes.
 
-#### MicrodataAPI.fetch(url, expectedType?)
+### Form Integration
 
-Fetches microdata directly from a URL without requiring a template. This method is useful for retrieving data that will be processed or applied to existing DOM elements.
+Extract and render form data:
 
-**Parameters:**
-- `url` (string) - The URL to fetch microdata from
-- `expectedType` (string, optional) - Optional expected itemtype to filter results
+```html
+<form id="person-form">
+  <input name="name" type="text" placeholder="Name" required>
+  <input name="email" type="email" placeholder="Email" required>
+  <select name="jobTitle">
+    <option value="Developer">Developer</option>
+    <option value="Designer">Designer</option>
+    <option value="Manager">Manager</option>
+  </select>
+  <button type="submit">Save</button>
+</form>
 
-**Returns:**
-- `Promise<Object|Array<Object>>` - Promise resolving to microdata object(s)
-
-**Example Usage:**
+<template id="person-display" itemscope itemtype="https://schema.org/Person">
+  <div class="person-info">
+    <h3 itemprop="name"></h3>
+    <p>Email: <span itemprop="email"></span></p>
+    <p>Role: <span itemprop="jobTitle"></span></p>
+  </div>
+</template>
+```
 
 ```javascript
-import { MicrodataAPI } from './index.mjs';
+const form = document.getElementById('person-form');
+const template = document.getElementById('person-display');
 
-// Fetch all microdata from a URL
-const allData = await MicrodataAPI.fetch('./data.json');
-
-// Fetch specific type of microdata
-const personData = await MicrodataAPI.fetch('./people.html', 'https://schema.org/Person');
-
-// Use with apply() method
-const userData = await MicrodataAPI.fetch('./user-profile.json');
-MicrodataAPI.apply(document.querySelector('#user-nav'), userData);
-
-// Combined fetch and apply pattern
-MicrodataAPI.apply(
-    document.querySelector('#destination'),
-    await MicrodataAPI.fetch('./source.html')
-);
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  
+  // Render form data to template
+  const rendered = Template.render(form, '#person-display');
+  document.body.appendChild(rendered);
+  
+  // Or validate with schema
+  const schema = await Schema.load('https://schema.org/Person');
+  if (schema.validate(form)) {
+    console.log('Form data is valid');
+  }
+});
 ```
 
-**Data Source Support:**
-- **JSON files** (`application/json`, `application/ld+json`): Parsed as JSON-LD
-- **HTML files** (`text/html`): Microdata is extracted from elements
-- **Mixed content**: Attempts JSON parsing first, then HTML extraction
-- **Type filtering**: When `expectedType` is provided, only matching items are returned
+### Remote Data Loading
 
-**Return Value Handling:**
-- Single matching item: Returns the object directly
-- Multiple matching items: Returns an array of objects
-- No matching items: Throws an error
+Fetch and render data from external sources:
 
-**Error Handling:**
-- Network errors (404, 500, etc.) result in Promise rejection
-- Missing or invalid microdata results in descriptive error messages
-- Type mismatches (when `expectedType` is specified) throw errors
+```javascript
+// Fetch JSON-LD
+const data = await Microdata.fetch('./api/person/123.json');
+const rendered = Template.render(data, '#person-template');
 
-**Use Cases:**
-- Direct data fetching without template rendering
-- Data preprocessing before applying to DOM
-- Combining with `apply()` for streamlined data flow
-- Type-specific data retrieval from mixed content sources
+// Fetch HTML with microdata
+const items = await Microdata.fetch('./people.html', {
+  expectedType: 'https://schema.org/Person'
+});
 
-The `fetch()` method complements the existing `render()` and `apply()` methods, providing a complete toolkit for working with microdata from various sources.
+// Auto-populate templates from URL
+const container = document.querySelector('[data-source]');
+container.setAttribute('data-source', './api/people.json');
+```
 
-## How It Works
+### Itemref Support
 
-1. **Initialization**: On page load, the library scans for all elements with `itemscope` attributes
-2. **Extraction**: Microdata is extracted respecting schema cardinality rules
-3. **Proxy Creation**: Each item is wrapped in a Proxy for reactive behavior
-4. **Template Discovery**: Templates are found by their `itemtype` attribute
-5. **Mutation Observer**: DOM changes are monitored and synced to the data model
-6. **Bidirectional Sync**: Changes to either DOM or JavaScript objects are synchronized
+Reference properties from other elements:
+
+```html
+<div id="person" itemscope itemtype="https://schema.org/Person" 
+     itemref="shared-address shared-contact">
+  <span itemprop="name">John Doe</span>
+</div>
+
+<!-- Shared properties -->
+<div id="shared-address" itemprop="address" itemscope 
+     itemtype="https://schema.org/PostalAddress">
+  <span itemprop="streetAddress">123 Main St</span>
+  <span itemprop="addressLocality">Anytown</span>
+</div>
+
+<div id="shared-contact">
+  <span itemprop="telephone">555-1234</span>
+  <span itemprop="email">john@example.com</span>
+</div>
+```
+
+## Schema Support
+
+### Schema.org Schemas
+
+Schema.org schemas are loaded automatically with permissive validation:
+
+```javascript
+// Automatic loading
+const person = document.microdata.person; // Schema loads automatically
+
+// Manual validation
+if (person.validate()) {
+  console.log('Valid according to schema.org/Person');
+}
+```
+
+### Custom Schemas
+
+Define custom schemas with strict validation:
+
+```javascript
+// RustyBeam.net style schema with cardinality and patterns
+const credentialSchema = await Schema.load('https://rustybeam.net/schema/Credential');
+
+// Validates required properties, cardinality, and patterns
+const isValid = credentialSchema.validate(credentialData);
+```
+
+### Schema Features
+
+- **Property validation**: Check required/optional properties
+- **Cardinality rules**: Enforce 0..1, 1..n, 0..n relationships  
+- **Type checking**: Validate data types (Text, Number, Boolean, etc.)
+- **Pattern matching**: Regex validation for string values
+- **Nested validation**: Validate complex nested structures
+
+## Events
+
+### DOMSchemasLoaded
+
+Fired when all schemas have been loaded:
+
+```javascript
+document.addEventListener('DOMSchemasLoaded', (e) => {
+  console.log('Schemas loaded:', e.detail.schemas);
+  // Safe to access microdata with validation
+});
+```
+
+### DOMSchemaError
+
+Fired when a schema fails to load:
+
+```javascript
+document.addEventListener('DOMSchemaError', (e) => {
+  console.error('Schema load failed:', e.detail.url, e.detail.error);
+});
+```
+
+### DOMSchemaInvalidData
+
+Fired when validation fails during property assignment:
+
+```javascript
+document.addEventListener('DOMSchemaInvalidData', (e) => {
+  console.warn('Invalid data:', e.detail.property, e.detail.value);
+  console.warn('Validation errors:', e.detail.errors);
+});
+```
 
 ## Browser Compatibility
 
-This library requires modern browser features:
-- ES6 Proxy
-- ES6 Modules
-- MutationObserver
-- ES6 Iterators/Generators
+SchemaElements requires modern browser features:
+
+- **ES6 Proxy** - For reactive data binding
+- **ES6 Modules** - For clean imports
+- **MutationObserver** - For DOM change detection
+- **Custom Events** - For event system
+- **ES6 Classes** - For OOP structure
+
+Supported browsers:
+- Chrome 49+
+- Firefox 45+
+- Safari 10+
+- Edge 14+
+
+## Examples
+
+### Basic Person Card
+
+```html
+<div id="john" itemscope itemtype="https://schema.org/Person">
+  <h2 itemprop="name">John Doe</h2>
+  <p itemprop="jobTitle">Software Engineer</p>
+  <a itemprop="email" href="mailto:john@example.com">john@example.com</a>
+</div>
+
+<script type="module">
+  import { Microdata } from './index.mjs';
+  
+  const john = document.microdata.john;
+  
+  // Update job title
+  john.jobTitle = "Senior Software Engineer";
+  
+  // Add new property
+  john.telephone = "555-0123";
+</script>
+```
+
+### Dynamic Product Catalog
+
+```html
+<div id="products" data-contains="https://schema.org/Product">
+  <template itemscope itemtype="https://schema.org/Product">
+    <div class="product">
+      <h3 itemprop="name"></h3>
+      <p itemprop="description"></p>
+      <span class="price">$<span itemprop="price"></span></span>
+      <button onclick="addToCart(this)">Add to Cart</button>
+    </div>
+  </template>
+</div>
+
+<script type="module">
+  // Products automatically render as they're added
+  function addProduct(productData) {
+    const product = document.createElement('div');
+    product.id = `product-${Date.now()}`;
+    product.setAttribute('itemscope', '');
+    product.setAttribute('itemtype', 'https://schema.org/Product');
+    product.style.display = 'none';
+    
+    // Set product data
+    document.body.appendChild(product);
+    const item = product.microdata;
+    Object.assign(item, productData);
+  }
+  
+  // Add products
+  addProduct({
+    name: 'Laptop',
+    description: 'High-performance laptop',
+    price: 999.99
+  });
+</script>
+```
+
+### Form with Validation
+
+```html
+<form id="registration" itemscope itemtype="https://schema.org/Person">
+  <input itemprop="name" type="text" placeholder="Full Name" required>
+  <input itemprop="email" type="email" placeholder="Email" required>
+  <input itemprop="telephone" type="tel" placeholder="Phone">
+  <button type="submit">Register</button>
+</form>
+
+<div id="confirmation"></div>
+
+<script type="module">
+  import { Template } from './index.mjs';
+  
+  const form = document.getElementById('registration');
+  
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const person = form.microdata;
+    
+    if (person.validate()) {
+      // Render confirmation
+      const confirmed = Template.render(person, '#confirmation-template');
+      document.getElementById('confirmation').appendChild(confirmed);
+      
+      // Send to server
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(person)
+      });
+    }
+  });
+</script>
+```
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0.
+SchemaElements is released under the Apache 2.0 License. See LICENSE file for details.
 
 ## Contributing
 
-Contributions are welcome! Please submit issues and pull requests on GitHub.
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## Support
+
+- **Documentation**: Full API docs at [link-to-docs]
+- **Examples**: See the `examples/` directory
+- **Issues**: Report bugs on [GitHub Issues]
+

@@ -1,4 +1,18 @@
 <!DOCTYPE html>
+<!--
+    Microdata API - Integration Tests
+    
+    This file contains integration tests that verify the complete functionality
+    of the Microdata API in real-world scenarios. Tests include:
+    - Live DOM synchronization between microdata and HTML
+    - Schema auto-loading and caching
+    - Template auto-synchronization with data-contains
+    - Form validation with schemas
+    - Fetch API for remote microdata
+    - Complex itemref scenarios
+    
+    Run this file in a browser to execute all integration tests.
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -369,6 +383,64 @@
                 
                 await wait(50);
                 assert(person.telephone === '555-9999', 'Should reflect itemref update');
+            });
+            
+            // 9.2.7 Test fetch() method
+            const fetchMethodSection = document.createElement('div');
+            fetchMethodSection.className = 'test-subsection';
+            fetchMethodSection.innerHTML = '<h3>Microdata Fetch Method</h3>';
+            results.appendChild(fetchMethodSection);
+            
+            await testAsync('Authoritative item fetch returns itself', async () => {
+                const person = document.getElementById('live-person').microdata;
+                const element = await person.fetch();
+                
+                assert(element === document.getElementById('live-person'), 'Should return same element');
+                assert(element.microdata === person, 'Should have same microdata instance');
+            });
+            
+            await testAsync('Non-authoritative item requires itemid', async () => {
+                // Create a non-authoritative item without itemid
+                const meta = document.createElement('meta');
+                meta.setAttribute('itemscope', '');
+                meta.setAttribute('itemtype', 'https://schema.org/Thing');
+                document.body.appendChild(meta);
+                
+                try {
+                    const item = meta.microdata;
+                    let errorThrown = false;
+                    try {
+                        await item.fetch();
+                    } catch (e) {
+                        errorThrown = true;
+                        assert(e.message.includes('itemid'), 'Error should mention itemid');
+                    }
+                    assert(errorThrown, 'Should throw error for missing itemid');
+                } finally {
+                    meta.remove();
+                }
+            });
+            
+            await testAsync('Invalid itemid URL throws error', async () => {
+                const meta = document.createElement('meta');
+                meta.setAttribute('itemscope', '');
+                meta.setAttribute('itemtype', 'https://schema.org/Thing');
+                meta.setAttribute('itemid', 'http://[invalid]:port/path');
+                document.body.appendChild(meta);
+                
+                try {
+                    const item = meta.microdata;
+                    let errorThrown = false;
+                    try {
+                        await item.fetch();
+                    } catch (e) {
+                        errorThrown = true;
+                        assert(e.message.includes('Invalid itemid URL'), 'Error should mention invalid URL');
+                    }
+                    assert(errorThrown, 'Should throw error for invalid URL');
+                } finally {
+                    meta.remove();
+                }
             });
             
             // Summary

@@ -3,218 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fetch API Example</title>
+    <title>Microdata Fetch Example</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .example { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
-        .fetch-controls { margin: 20px 0; }
-        input[type="url"] { width: 400px; padding: 5px; }
-        button { padding: 8px 15px; margin: 0 5px; }
-        .loading { color: #007bff; font-style: italic; }
-        .error { color: #dc3545; }
-        .success { color: #28a745; }
-        .fetched-data { background: #f5f5f5; padding: 15px; margin: 15px 0; }
-        .microdata-item { border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: white; }
-        pre { background: #e9ecef; padding: 10px; overflow-x: auto; }
-        .fragment-example { background: #fff3cd; padding: 10px; margin: 10px 0; }
-        .demo-content { display: none; }
+        body { font-family: Arial, sans-serif; margin: 20px; max-width: 800px; }
+        .example { border: 1px solid #ddd; padding: 15px; margin: 20px 0; background: #f9f9f9; }
+        .result { background: #e9f5e9; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #f5e9e9; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 4px; overflow-x: auto; }
     </style>
 </head>
 <body>
-    <h1>Microdata Fetch API Example</h1>
+    <h1>Microdata Fetch Example</h1>
+    
+    <p>This example demonstrates the <code>fetch()</code> method on microdata items.</p>
     
     <div class="example">
-        <h2>Fetch Remote Microdata</h2>
+        <h2>Authoritative Items</h2>
+        <p>Items with an <code>id</code> attribute are authoritative. Calling <code>fetch()</code> returns the element itself.</p>
         
-        <div class="fetch-controls">
-            <label>
-                URL to fetch: <br>
-                <input type="url" id="fetch-url" placeholder="https://example.com/page.html">
-            </label>
-            <br><br>
-            <button onclick="fetchMicrodata()">Fetch Microdata</button>
-            <button onclick="fetchWithFragment()">Fetch with Fragment</button>
-            <button onclick="clearResults()">Clear Results</button>
+        <div id="local-person" itemscope itemtype="https://schema.org/Person">
+            <h3 itemprop="name">John Doe</h3>
+            <p>Email: <span itemprop="email">john@example.com</span></p>
+            <p>Job Title: <span itemprop="jobTitle">Software Developer</span></p>
         </div>
         
-        <div id="fetch-status"></div>
-        <div id="fetch-results"></div>
+        <button onclick="fetchAuthoritative()">Fetch Authoritative Item</button>
+        <div id="auth-result"></div>
     </div>
     
     <div class="example">
-        <h2>Demo: Fetch from Same Page</h2>
+        <h2>Non-Authoritative Items</h2>
+        <p>Items without an <code>id</code> but with an <code>itemid</code> can fetch remote data.</p>
         
-        <p>Click the button below to fetch microdata from a fragment on this same page:</p>
-        <button onclick="fetchLocalFragment()">Fetch #demo-data Fragment</button>
+        <!-- Reference to remote data -->
+        <meta itemscope itemtype="https://schema.org/Person" itemid="./test-fetch-data.html#remote-person">
         
-        <div class="fragment-example">
-            <strong>Note:</strong> The data below is hidden but can be fetched using the fragment identifier.
-        </div>
+        <button onclick="fetchRemote()">Fetch Remote Item</button>
+        <div id="remote-result"></div>
     </div>
     
     <div class="example">
-        <h2>Fetch and Render Example</h2>
+        <h2>Error Cases</h2>
         
-        <p>This example fetches microdata and renders it using a template:</p>
-        <button onclick="fetchAndRender()">Fetch and Render Demo Data</button>
+        <!-- Missing itemid -->
+        <meta itemscope itemtype="https://schema.org/Organization">
         
-        <div id="render-output"></div>
+        <!-- Invalid URL -->
+        <meta itemscope itemtype="https://schema.org/Product" itemid="not-a-url">
         
-        <template id="render-template" itemscope itemtype="https://schema.org/Article">
-            <article style="border: 1px solid #007bff; padding: 15px; margin: 10px 0;">
-                <h3 itemprop="headline"></h3>
-                <p><em>By <span itemprop="author"></span> on <span itemprop="datePublished"></span></em></p>
-                <div itemprop="articleBody"></div>
-            </article>
-        </template>
+        <button onclick="testErrors()">Test Error Cases</button>
+        <div id="error-result"></div>
     </div>
     
-    <!-- Hidden demo content for local fetching -->
-    <div id="demo-data" class="demo-content">
-        <div itemscope itemtype="https://schema.org/Article">
-            <h2 itemprop="headline">Understanding Microdata</h2>
-            <p>By <span itemprop="author">Tech Writer</span></p>
-            <time itemprop="datePublished" datetime="2024-01-15">January 15, 2024</time>
-            <div itemprop="articleBody">
-                <p>Microdata provides a way to embed semantic information in HTML documents.</p>
-            </div>
-        </div>
-        
-        <div itemscope itemtype="https://schema.org/Person">
-            <span itemprop="name">Demo Person</span>
-            <span itemprop="email">demo@example.com</span>
-        </div>
-    </div>
-    
+    <script type="module" src="./index.mjs"></script>
     <script type="module">
-        import { Microdata, Template } from './index.mjs';
+        import { Microdata } from './index.mjs';
         
-        window.fetchMicrodata = async function() {
-            const url = document.getElementById('fetch-url').value;
-            const statusDiv = document.getElementById('fetch-status');
-            const resultsDiv = document.getElementById('fetch-results');
-            
-            if (!url) {
-                statusDiv.className = 'error';
-                statusDiv.textContent = 'Please enter a URL';
-                return;
-            }
-            
-            statusDiv.className = 'loading';
-            statusDiv.textContent = 'Fetching...';
-            resultsDiv.innerHTML = '';
-            
+        // Make functions available globally
+        window.fetchAuthoritative = async function() {
+            const resultDiv = document.getElementById('auth-result');
             try {
-                const result = await Microdata.fetch(url);
+                const person = document.microdata['local-person'];
+                const element = await person.fetch();
                 
-                statusDiv.className = 'success';
-                statusDiv.textContent = `✓ Successfully fetched from ${url}`;
-                
-                // Display microdata items
-                const items = result.microdata;
-                resultsDiv.innerHTML = '<h3>Found Microdata Items:</h3>';
-                
-                if (items.length === 0) {
-                    resultsDiv.innerHTML += '<p>No microdata items found on the page.</p>';
-                } else {
-                    resultsDiv.innerHTML += `<p>Found ${items.length} microdata item(s):</p>`;
-                    
-                    items.forEach((item, index) => {
-                        const itemDiv = document.createElement('div');
-                        itemDiv.className = 'microdata-item';
-                        itemDiv.innerHTML = `
-                            <h4>Item ${index + 1}: ${item['@type'] || 'No type'}</h4>
-                            <pre>${JSON.stringify(item, null, 2)}</pre>
-                        `;
-                        resultsDiv.appendChild(itemDiv);
-                    });
-                }
+                resultDiv.innerHTML = `
+                    <div class="result">
+                        <strong>Success!</strong><br>
+                        Fetched element ID: ${element.id}<br>
+                        Same as original: ${element === document.getElementById('local-person')}<br>
+                        Name from fetched element: ${element.microdata.name}
+                    </div>
+                `;
             } catch (error) {
-                statusDiv.className = 'error';
-                statusDiv.textContent = `✗ Error: ${error.message}`;
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        };
+        
+        window.fetchRemote = async function() {
+            const resultDiv = document.getElementById('remote-result');
+            try {
+                // Get the meta element with itemid
+                const metaElement = document.querySelector('meta[itemid]');
+                const item = metaElement.microdata;
                 
-                // Provide helpful message for CORS errors
-                if (error.message.includes('Failed to fetch')) {
-                    resultsDiv.innerHTML = `
-                        <div class="error">
-                            <p><strong>CORS Error:</strong> Cannot fetch from external domains due to browser security.</p>
-                            <p>Try one of these options:</p>
-                            <ul>
-                                <li>Use a local URL or same-origin URL</li>
-                                <li>Use the fragment example below</li>
-                                <li>Set up a proxy server for external URLs</li>
-                            </ul>
-                        </div>
-                    `;
-                }
+                resultDiv.innerHTML = '<div class="result">Fetching remote data...</div>';
+                
+                const element = await item.fetch();
+                
+                resultDiv.innerHTML = `
+                    <div class="result">
+                        <strong>Success!</strong><br>
+                        Fetched from: ${metaElement.getAttribute('itemid')}<br>
+                        Remote person name: ${element.microdata.name}<br>
+                        Remote person email: ${element.microdata.email}<br>
+                        Remote person job: ${element.microdata.jobTitle}
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
             }
         };
         
-        window.fetchWithFragment = function() {
-            const baseUrl = document.getElementById('fetch-url').value || window.location.href;
-            const fragment = prompt('Enter fragment ID (e.g., "demo-data"):');
+        window.testErrors = async function() {
+            const resultDiv = document.getElementById('error-result');
+            let errors = [];
             
-            if (fragment) {
-                document.getElementById('fetch-url').value = baseUrl.split('#')[0] + '#' + fragment;
-                fetchMicrodata();
+            // Test missing itemid
+            try {
+                const org = document.microdata[1]; // The Organization meta
+                await org.fetch();
+            } catch (error) {
+                errors.push(`Missing itemid: ${error.message}`);
             }
-        };
-        
-        window.fetchLocalFragment = async function() {
-            const url = window.location.href.split('#')[0] + '#demo-data';
-            document.getElementById('fetch-url').value = url;
-            await fetchMicrodata();
             
-            // Also show what the fragment contains
-            const resultsDiv = document.getElementById('fetch-results');
-            resultsDiv.innerHTML += `
-                <div class="fragment-example">
-                    <p><strong>Fragment fetch returns only the element with id="demo-data"</strong></p>
-                    <p>This demonstrates how you can fetch specific sections of a page.</p>
+            // Test invalid URL
+            try {
+                const product = document.microdata[2]; // The Product meta
+                await product.fetch();
+            } catch (error) {
+                errors.push(`Invalid URL: ${error.message}`);
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="error">
+                    <strong>Expected errors caught:</strong><br>
+                    ${errors.map(e => `• ${e}`).join('<br>')}
                 </div>
             `;
         };
         
-        window.fetchAndRender = async function() {
-            const outputDiv = document.getElementById('render-output');
-            outputDiv.innerHTML = '<p class="loading">Fetching and rendering...</p>';
-            
-            try {
-                // Fetch the demo data
-                const url = window.location.href.split('#')[0] + '#demo-data';
-                const result = await Microdata.fetch(url);
-                
-                // Find article items
-                const articles = result.microdata.filter(item => item['@type'] === 'Article');
-                
-                if (articles.length > 0) {
-                    outputDiv.innerHTML = '<h3>Rendered Articles:</h3>';
-                    
-                    const template = document.getElementById('render-template');
-                    articles.forEach(article => {
-                        const rendered = Template.render(article);
-                        outputDiv.appendChild(rendered);
-                    });
-                } else {
-                    outputDiv.innerHTML = '<p>No articles found to render.</p>';
-                }
-            } catch (error) {
-                outputDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
-            }
-        };
-        
-        window.clearResults = function() {
-            document.getElementById('fetch-url').value = '';
-            document.getElementById('fetch-status').textContent = '';
-            document.getElementById('fetch-results').innerHTML = '';
-            document.getElementById('render-output').innerHTML = '';
-        };
-        
-        // Example URLs for testing
-        console.log('Example URLs to try:');
-        console.log('- ' + window.location.href + ' (this page)');
-        console.log('- ' + window.location.href + '#demo-data (fragment)');
-        console.log('Note: External URLs will fail due to CORS unless proxied');
+        // Wait for microdata to be ready
+        document.addEventListener('DOMSchemasLoaded', () => {
+            console.log('Microdata ready. You can now test the fetch() functionality.');
+        });
     </script>
+    
+    <div class="example">
+        <h2>Code Example</h2>
+        <pre><code>// Authoritative item (has id)
+const person = document.microdata.person;
+const element = await person.fetch();
+// Returns the same element
+
+// Non-authoritative item (has itemid)
+const meta = document.querySelector('meta[itemid]');
+const remote = await meta.microdata.fetch();
+// Fetches remote document and returns referenced element
+console.log(remote.microdata.name);</code></pre>
+    </div>
 </body>
 </html>
