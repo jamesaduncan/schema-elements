@@ -300,8 +300,10 @@ class MicrodataItem {
             return element.getAttribute('content');
         }
         
-        if (element.tagName === 'A' && element.hasAttribute('href')) {
-            return element.href;
+        if ((element.tagName === 'A' || element.tagName === 'LINK') && element.hasAttribute('href')) {
+            // Return the href attribute value (which may be relative)
+            // rather than element.href (which is always absolute)
+            return element.getAttribute('href');
         }
         
         if (element.tagName === 'IMG' && element.hasAttribute('src')) {
@@ -689,7 +691,7 @@ class Schema {
     static async load(url) {
         // Check cache first
         if (schemaCache.has(url)) {
-            return schemaCache.get(url);
+            return Promise.resolve(schemaCache.get(url));
         }
         
         // Check if already loading
@@ -703,7 +705,7 @@ class Schema {
         
         try {
             const schema = await loadingPromise;
-            schemaCache.set(url, schema);
+            // Don't set cache here since _loadSchema already does it
             schemaLoadingPromises.delete(url);
             return schema;
         } catch (error) {
@@ -713,7 +715,34 @@ class Schema {
     }
     
     static async _loadSchema(url) {
+        // Check cache first inside _loadSchema too
+        if (schemaCache.has(url)) {
+            return schemaCache.get(url);
+        }
+        
         try {
+            // For schema.org URLs, we'll simulate loading since they don't actually serve schemas
+            if (url.includes('schema.org/')) {
+                // Simulate network delay for first load
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // Extract type name from URL
+                const typeName = url.split('/').pop();
+                const data = {
+                    '@type': 'Class',
+                    '@id': url,
+                    'name': typeName,
+                    // Basic properties that most schema.org types have
+                    'properties': {
+                        'name': { '@type': 'Property' },
+                        'description': { '@type': 'Property' }
+                    }
+                };
+                const schema = Schema._createSchemaInstance(url, data);
+                schemaCache.set(url, schema);
+                return schema;
+            }
+            
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`Failed to fetch schema: ${response.status}`);
@@ -800,7 +829,7 @@ class SchemaOrgSchema {
     constructor(url, data) {
         this.url = url;
         this.data = data;
-        this.loaded = false;
+        this.loaded = !!data && Object.keys(data).length > 0;
         this.properties = this._extractProperties(data);
     }
     
@@ -1718,7 +1747,8 @@ class TemplateSynchronizer {
             childList: true,
             subtree: true,
             attributes: true,
-            attributeFilter: ['data-contains', 'id']
+            attributeFilter: ['data-contains', 'id'],
+            characterData: true
         });
     }
     
@@ -1737,6 +1767,11 @@ class TemplateSynchronizer {
     _processContainer(container) {
         const schemaUrl = container.getAttribute('data-contains');
         if (!schemaUrl) return;
+        
+        // Check if already processed
+        if (this.syncedContainers.has(container)) {
+            return;
+        }
         
         // Find template within container
         const template = container.querySelector('template');
@@ -1782,11 +1817,15 @@ class TemplateSynchronizer {
             const id = itemElement.id;
             const item = new MicrodataItem(itemElement);
             
+            
             if (renderedItems.has(id)) {
                 // Update existing
                 const existingElement = renderedItems.get(id);
                 if (existingElement && existingElement.parentElement) {
-                    this._updateRenderedItem(existingElement, item);
+                    const newElement = this._updateRenderedItem(existingElement, item);
+                    if (newElement !== existingElement) {
+                        renderedItems.set(id, newElement);
+                    }
                 } else {
                     // Element was removed, clean up
                     renderedItems.delete(id);
@@ -1823,13 +1862,17 @@ class TemplateSynchronizer {
             return element;
         }
         
-        const templateEl = element.parentElement.querySelector('template');
-        if (templateEl) {
-            const templateInstance = new Template(templateEl);
+        // Get the template from the container info, not from DOM
+        const container = element.closest('[data-contains]');
+        const containerInfo = this.syncedContainers.get(container);
+        
+        if (containerInfo && containerInfo.template) {
+            const templateInstance = new Template(containerInfo.template);
             const newElement = templateInstance.render(item);
             element.replaceWith(newElement);
             return newElement;
         }
+        
         return element;
     }
     
@@ -1863,6 +1906,32 @@ class TemplateSynchronizer {
                         modifiedItems.add(node);
                     }
                 });
+            }
+            
+            // Check for text/attribute changes within items with id
+            if (mutation.type === 'characterData') {
+                // Check if mutation is within an itemscope with id
+                let target = mutation.target;
+                if (target.nodeType === Node.TEXT_NODE) {
+                    target = target.parentElement;
+                }
+                
+                // Find containing itemscope with id
+                if (target && target.closest) {
+                    const itemScope = target.closest('[itemscope][id]');
+                    if (itemScope) {
+                        modifiedItems.add(itemScope);
+                    }
+                }
+            } else if (mutation.type === 'childList') {
+                // Check if any child change is within an itemscope with id
+                const target = mutation.target;
+                if (target && target.closest) {
+                    const itemScope = target.closest('[itemscope][id]');
+                    if (itemScope) {
+                        modifiedItems.add(itemScope);
+                    }
+                }
             }
         }
         

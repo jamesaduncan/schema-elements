@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Validation Example</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .example { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        form { margin: 20px 0; }
+        label { display: block; margin: 10px 0; }
+        input, select, textarea { padding: 5px; width: 300px; }
+        button { padding: 10px 20px; margin: 10px 0; }
+        .validation-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .valid { background: #d4edda; color: #155724; }
+        .invalid { background: #f8d7da; color: #721c24; }
+        .error-list { margin: 10px 0; }
+        .error-item { color: #dc3545; margin: 5px 0; }
+        .rendered-output { background: #f5f5f5; padding: 15px; margin: 15px 0; }
+        .schema-info { background: #e9ecef; padding: 10px; margin: 10px 0; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Form Validation with Microdata Schemas</h1>
+    
+    <div class="example">
+        <h2>Basic Person Form (Schema.org)</h2>
+        
+        <div class="schema-info">
+            <strong>Schema:</strong> https://schema.org/Person<br>
+            <em>Note: Schema.org validation is permissive - all fields are optional</em>
+        </div>
+        
+        <form id="person-form">
+            <label>
+                Name: <br>
+                <input name="name" type="text" placeholder="John Doe">
+            </label>
+            
+            <label>
+                Email: <br>
+                <input name="email" type="email" placeholder="john@example.com">
+            </label>
+            
+            <label>
+                Job Title: <br>
+                <input name="jobTitle" type="text" placeholder="Software Developer">
+            </label>
+            
+            <label>
+                Telephone: <br>
+                <input name="telephone" type="tel" placeholder="555-1234">
+            </label>
+            
+            <button type="button" onclick="validatePersonForm()">Validate</button>
+            <button type="button" onclick="renderPersonForm()">Render to Template</button>
+        </form>
+        
+        <div id="person-validation-result"></div>
+        <div id="person-rendered" class="rendered-output" style="display: none;"></div>
+        
+        <template id="person-template" itemscope itemtype="https://schema.org/Person">
+            <div style="border: 1px solid #ccc; padding: 10px;">
+                <h3 itemprop="name"></h3>
+                <p>Email: <a itemprop="email" href=""></a></p>
+                <p>Job: <span itemprop="jobTitle"></span></p>
+                <p>Phone: <span itemprop="telephone"></span></p>
+            </div>
+        </template>
+    </div>
+    
+    <div class="example">
+        <h2>Strict Validation Form (RustyBeam.net Schema)</h2>
+        
+        <div class="schema-info">
+            <strong>Schema:</strong> Custom Credential Schema<br>
+            <em>Required fields: username, password<br>
+            Optional fields: role, encryption</em>
+        </div>
+        
+        <form id="credential-form">
+            <label>
+                Username: <span style="color: red;">*</span><br>
+                <input name="username" type="text" required placeholder="Required">
+            </label>
+            
+            <label>
+                Password: <span style="color: red;">*</span><br>
+                <input name="password" type="password" required placeholder="Required">
+            </label>
+            
+            <label>
+                Role: <br>
+                <select name="role">
+                    <option value="">Select role...</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                    <option value="guest">Guest</option>
+                </select>
+            </label>
+            
+            <label>
+                Encryption: <br>
+                <select name="encryption">
+                    <option value="bcrypt">BCrypt</option>
+                    <option value="sha256">SHA-256</option>
+                    <option value="plaintext">Plain Text</option>
+                </select>
+            </label>
+            
+            <button type="button" onclick="validateCredentialForm()">Validate</button>
+        </form>
+        
+        <div id="credential-validation-result"></div>
+    </div>
+    
+    <div class="example">
+        <h2>Complex Form with Nested Data</h2>
+        
+        <form id="product-form">
+            <h3>Product Information</h3>
+            <label>
+                Product Name: <br>
+                <input name="name" type="text" placeholder="Product name">
+            </label>
+            
+            <label>
+                Description: <br>
+                <textarea name="description" rows="3" placeholder="Product description"></textarea>
+            </label>
+            
+            <h4>Offer Details</h4>
+            <label>
+                Price: <br>
+                <input name="offers.price" type="number" step="0.01" placeholder="99.99">
+            </label>
+            
+            <label>
+                Currency: <br>
+                <select name="offers.priceCurrency">
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                </select>
+            </label>
+            
+            <label>
+                Availability: <br>
+                <select name="offers.availability">
+                    <option value="https://schema.org/InStock">In Stock</option>
+                    <option value="https://schema.org/OutOfStock">Out of Stock</option>
+                    <option value="https://schema.org/PreOrder">Pre-Order</option>
+                </select>
+            </label>
+            
+            <button type="button" onclick="validateProductForm()">Validate & Show Data</button>
+        </form>
+        
+        <div id="product-validation-result"></div>
+    </div>
+    
+    <script type="module">
+        import { Schema, Template, RustyBeamNetSchema } from './index.mjs';
+        
+        // Create a custom RustyBeam schema for credentials
+        const credentialSchema = new RustyBeamNetSchema('https://example.com/schema/Credential', {
+            '@type': 'Schema',
+            '@context': 'https://example.com/schema/',
+            'username': {
+                '@type': 'Property',
+                'name': 'username',
+                'type': 'Text',
+                'cardinality': '1'  // Required
+            },
+            'password': {
+                '@type': 'Property',
+                'name': 'password',
+                'type': 'Text',
+                'cardinality': '1'  // Required
+            },
+            'role': {
+                '@type': 'Property',
+                'name': 'role',
+                'type': 'Text',
+                'cardinality': '0..1'  // Optional
+            },
+            'encryption': {
+                '@type': 'Property',
+                'name': 'encryption',
+                'type': 'Text',
+                'cardinality': '0..1'  // Optional
+            }
+        });
+        credentialSchema.loaded = true;
+        
+        // Make validation functions global
+        window.validatePersonForm = async function() {
+            const form = document.getElementById('person-form');
+            const resultDiv = document.getElementById('person-validation-result');
+            
+            try {
+                const schema = await Schema.load('https://schema.org/Person');
+                const isValid = schema.validate(form);
+                
+                resultDiv.className = isValid ? 'validation-result valid' : 'validation-result invalid';
+                resultDiv.innerHTML = isValid ? 
+                    '✓ Form is valid according to Schema.org Person schema' : 
+                    '✗ Form validation failed';
+                    
+                // Show form data
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData);
+                resultDiv.innerHTML += '<br><br><strong>Form Data:</strong><pre>' + 
+                    JSON.stringify(data, null, 2) + '</pre>';
+            } catch (e) {
+                resultDiv.className = 'validation-result invalid';
+                resultDiv.innerHTML = '✗ Error: ' + e.message;
+            }
+        };
+        
+        window.renderPersonForm = function() {
+            const form = document.getElementById('person-form');
+            const template = document.getElementById('person-template');
+            const outputDiv = document.getElementById('person-rendered');
+            
+            try {
+                const templateInstance = new Template(template);
+                const rendered = templateInstance.render(form);
+                
+                outputDiv.innerHTML = '<h3>Rendered Output:</h3>';
+                outputDiv.appendChild(rendered);
+                outputDiv.style.display = 'block';
+            } catch (e) {
+                outputDiv.innerHTML = '<div class="validation-result invalid">Error: ' + e.message + '</div>';
+                outputDiv.style.display = 'block';
+            }
+        };
+        
+        window.validateCredentialForm = function() {
+            const form = document.getElementById('credential-form');
+            const resultDiv = document.getElementById('credential-validation-result');
+            
+            try {
+                const isValid = credentialSchema.validate(form);
+                
+                resultDiv.className = isValid ? 'validation-result valid' : 'validation-result invalid';
+                
+                if (isValid) {
+                    resultDiv.innerHTML = '✓ All required fields are present and valid';
+                } else {
+                    resultDiv.innerHTML = '✗ Validation failed<div class="error-list">';
+                    
+                    // Check specific fields
+                    const formData = new FormData(form);
+                    if (!formData.get('username')) {
+                        resultDiv.innerHTML += '<div class="error-item">• Username is required</div>';
+                    }
+                    if (!formData.get('password')) {
+                        resultDiv.innerHTML += '<div class="error-item">• Password is required</div>';
+                    }
+                    resultDiv.innerHTML += '</div>';
+                }
+                
+                // Show form data
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData);
+                resultDiv.innerHTML += '<br><strong>Form Data:</strong><pre>' + 
+                    JSON.stringify(data, null, 2) + '</pre>';
+            } catch (e) {
+                resultDiv.className = 'validation-result invalid';
+                resultDiv.innerHTML = '✗ Error: ' + e.message;
+            }
+        };
+        
+        window.validateProductForm = async function() {
+            const form = document.getElementById('product-form');
+            const resultDiv = document.getElementById('product-validation-result');
+            
+            try {
+                const schema = await Schema.load('https://schema.org/Product');
+                const isValid = schema.validate(form);
+                
+                // Extract nested form data
+                const formData = new FormData(form);
+                const data = {};
+                
+                for (const [key, value] of formData.entries()) {
+                    if (key.includes('.')) {
+                        const [parent, child] = key.split('.');
+                        if (!data[parent]) data[parent] = {};
+                        data[parent][child] = value;
+                    } else {
+                        data[key] = value;
+                    }
+                }
+                
+                resultDiv.className = 'validation-result valid';
+                resultDiv.innerHTML = '✓ Form data extracted successfully';
+                resultDiv.innerHTML += '<br><br><strong>Structured Data:</strong><pre>' + 
+                    JSON.stringify(data, null, 2) + '</pre>';
+            } catch (e) {
+                resultDiv.className = 'validation-result invalid';
+                resultDiv.innerHTML = '✗ Error: ' + e.message;
+            }
+        };
+        
+        // Listen for validation events
+        document.addEventListener('DOMSchemaInvalidData', (e) => {
+            console.log('Validation error:', e.detail);
+        });
+    </script>
+</body>
+</html>

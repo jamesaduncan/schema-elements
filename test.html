@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microdata API - Test Suite and Examples</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .card a {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .card a:hover {
+            background: #0056b3;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+        .status.complete { background: #d4edda; color: #155724; }
+        .status.partial { background: #fff3cd; color: #856404; }
+        .status.planned { background: #d1ecf1; color: #0c5460; }
+        .phase-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .phase-card {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+        }
+        .phase-card h4 {
+            margin: 0 0 5px 0;
+        }
+        .phase-card.complete {
+            border-color: #28a745;
+        }
+        .code-example {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .quick-start {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Microdata API - Test Suite and Examples</h1>
+        
+        <div class="section quick-start">
+            <h2>Quick Start</h2>
+            <p>The Microdata API provides seamless access to HTML microdata with live DOM synchronization.</p>
+            <div class="code-example">
+// Access microdata from any element
+const person = document.getElementById('person1').microdata;
+console.log(person.name);  // "John Doe"
+
+// Access all microdata on the page
+const items = document.microdata;
+console.log(items.length); // Number of microdata items
+
+// Fetch microdata from remote URLs
+const data = await Microdata.fetch('https://example.com/page.html#fragment');
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Implementation Status</h2>
+            <div class="phase-grid">
+                <div class="phase-card complete">
+                    <h4>✅ Phase 1: Core Foundation</h4>
+                    <p>MicrodataItem, MicrodataCollection, DOM Integration</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 2: Schema System</h4>
+                    <p>Schema loading, validation, caching</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 3: Template System</h4>
+                    <p>Template rendering, auto-synchronization</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 4: Form Support</h4>
+                    <p>Form validation and data extraction</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 5: Fetch API</h4>
+                    <p>Remote microdata fetching</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 6: Event System</h4>
+                    <p>Schema events and validation events</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 7: Module Structure</h4>
+                    <p>ES6 modules and static methods</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 8: Edge Cases</h4>
+                    <p>Error handling and optimization</p>
+                </div>
+                <div class="phase-card complete">
+                    <h4>✅ Phase 9: Testing</h4>
+                    <p>Comprehensive test suite</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Test Suites</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Phase Tests</h3>
+                    <p>Individual tests for each implementation phase:</p>
+                    <a href="test-phase1.html">Phase 1: Core</a>
+                    <a href="test-phase2.html">Phase 2: Schema</a>
+                    <a href="test-phase3.html">Phase 3: Templates</a>
+                    <a href="test-phase4.html">Phase 4: Forms</a>
+                    <a href="test-phase5.html">Phase 5: Fetch</a>
+                    <a href="test-phase6.html">Phase 6: Events</a>
+                    <a href="test-phase7.html">Phase 7: Modules</a>
+                    <a href="test-phase8.html">Phase 8: Edge Cases</a>
+                </div>
+                
+                <div class="card">
+                    <h3>Comprehensive Tests</h3>
+                    <p>Complete test coverage for the API:</p>
+                    <a href="test-unit.html">Unit Tests</a>
+                    <a href="test-integration.html">Integration Tests</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Examples</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Basic Microdata</h3>
+                    <p>Simple examples of accessing and manipulating microdata through the API.</p>
+                    <a href="example-basic.html">View Example</a>
+                </div>
+                
+                <div class="card">
+                    <h3>Complex Nested Structures</h3>
+                    <p>Advanced examples with nested items, multiple values, and itemref usage.</p>
+                    <a href="example-complex.html">View Example</a>
+                </div>
+                
+                <div class="card">
+                    <h3>Template Auto-Sync</h3>
+                    <p>Live synchronization between data sources and rendered templates.</p>
+                    <a href="example-template-sync.html">View Example</a>
+                </div>
+                
+                <div class="card">
+                    <h3>Form Validation</h3>
+                    <p>Validate forms against microdata schemas with strict or permissive rules.</p>
+                    <a href="example-form-validation.html">View Example</a>
+                </div>
+                
+                <div class="card">
+                    <h3>Fetch API</h3>
+                    <p>Fetch and process microdata from remote URLs or page fragments.</p>
+                    <a href="example-fetch.html">View Example</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>API Documentation</h2>
+            <p>For complete API documentation, see:</p>
+            <ul>
+                <li><a href="SCHEMA-API.md">SCHEMA-API.md</a> - Full API specification</li>
+                <li><a href="SCHEMA-IMPLEMENTATION-PLAN.md">SCHEMA-IMPLEMENTATION-PLAN.md</a> - Implementation details</li>
+                <li><a href="README.md">README.md</a> - Project overview and usage guide</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>Browser Console Demo</h2>
+            <p>Open your browser console and try these commands:</p>
+            <div class="code-example">
+// This page has some demo microdata
+document.microdata.length  // See how many items
+
+// Access first item
+document.microdata[0]
+
+// Access by ID (if items have IDs)
+document.microdata['demo-item']
+
+// Create new microdata programmatically
+const div = document.createElement('div');
+div.setAttribute('itemscope', '');
+div.setAttribute('itemtype', 'https://schema.org/Thing');
+div.innerHTML = '&lt;span itemprop="name"&gt;Dynamic Item&lt;/span&gt;';
+document.body.appendChild(div);
+
+// It's immediately available
+div.microdata.name  // "Dynamic Item"
+            </div>
+        </div>
+        
+        <!-- Demo microdata for console testing -->
+        <div style="display: none;">
+            <div id="demo-item" itemscope itemtype="https://schema.org/Thing">
+                <span itemprop="name">Demo Item</span>
+                <span itemprop="description">This is a hidden demo item for testing</span>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import './index.mjs';
+        
+        // Make microdata globally accessible for console demos
+        window.addEventListener('DOMSchemasLoaded', () => {
+            console.log('Microdata API loaded!');
+            console.log('Try: document.microdata');
+            console.log('Or: document.getElementById("demo-item").microdata');
+        });
+    </script>
+</body>
+</html>

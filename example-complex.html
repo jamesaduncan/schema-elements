@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complex Nested Microdata Example</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .example { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .output { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        .nested { margin-left: 20px; padding: 10px; border-left: 3px solid #ccc; }
+        code { background: #eee; padding: 2px 4px; }
+    </style>
+</head>
+<body>
+    <h1>Complex Nested Microdata Example</h1>
+    
+    <div class="example">
+        <h2>Organization with Employees</h2>
+        <div id="company" itemscope itemtype="https://schema.org/Organization">
+            <h3 itemprop="name">Tech Innovators Inc.</h3>
+            <p itemprop="description">Leading technology solutions provider</p>
+            
+            <div class="nested">
+                <h4>Address:</h4>
+                <div itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+                    <span itemprop="streetAddress">123 Tech Boulevard</span><br>
+                    <span itemprop="addressLocality">San Francisco</span>,
+                    <span itemprop="addressRegion">CA</span>
+                    <span itemprop="postalCode">94105</span><br>
+                    <span itemprop="addressCountry">USA</span>
+                </div>
+            </div>
+            
+            <div class="nested">
+                <h4>Employees:</h4>
+                <div itemprop="employee" itemscope itemtype="https://schema.org/Person">
+                    <span itemprop="name">Alice Johnson</span> - 
+                    <span itemprop="jobTitle">CEO</span>
+                    <meta itemprop="email" content="alice@techinnovators.com">
+                </div>
+                
+                <div itemprop="employee" itemscope itemtype="https://schema.org/Person">
+                    <span itemprop="name">Bob Smith</span> - 
+                    <span itemprop="jobTitle">CTO</span>
+                    <meta itemprop="email" content="bob@techinnovators.com">
+                </div>
+            </div>
+            
+            <div class="nested">
+                <h4>Contact:</h4>
+                <p>Phone: <span itemprop="telephone">+1-555-0123</span></p>
+                <p>Website: <a itemprop="url" href="https://techinnovators.example.com">techinnovators.example.com</a></p>
+            </div>
+        </div>
+        
+        <div class="output">
+            <strong>Organization Data Structure:</strong>
+            <div id="org-output"></div>
+        </div>
+    </div>
+    
+    <div class="example">
+        <h2>Event with Multiple Performers and Offers</h2>
+        <div id="concert" itemscope itemtype="https://schema.org/MusicEvent">
+            <h3 itemprop="name">Summer Music Festival 2024</h3>
+            <meta itemprop="startDate" content="2024-07-15T19:00">
+            <p>Date: July 15, 2024 at 7:00 PM</p>
+            
+            <div class="nested">
+                <h4>Venue:</h4>
+                <div itemprop="location" itemscope itemtype="https://schema.org/MusicVenue">
+                    <span itemprop="name">Harmony Arena</span><br>
+                    <div itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+                        <span itemprop="streetAddress">456 Music Way</span><br>
+                        <span itemprop="addressLocality">Nashville</span>,
+                        <span itemprop="addressRegion">TN</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="nested">
+                <h4>Performers:</h4>
+                <div itemprop="performer" itemscope itemtype="https://schema.org/MusicGroup">
+                    <span itemprop="name">The Electric Dreams</span>
+                    <meta itemprop="genre" content="Rock">
+                </div>
+                <div itemprop="performer" itemscope itemtype="https://schema.org/MusicGroup">
+                    <span itemprop="name">Jazz Fusion Collective</span>
+                    <meta itemprop="genre" content="Jazz">
+                </div>
+            </div>
+            
+            <div class="nested">
+                <h4>Ticket Options:</h4>
+                <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+                    <span itemprop="name">General Admission</span> - 
+                    $<span itemprop="price">75</span>
+                    <meta itemprop="priceCurrency" content="USD">
+                    <link itemprop="availability" href="https://schema.org/InStock">
+                </div>
+                <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+                    <span itemprop="name">VIP Package</span> - 
+                    $<span itemprop="price">150</span>
+                    <meta itemprop="priceCurrency" content="USD">
+                    <link itemprop="availability" href="https://schema.org/LimitedAvailability">
+                </div>
+            </div>
+        </div>
+        
+        <div class="output">
+            <strong>Event Data Structure:</strong>
+            <div id="event-output"></div>
+        </div>
+    </div>
+    
+    <div class="example">
+        <h2>Recipe with Ingredients and Instructions</h2>
+        <div id="recipe" itemscope itemtype="https://schema.org/Recipe" itemref="recipe-nutrition">
+            <h3 itemprop="name">Chocolate Chip Cookies</h3>
+            <meta itemprop="prepTime" content="PT15M">
+            <meta itemprop="cookTime" content="PT12M">
+            <p>Prep: 15 mins | Cook: 12 mins</p>
+            
+            <div class="nested">
+                <h4>Ingredients:</h4>
+                <ul>
+                    <li itemprop="recipeIngredient">2 cups all-purpose flour</li>
+                    <li itemprop="recipeIngredient">1 tsp baking soda</li>
+                    <li itemprop="recipeIngredient">1 cup butter, softened</li>
+                    <li itemprop="recipeIngredient">3/4 cup sugar</li>
+                    <li itemprop="recipeIngredient">2 eggs</li>
+                    <li itemprop="recipeIngredient">2 cups chocolate chips</li>
+                </ul>
+            </div>
+            
+            <div class="nested">
+                <h4>Instructions:</h4>
+                <ol>
+                    <li itemprop="recipeInstructions">Preheat oven to 375°F (190°C)</li>
+                    <li itemprop="recipeInstructions">Mix flour and baking soda</li>
+                    <li itemprop="recipeInstructions">Cream butter and sugar</li>
+                    <li itemprop="recipeInstructions">Add eggs and mix well</li>
+                    <li itemprop="recipeInstructions">Stir in flour mixture and chocolate chips</li>
+                    <li itemprop="recipeInstructions">Drop by spoonfuls onto baking sheet</li>
+                    <li itemprop="recipeInstructions">Bake for 10-12 minutes</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- External nutrition info referenced by itemref -->
+        <div id="recipe-nutrition" class="nested">
+            <h4>Nutrition (per cookie):</h4>
+            <div itemprop="nutrition" itemscope itemtype="https://schema.org/NutritionInformation">
+                <span itemprop="calories">120 calories</span>,
+                <span itemprop="fatContent">6g fat</span>,
+                <span itemprop="carbohydrateContent">16g carbs</span>,
+                <span itemprop="proteinContent">2g protein</span>
+            </div>
+        </div>
+        
+        <div class="output">
+            <strong>Recipe Data (with itemref):</strong>
+            <div id="recipe-output"></div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import './index.mjs';
+        
+        setTimeout(() => {
+            // Organization example
+            const org = document.getElementById('company').microdata;
+            document.getElementById('org-output').innerHTML = `
+                <pre>${JSON.stringify(org, null, 2)}</pre>
+                <p>Employee count: ${Array.isArray(org.employee) ? org.employee.length : 1}</p>
+                <p>First employee: ${Array.isArray(org.employee) ? org.employee[0].name : org.employee.name}</p>
+                <p>Address: ${org.address.addressLocality}, ${org.address.addressRegion}</p>
+            `;
+            
+            // Event example
+            const event = document.getElementById('concert').microdata;
+            document.getElementById('event-output').innerHTML = `
+                <pre>${JSON.stringify(event, null, 2)}</pre>
+                <p>Venue: ${event.location.name}</p>
+                <p>Performers: ${event.performer.map(p => p.name).join(', ')}</p>
+                <p>Ticket options: ${event.offers.map(o => `${o.name} ($${o.price})`).join(', ')}</p>
+            `;
+            
+            // Recipe example (with itemref)
+            const recipe = document.getElementById('recipe').microdata;
+            document.getElementById('recipe-output').innerHTML = `
+                <pre>${JSON.stringify(recipe, null, 2)}</pre>
+                <p>Ingredients: ${recipe.recipeIngredient.length} items</p>
+                <p>Calories: ${recipe.nutrition.calories}</p>
+                <p>Note: Nutrition info comes from external element via itemref</p>
+            `;
+            
+            // Make available for console
+            window.complexExamples = { org, event, recipe };
+            console.log('Complex examples available as window.complexExamples');
+            
+        }, 500);
+    </script>
+</body>
+</html>

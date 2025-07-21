@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic Microdata Example</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .example { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .output { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        code { background: #eee; padding: 2px 4px; }
+    </style>
+</head>
+<body>
+    <h1>Basic Microdata Example</h1>
+    
+    <div class="example">
+        <h2>Simple Person Microdata</h2>
+        <div id="person1" itemscope itemtype="https://schema.org/Person">
+            <h3 itemprop="name">Jane Smith</h3>
+            <p>Email: <span itemprop="email">jane@example.com</span></p>
+            <p>Job: <span itemprop="jobTitle">Software Engineer</span></p>
+            <p>Phone: <span itemprop="telephone">555-1234</span></p>
+        </div>
+        
+        <h3>Accessing via JavaScript:</h3>
+        <pre><code>const person = document.getElementById('person1').microdata;
+console.log(person.name);     // "Jane Smith"
+console.log(person.email);    // "jane@example.com"
+console.log(person['@type']); // "Person"</code></pre>
+        
+        <div class="output">
+            <strong>Live Output:</strong>
+            <div id="person-output"></div>
+        </div>
+    </div>
+    
+    <div class="example">
+        <h2>Product with Offer</h2>
+        <div id="product1" itemscope itemtype="https://schema.org/Product">
+            <h3 itemprop="name">Professional Microphone</h3>
+            <p itemprop="description">High-quality condenser microphone for recording.</p>
+            
+            <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+                <p>Price: $<span itemprop="price">299.99</span></p>
+                <meta itemprop="priceCurrency" content="USD">
+                <link itemprop="availability" href="https://schema.org/InStock">
+                <p>In Stock</p>
+            </div>
+        </div>
+        
+        <div class="output">
+            <strong>Product Data:</strong>
+            <div id="product-output"></div>
+        </div>
+    </div>
+    
+    <div class="example">
+        <h2>Multiple Values (Array Properties)</h2>
+        <div id="person2" itemscope itemtype="https://schema.org/Person">
+            <h3 itemprop="name">Multi-talented Developer</h3>
+            <p>Skills:</p>
+            <ul>
+                <li itemprop="knowsAbout">JavaScript</li>
+                <li itemprop="knowsAbout">Python</li>
+                <li itemprop="knowsAbout">Machine Learning</li>
+            </ul>
+        </div>
+        
+        <div class="output">
+            <strong>Array Property:</strong>
+            <div id="array-output"></div>
+        </div>
+    </div>
+    
+    <div class="example">
+        <h2>All Microdata Items on Page</h2>
+        <div class="output">
+            <strong>document.microdata:</strong>
+            <div id="all-output"></div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import './index.mjs';
+        
+        // Wait for microdata to initialize
+        setTimeout(() => {
+            // Example 1: Simple Person
+            const person = document.getElementById('person1').microdata;
+            document.getElementById('person-output').innerHTML = `
+                <pre>${JSON.stringify(person, null, 2)}</pre>
+                <p>person.name = "${person.name}"</p>
+                <p>person['@type'] = "${person['@type']}"</p>
+            `;
+            
+            // Example 2: Nested Product
+            const product = document.getElementById('product1').microdata;
+            document.getElementById('product-output').innerHTML = `
+                <pre>${JSON.stringify(product, null, 2)}</pre>
+                <p>Offer price: $${product.offers.price}</p>
+            `;
+            
+            // Example 3: Array Properties
+            const person2 = document.getElementById('person2').microdata;
+            document.getElementById('array-output').innerHTML = `
+                <pre>${JSON.stringify(person2, null, 2)}</pre>
+                <p>Skills array length: ${person2.knowsAbout.length}</p>
+                <p>Skills: ${person2.knowsAbout.join(', ')}</p>
+            `;
+            
+            // Example 4: All items
+            const items = document.microdata;
+            document.getElementById('all-output').innerHTML = `
+                <p>Total items: ${items.length}</p>
+                <p>Item types: ${items.map(item => item['@type']).join(', ')}</p>
+                <p>Access by ID: document.microdata['person1'].name = "${items['person1'].name}"</p>
+            `;
+            
+            // Make data globally accessible for console experimentation
+            window.exampleData = { person, product, person2, items };
+            console.log('Example data available as window.exampleData');
+            
+        }, 500);
+    </script>
+</body>
+</html>

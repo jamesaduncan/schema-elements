@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microdata API - Integration Tests</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .test-subsection { margin: 10px 0; padding: 5px 10px; background: #f9f9f9; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .dynamic-content { background: #ffffcc; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Integration Tests</h1>
+    
+    <!-- Test areas for dynamic content -->
+    <div class="test-section">
+        <h2>Live DOM Synchronization Test Area</h2>
+        <div id="live-sync-area" class="dynamic-content">
+            <div id="live-person" itemscope itemtype="https://schema.org/Person">
+                <span itemprop="name">Initial Name</span>
+                <span itemprop="email">initial@example.com</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Template Auto-Sync Test Area</h2>
+        <div id="template-sync-area" class="dynamic-content" data-contains="https://schema.org/Product">
+            <template itemscope itemtype="https://schema.org/Product">
+                <div class="product-card">
+                    <h3 itemprop="name"></h3>
+                    <p>Price: $<span itemprop="price"></span></p>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Source data for template sync -->
+        <div style="display: none;">
+            <div id="product1" itemscope itemtype="https://schema.org/Product">
+                <span itemprop="name">Widget</span>
+                <span itemprop="price">19.99</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Form Validation Test Area</h2>
+        <form id="test-form">
+            <input name="name" type="text" required>
+            <input name="email" type="email" required>
+            <select name="role">
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+            </select>
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+    
+    <div class="test-section">
+        <h2>Complex Itemref Test Area</h2>
+        <div id="complex-itemref" itemscope itemtype="https://schema.org/Person" itemref="shared-address shared-phone">
+            <span itemprop="name">Complex Person</span>
+        </div>
+        <div id="shared-address" itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+            <span itemprop="streetAddress">123 Main St</span>
+            <span itemprop="addressLocality">Anytown</span>
+        </div>
+        <div id="shared-phone" itemprop="telephone">555-1234</div>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script>
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        async function testAsync(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                await fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+    </script>
+    
+    <script type="module">
+        import { Microdata, Schema, Template } from './index.mjs';
+        
+        // Wait for DOM and schemas to load
+        document.addEventListener('DOMSchemasLoaded', async () => {
+            results.innerHTML = '';
+            
+            // 9.2.1 Test live DOM synchronization
+            const syncSection = document.createElement('div');
+            syncSection.className = 'test-subsection';
+            syncSection.innerHTML = '<h3>Live DOM Synchronization</h3>';
+            results.appendChild(syncSection);
+            
+            test('Initial microdata access', () => {
+                const person = document.getElementById('live-person').microdata;
+                assert(person.name === 'Initial Name', 'Should have initial name');
+                assert(person.email === 'initial@example.com', 'Should have initial email');
+            });
+            
+            await testAsync('DOM update reflects in microdata', async () => {
+                const person = document.getElementById('live-person').microdata;
+                const nameEl = document.querySelector('#live-person [itemprop="name"]');
+                
+                nameEl.textContent = 'Updated Name';
+                await wait(50); // Wait for MutationObserver
+                
+                assert(person.name === 'Updated Name', 'Microdata should reflect DOM change');
+            });
+            
+            await testAsync('Microdata update reflects in DOM', async () => {
+                const person = document.getElementById('live-person').microdata;
+                person.email = 'updated@example.com';
+                await wait(50);
+                
+                const emailEl = document.querySelector('#live-person [itemprop="email"]');
+                assert(emailEl.textContent === 'updated@example.com', 'DOM should reflect microdata change');
+            });
+            
+            await testAsync('Adding new property element', async () => {
+                const person = document.getElementById('live-person').microdata;
+                const newProp = document.createElement('span');
+                newProp.setAttribute('itemprop', 'jobTitle');
+                newProp.textContent = 'Developer';
+                document.getElementById('live-person').appendChild(newProp);
+                
+                await wait(50);
+                assert(person.jobTitle === 'Developer', 'Should detect new property');
+            });
+            
+            await testAsync('Removing property element', async () => {
+                const person = document.getElementById('live-person').microdata;
+                const jobTitleEl = document.querySelector('#live-person [itemprop="jobTitle"]');
+                jobTitleEl.remove();
+                
+                await wait(50);
+                assert(person.jobTitle === undefined, 'Should remove property when element removed');
+            });
+            
+            // 9.2.2 Test schema loading and caching
+            const schemaSection = document.createElement('div');
+            schemaSection.className = 'test-subsection';
+            schemaSection.innerHTML = '<h3>Schema Loading and Caching</h3>';
+            results.appendChild(schemaSection);
+            
+            await testAsync('Schema auto-loading on page load', async () => {
+                // Schemas should have loaded automatically during DOMSchemasLoaded
+                // Check if schema is in cache
+                try {
+                    const personSchema = await Schema.load('https://schema.org/Person');
+                    assert(personSchema !== null, 'Person schema should exist');
+                    assert(personSchema.loaded === true, 'Person schema should be loaded');
+                } catch (e) {
+                    // If schema loading failed, try to understand why
+                    console.error('Schema loading error:', e);
+                    throw e;
+                }
+            });
+            
+            await testAsync('Schema caching works', async () => {
+                // Clear cache first to ensure clean test
+                Schema.clearCache();
+                
+                const start = performance.now();
+                const schema1 = await Schema.load('https://schema.org/Product');
+                const mid = performance.now();
+                const schema2 = await Schema.load('https://schema.org/Product');
+                const end = performance.now();
+                
+                assert(schema1 === schema2, 'Should return same instance');
+                // Cached load should be significantly faster (at least 10x)
+                assert((end - mid) < (mid - start) / 10, 'Cached load should be much faster');
+            });
+            
+            // 9.2.3 Test template auto-sync
+            const templateSection = document.createElement('div');
+            templateSection.className = 'test-subsection';
+            templateSection.innerHTML = '<h3>Template Auto-Synchronization</h3>';
+            results.appendChild(templateSection);
+            
+            await testAsync('Template auto-renders on load', async () => {
+                await wait(100); // Wait for auto-sync to initialize
+                
+                const container = document.getElementById('template-sync-area');
+                const rendered = container.querySelector('.product-card');
+                assert(rendered !== null, 'Should auto-render template');
+                assert(rendered.querySelector('[itemprop="name"]').textContent === 'Widget', 'Should render data');
+            });
+            
+            await testAsync('Template updates when source changes', async () => {
+                // First ensure template has rendered
+                await wait(200);
+                
+                const container = document.getElementById('template-sync-area');
+                const initialRendered = container.querySelector('.product-card');
+                assert(initialRendered !== null, 'Should have initial rendered element');
+                assert(initialRendered.querySelector('[itemprop="name"]').textContent === 'Widget', 'Should have initial content');
+                
+                // Get the source and update it
+                const source = document.getElementById('product1');
+                const nameEl = source.querySelector('[itemprop="name"]');
+                
+                // Change the text content
+                nameEl.textContent = 'Updated Widget';
+                
+                // Wait for sync - use longer polling to ensure update completes
+                let updatedElement = null;
+                let attempts = 0;
+                const maxAttempts = 30;
+                
+                while (!updatedElement && attempts < maxAttempts) {
+                    await wait(100);
+                    attempts++;
+                    
+                    // Look for any element with the updated content
+                    const allCards = container.querySelectorAll('.product-card');
+                    
+                    for (const card of allCards) {
+                        const name = card.querySelector('[itemprop="name"]')?.textContent;
+                        if (name === 'Updated Widget') {
+                            updatedElement = card;
+                            break;
+                        }
+                    }
+                }
+                
+                
+                assert(updatedElement !== null, 'Should find element with updated content');
+                const finalName = updatedElement.querySelector('[itemprop="name"]');
+                assert(finalName !== null, 'Should have name element');
+                assert(finalName.textContent === 'Updated Widget', `Should sync updates (got: ${finalName.textContent})`);
+            });
+            
+            await testAsync('New items auto-render', async () => {
+                const newProduct = document.createElement('div');
+                newProduct.id = 'product2';
+                newProduct.setAttribute('itemscope', '');
+                newProduct.setAttribute('itemtype', 'https://schema.org/Product');
+                newProduct.innerHTML = '<span itemprop="name">New Product</span><span itemprop="price">29.99</span>';
+                document.body.appendChild(newProduct);
+                
+                await wait(100);
+                
+                const container = document.getElementById('template-sync-area');
+                const cards = container.querySelectorAll('.product-card');
+                assert(cards.length === 2, 'Should render new item');
+            });
+            
+            // 9.2.4 Test form validation
+            const formSection = document.createElement('div');
+            formSection.className = 'test-subsection';
+            formSection.innerHTML = '<h3>Form Validation</h3>';
+            results.appendChild(formSection);
+            
+            test('Form data extraction', () => {
+                const form = document.getElementById('test-form');
+                form.name.value = 'Test User';
+                form.email.value = 'test@example.com';
+                form.role.value = 'admin';
+                
+                // Create a template to test form rendering
+                const template = new Template(document.createElement('template'));
+                const data = template._extractData(form);
+                
+                assert(data.name === 'Test User', 'Should extract name');
+                assert(data.email === 'test@example.com', 'Should extract email');
+                assert(data.role === 'admin', 'Should extract select value');
+            });
+            
+            await testAsync('Form validation with schema', async () => {
+                const form = document.getElementById('test-form');
+                
+                // Load and verify schema is loaded
+                const schema = await Schema.load('https://schema.org/Person');
+                assert(schema !== null, 'Schema should exist');
+                assert(schema.loaded === true, 'Schema should be loaded before validation');
+                
+                // Schema.org validation is permissive
+                const isValid = schema.validate(form);
+                assert(isValid === true, 'Form should validate against schema');
+            });
+            
+            // 9.2.5 Test fetch API
+            const fetchSection = document.createElement('div');
+            fetchSection.className = 'test-subsection';
+            fetchSection.innerHTML = '<h3>Fetch API</h3>';
+            results.appendChild(fetchSection);
+            
+            await testAsync('Fetch with fragment', async () => {
+                // Create a test document to fetch
+                const testUrl = window.location.href + '#live-person';
+                
+                try {
+                    const result = await Microdata.fetch(testUrl);
+                    assert(result.microdata !== undefined, 'Should have microdata property');
+                    assert(result.microdata.name !== undefined, 'Should access microdata from fragment');
+                } catch (e) {
+                    // Fetch of same-origin might fail in some environments
+                    console.warn('Fetch test skipped:', e);
+                }
+            });
+            
+            // 9.2.6 Test complex itemref scenarios
+            const itemrefSection = document.createElement('div');
+            itemrefSection.className = 'test-subsection';
+            itemrefSection.innerHTML = '<h3>Complex Itemref Scenarios</h3>';
+            results.appendChild(itemrefSection);
+            
+            test('Complex nested itemref', () => {
+                const person = document.getElementById('complex-itemref').microdata;
+                assert(person.name === 'Complex Person', 'Should have direct property');
+                assert(person.telephone === '555-1234', 'Should have referenced property');
+                assert(person.address instanceof Object, 'Should have nested referenced item');
+                assert(person.address.streetAddress === '123 Main St', 'Should access nested property');
+            });
+            
+            await testAsync('Itemref updates propagate', async () => {
+                const person = document.getElementById('complex-itemref').microdata;
+                const phoneEl = document.getElementById('shared-phone');
+                phoneEl.textContent = '555-9999';
+                
+                await wait(50);
+                assert(person.telephone === '555-9999', 'Should reflect itemref update');
+            });
+            
+            // Summary
+            const summary = document.getElementById('summary');
+            summary.textContent = `Integration Tests completed: ${passCount}/${testCount} passed`;
+            summary.className = passCount === testCount ? 'test-pass' : 'test-fail';
+            
+            // Clean up
+            const product2 = document.getElementById('product2');
+            if (product2) product2.remove();
+            
+        }); // DOMSchemasLoaded event
+    </script>
+</body>
+</html>

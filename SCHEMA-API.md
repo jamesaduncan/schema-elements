@@ -479,4 +479,40 @@ The Fetch API respects document fragments too:
         console.log( fragment.microdata );
     ```
 
+Microdata is aware of the fetch API and can 
 
+    ```html
+    <meta itemscope itemtype="https://rustybeam.net/schema/HostConfig" itemid="https://example.com/#localhost">
+    <script type="module">
+        import { Microdata } from './index.mjs';
+        
+    
+        // fetches the page at https://example.com/ and then returns page.getElementById('localhost');
+        const microdataElement = await document.microdata[0].fetch();
+        console.log( microdataElement.microdata.hostname ) // logs the hostname property from the fetched microdata item
+    </script>
+    ```
+
+It's worth noting that this works because the meta tag there is not an authoritative source.
+
+    ```html
+    <div id="johndoe" itemref="enc" itemscope itemtype="https://rustybeam.net/schema/Credential">
+        <p>
+            The users' username is <span itemprop="username">johndoe</username>. They
+            have the following roles:
+            <ul>
+                <li itemprop="role">editor</li>
+                <li itemprop="role">writer</li>
+            </ul>
+            The users' password is <span itemprop="password">seecret</span>.
+        </p>
+    </div>
+        <script type="module">
+        import { Microdata } from './index.mjs';        
+    
+        // returns document.getElementById('johndoe') because it is an authoritative item. I can
+        // then ask for the element's microdata property to get the microdata item.
+        const microdataElement = await document.microdata[0].fetch();
+        microdataElement.microdata.username = "paul"; // change username to paul
+    </script>
+    ```
