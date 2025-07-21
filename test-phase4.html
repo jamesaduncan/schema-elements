@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 4 Form Support Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .card { border: 1px solid #ddd; padding: 10px; margin: 5px 0; }
+        form { margin: 20px 0; }
+        label { display: block; margin: 5px 0; }
+        fieldset { margin: 10px 0; }
+        .error { color: red; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 4 Form Support Test</h1>
+    
+    <!-- Test Forms -->
+    <div class="test-section">
+        <h2>Test Forms</h2>
+        
+        <!-- Basic form with all input types -->
+        <form id="complete-form">
+            <h3>Complete Form Test</h3>
+            
+            <!-- Text inputs -->
+            <label>Username: <input type="text" name="username" value="testuser"></label>
+            <label>Password: <input type="password" name="password" value="secret123"></label>
+            <label>Email: <input type="email" name="email" value="test@example.com"></label>
+            
+            <!-- Textarea -->
+            <label>Bio: <textarea name="bio">This is my bio text.</textarea></label>
+            
+            <!-- Select single -->
+            <label>Role:
+                <select name="role">
+                    <option value="admin">Administrator</option>
+                    <option value="editor" selected>Editor</option>
+                    <option value="writer">Writer</option>
+                </select>
+            </label>
+            
+            <!-- Select multiple -->
+            <label>Permissions:
+                <select name="permissions" multiple>
+                    <option value="read" selected>Read</option>
+                    <option value="write" selected>Write</option>
+                    <option value="delete">Delete</option>
+                </select>
+            </label>
+            
+            <!-- Radio buttons -->
+            <fieldset>
+                <legend>Status:</legend>
+                <label><input type="radio" name="status" value="active" checked> Active</label>
+                <label><input type="radio" name="status" value="inactive"> Inactive</label>
+            </fieldset>
+            
+            <!-- Checkboxes for array -->
+            <fieldset>
+                <legend>Notifications:</legend>
+                <label><input type="checkbox" name="notifications[]" value="email" checked> Email</label>
+                <label><input type="checkbox" name="notifications[]" value="sms" checked> SMS</label>
+                <label><input type="checkbox" name="notifications[]" value="push"> Push</label>
+            </fieldset>
+            
+            <!-- Other input types -->
+            <label>Age: <input type="number" name="age" value="25"></label>
+            <label>Website: <input type="url" name="website" value="https://example.com"></label>
+            <label>Phone: <input type="tel" name="phone" value="+1234567890"></label>
+            <label>Birthday: <input type="date" name="birthday" value="1990-01-01"></label>
+            <label>Preferred Time: <input type="time" name="preferredTime" value="09:00"></label>
+            <label>Color: <input type="color" name="favoriteColor" value="#ff0000"></label>
+            <label>Rating: <input type="range" name="rating" min="0" max="10" value="7"></label>
+            
+            <button type="submit">Submit</button>
+        </form>
+        
+        <!-- Credential form for validation -->
+        <form id="credential-form">
+            <h3>Credential Form (for validation)</h3>
+            <label>Username: <input type="text" name="username" required></label>
+            <label>Password: <input type="password" name="password" required></label>
+            <label>Role: 
+                <select name="role" required>
+                    <option value="">Select role...</option>
+                    <option value="admin">Admin</option>
+                    <option value="editor">Editor</option>
+                </select>
+            </label>
+            <label>Encryption: <input type="text" name="encryption" value="plaintext" required></label>
+            <button type="submit">Submit</button>
+            <div class="error" id="credential-error"></div>
+        </form>
+        
+        <!-- Person form -->
+        <form id="person-form">
+            <h3>Person Form</h3>
+            <label>Name: <input type="text" name="name" value="Test Person"></label>
+            <label>Email: <input type="email" name="email" value="person@example.com"></label>
+            <label>Birthday: <input type="date" name="birthdate" value="1985-05-15"></label>
+        </form>
+    </div>
+    
+    <!-- Templates for rendering -->
+    <div class="test-section">
+        <h2>Templates</h2>
+        
+        <!-- Template with form elements -->
+        <template id="form-state-template">
+            <div class="card" itemscope itemtype="https://rustybeam.net/schema/User">
+                <h3>User Profile</h3>
+                <p>Username: <input type="text" itemprop="username" readonly></p>
+                <p>Email: <input type="email" itemprop="email" readonly></p>
+                <p>Bio: <textarea itemprop="bio" readonly></textarea></p>
+                <p>Role: 
+                    <select itemprop="role" disabled>
+                        <option value="admin">Administrator</option>
+                        <option value="editor">Editor</option>
+                        <option value="writer">Writer</option>
+                    </select>
+                </p>
+                <p>Status: <span itemprop="status"></span></p>
+                <p>Notifications:
+                    <label><input type="checkbox" itemprop="notifications[]" value="email" disabled> Email</label>
+                    <label><input type="checkbox" itemprop="notifications[]" value="sms" disabled> SMS</label>
+                    <label><input type="checkbox" itemprop="notifications[]" value="push" disabled> Push</label>
+                </p>
+            </div>
+        </template>
+        
+        <!-- Person template -->
+        <template id="person-template">
+            <div class="card" itemscope itemtype="http://schema.org/Person">
+                <h1 itemprop="name"></h1>
+                <p>Email: <span itemprop="email"></span></p>
+                <p>Birthday: <span itemprop="birthdate"></span></p>
+            </div>
+        </template>
+    </div>
+    
+    <div id="render-target" class="test-section">
+        <h2>Render Target</h2>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script type="module">
+        import { Microdata, Schema, Template } from './index.mjs';
+        
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        async function testAsync(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                await fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        // Wait for DOM to be ready
+        setTimeout(async () => {
+            results.innerHTML = '<h3>Running Form Support tests...</h3>';
+            
+            // Test 4.1: Form Data Extraction
+            test('Extract basic form inputs', () => {
+                const form = document.getElementById('complete-form');
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(data.username === 'testuser', 'Should extract text input');
+                assert(data.password === 'secret123', 'Should extract password input');
+                assert(data.email === 'test@example.com', 'Should extract email input');
+            });
+            
+            test('Extract textarea', () => {
+                const form = document.getElementById('complete-form');
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(data.bio === 'This is my bio text.', 'Should extract textarea value');
+            });
+            
+            test('Extract select single', () => {
+                const form = document.getElementById('complete-form');
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(data.role === 'editor', 'Should extract selected option');
+            });
+            
+            test('Extract select multiple', () => {
+                const form = document.getElementById('complete-form');
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(Array.isArray(data.permissions), 'Should extract as array');
+                assert(data.permissions.length === 2, 'Should have 2 selected options');
+                assert(data.permissions.includes('read'), 'Should include read');
+                assert(data.permissions.includes('write'), 'Should include write');
+            });
+            
+            test('Extract radio buttons', () => {
+                const form = document.getElementById('complete-form');
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(data.status === 'active', 'Should extract checked radio value');
+            });
+            
+            test('Extract checkbox arrays', () => {
+                const form = document.getElementById('complete-form');
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(Array.isArray(data.notifications), 'Should extract as array');
+                assert(data.notifications.length === 2, 'Should have 2 checked boxes');
+                assert(data.notifications.includes('email'), 'Should include email');
+                assert(data.notifications.includes('sms'), 'Should include sms');
+            });
+            
+            test('Extract other input types', () => {
+                const form = document.getElementById('complete-form');
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(data.age === '25', 'Should extract number input');
+                assert(data.website === 'https://example.com', 'Should extract url input');
+                assert(data.phone === '+1234567890', 'Should extract tel input');
+                assert(data.birthday === '1990-01-01', 'Should extract date input');
+                assert(data.preferredTime === '09:00', 'Should extract time input');
+                assert(data.favoriteColor === '#ff0000', 'Should extract color input');
+                assert(data.rating === '7', 'Should extract range input');
+            });
+            
+            // Test 4.2: Form Validation
+            await testAsync('Schema validation with forms', async () => {
+                const form = document.getElementById('credential-form');
+                form.username.value = 'testuser';
+                form.password.value = 'testpass';
+                form.role.value = 'admin';
+                
+                const schema = new Microdata.Schema('https://rustybeam.net/schema/Credential');
+                schema.loaded = true; // Mock as loaded for now
+                
+                const isValid = schema.validate(form);
+                assert(isValid === true, 'Form with valid data should validate');
+            });
+            
+            test('HTML5 form validation integration', () => {
+                const form = document.getElementById('credential-form');
+                form.username.value = '';  // Required field empty
+                
+                // Check HTML5 validation
+                assert(!form.checkValidity(), 'Form should be invalid with empty required field');
+                assert(form.username.validationMessage !== '', 'Should have validation message');
+            });
+            
+            // Test 4.3: Form Rendering
+            test('Template render from form', () => {
+                const form = document.getElementById('person-form');
+                const template = new Microdata.Template(document.getElementById('person-template'));
+                
+                const rendered = template.render(form);
+                assert(rendered.querySelector('[itemprop="name"]').textContent === 'Test Person', 'Should render name from form');
+                assert(rendered.querySelector('[itemprop="email"]').textContent === 'person@example.com', 'Should render email from form');
+                assert(rendered.querySelector('[itemprop="birthdate"]').textContent === '1985-05-15', 'Should render birthdate from form');
+                
+                // Add to page for visual verification
+                document.getElementById('render-target').appendChild(rendered);
+            });
+            
+            test('Form state preservation in rendered output', () => {
+                const form = document.getElementById('complete-form');
+                const template = new Microdata.Template(document.getElementById('form-state-template'));
+                
+                // Extract subset of form data
+                const data = {
+                    username: form.username.value,
+                    email: form.email.value,
+                    bio: form.bio.value,
+                    role: form.role.value,
+                    status: form.status.value,
+                    notifications: ['email', 'sms']
+                };
+                
+                const rendered = template.render(data);
+                
+                // Check form elements maintain state
+                const usernameInput = rendered.querySelector('[itemprop="username"]');
+                assert(usernameInput.value === 'testuser', 'Should preserve input value');
+                
+                const bioTextarea = rendered.querySelector('[itemprop="bio"]');
+                assert(bioTextarea.value === 'This is my bio text.', 'Should preserve textarea value');
+                
+                const roleSelect = rendered.querySelector('[itemprop="role"]');
+                assert(roleSelect.value === 'editor', 'Should preserve select value');
+                
+                const emailCheckbox = rendered.querySelector('[itemprop="notifications[]"][value="email"]');
+                assert(emailCheckbox.checked === true, 'Should preserve checkbox state for email');
+                
+                const smsCheckbox = rendered.querySelector('[itemprop="notifications[]"][value="sms"]');
+                assert(smsCheckbox.checked === true, 'Should preserve checkbox state for sms');
+                
+                const pushCheckbox = rendered.querySelector('[itemprop="notifications[]"][value="push"]');
+                assert(pushCheckbox.checked === false, 'Should not check unchecked checkbox');
+                
+                // Add to page for visual verification
+                document.getElementById('render-target').appendChild(rendered);
+            });
+            
+            test('Complex form data extraction', () => {
+                const form = document.createElement('form');
+                form.innerHTML = `
+                    <input type="checkbox" name="agree" value="yes" checked>
+                    <input type="checkbox" name="options" value="opt1" checked>
+                    <input type="checkbox" name="options" value="opt2">
+                    <input type="checkbox" name="options" value="opt3" checked>
+                `;
+                
+                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const data = schema._extractData(form);
+                
+                assert(data.agree === 'yes', 'Single checkbox should have value');
+                assert(Array.isArray(data.options), 'Multiple checkboxes should be array');
+                assert(data.options.length === 2, 'Should only include checked options');
+                assert(data.options.includes('opt1') && data.options.includes('opt3'), 'Should have correct values');
+            });
+            
+            // Display summary
+            setTimeout(() => {
+                const summary = document.getElementById('summary');
+                summary.innerHTML = `
+                    <h2>Test Summary</h2>
+                    <div>Total Tests: ${testCount}</div>
+                    <div>Passed: ${passCount}</div>
+                    <div>Failed: ${testCount - passCount}</div>
+                    <div>${passCount === testCount ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
+                `;
+            }, 500);
+            
+        }, 100);
+        
+        // Prevent form submission
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log('Form submission prevented');
+            });
+        });
+        
+        // Import SchemaOrgSchema for testing
+        const { SchemaOrgSchema } = await import('./index.mjs');
+    </script>
+</body>
+</html>

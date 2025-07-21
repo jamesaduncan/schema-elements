@@ -137,24 +137,24 @@ This document outlines the complete implementation plan for the Microdata API as
 - [x] Create form data extractor (in _extractData methods)
 - [x] Map form input name attributes to properties
 - [x] Handle text, password, email input types
-- [ ] Handle select elements
-- [ ] Handle textarea elements
-- [ ] Handle checkbox groups for arrays
-- [ ] Handle radio buttons
+- [x] Handle select elements
+- [x] Handle textarea elements
+- [x] Handle checkbox groups for arrays
+- [x] Handle radio buttons
 - [x] Extract values into plain object
 
 ### 4.2 Form Validation
 - [x] Extend Schema.validate() to accept form elements
 - [x] Extract data from form
 - [x] Validate against schema
-- [ ] Support HTML5 form validation integration
+- [x] Support HTML5 form validation integration
 - [x] Return validation result
 
 ### 4.3 Form Rendering
 - [x] Extend Template.render() to accept form elements
 - [x] Extract form data
 - [x] Render to template
-- [ ] Maintain form state in rendered output
+- [x] Maintain form state in rendered output
 
 ## Phase 5: Fetch API
 

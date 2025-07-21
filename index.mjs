@@ -831,20 +831,82 @@ class SchemaOrgSchema {
         }
         
         if (obj instanceof HTMLFormElement) {
-            // Extract form data
+            // Extract form data with enhanced support for all form elements
             const data = {};
-            const formData = new FormData(obj);
-            for (const [key, value] of formData.entries()) {
-                if (data[key]) {
-                    // Convert to array if multiple values
-                    if (!Array.isArray(data[key])) {
-                        data[key] = [data[key]];
-                    }
-                    data[key].push(value);
-                } else {
-                    data[key] = value;
+            
+            // Process all form elements
+            const elements = obj.elements;
+            for (let i = 0; i < elements.length; i++) {
+                const element = elements[i];
+                if (!element.name) continue;
+                
+                const name = element.name;
+                let value;
+                
+                switch (element.type) {
+                    case 'checkbox':
+                        if (element.checked) {
+                            value = element.value || 'on';
+                            // Handle checkbox groups for arrays
+                            if (name.endsWith('[]')) {
+                                const baseName = name.slice(0, -2);
+                                if (!data[baseName]) data[baseName] = [];
+                                data[baseName].push(value);
+                            } else {
+                                if (data[name]) {
+                                    // Convert to array if multiple checkboxes with same name
+                                    if (!Array.isArray(data[name])) {
+                                        data[name] = [data[name]];
+                                    }
+                                    data[name].push(value);
+                                } else {
+                                    data[name] = value;
+                                }
+                            }
+                        }
+                        break;
+                        
+                    case 'radio':
+                        if (element.checked) {
+                            data[name] = element.value;
+                        }
+                        break;
+                        
+                    case 'select-multiple':
+                        const selectedOptions = [];
+                        for (let j = 0; j < element.options.length; j++) {
+                            if (element.options[j].selected) {
+                                selectedOptions.push(element.options[j].value);
+                            }
+                        }
+                        data[name] = selectedOptions;
+                        break;
+                        
+                    case 'select-one':
+                        data[name] = element.value;
+                        break;
+                        
+                    case 'textarea':
+                        data[name] = element.value;
+                        break;
+                        
+                    case 'text':
+                    case 'password':
+                    case 'email':
+                    case 'number':
+                    case 'tel':
+                    case 'url':
+                    case 'date':
+                    case 'time':
+                    case 'datetime-local':
+                    case 'color':
+                    case 'range':
+                    case 'hidden':
+                        data[name] = element.value;
+                        break;
                 }
             }
+            
             return data;
         }
         
@@ -931,6 +993,7 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
         
         const data = this._extractData(obj);
         let isValid = true;
+        const validationErrors = [];
         
         // Validate each property against schema
         for (const [propName, propDef] of this.propertyDefinitions) {
@@ -940,6 +1003,12 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
             if (!this._validateCardinality(value, propDef.cardinality)) {
                 console.warn(`Property ${propName} fails cardinality ${propDef.cardinality}`);
                 isValid = false;
+                validationErrors.push({
+                    property: propName,
+                    type: 'cardinality',
+                    expected: propDef.cardinality,
+                    message: `Property ${propName} must have cardinality ${propDef.cardinality}`
+                });
                 
                 // Fire validation event
                 this._fireValidationError(obj, propName, 'cardinality', propDef.cardinality);
@@ -951,11 +1020,22 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
                 if (dataType && !this._validateDataType(value, dataType)) {
                     console.warn(`Property ${propName} fails type validation`);
                     isValid = false;
+                    validationErrors.push({
+                        property: propName,
+                        type: 'type',
+                        expected: propDef.type,
+                        message: `Property ${propName} must match type ${propDef.type}`
+                    });
                     
                     this._fireValidationError(obj, propName, 'type', propDef.type);
                 }
                 // Note: If DataType is not loaded, we skip validation for it
             }
+        }
+        
+        // HTML5 form validation integration
+        if (obj instanceof HTMLFormElement && !isValid) {
+            this._applyHTML5Validation(obj, validationErrors);
         }
         
         return isValid;
@@ -1055,6 +1135,31 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
         } else {
             document.dispatchEvent(event);
         }
+    }
+    
+    _applyHTML5Validation(form, errors) {
+        // Clear existing custom validity
+        const elements = form.elements;
+        for (let i = 0; i < elements.length; i++) {
+            elements[i].setCustomValidity('');
+        }
+        
+        // Apply validation errors
+        for (const error of errors) {
+            const element = form.elements[error.property];
+            if (element) {
+                element.setCustomValidity(error.message);
+                
+                // For radio buttons and checkboxes, apply to all with same name
+                if (element.type === 'radio' || element.type === 'checkbox') {
+                    const sameNameElements = form.querySelectorAll(`[name="${error.property}"]`);
+                    sameNameElements.forEach(el => el.setCustomValidity(error.message));
+                }
+            }
+        }
+        
+        // Report validity on the form
+        form.reportValidity();
     }
 }
 
@@ -1179,20 +1284,82 @@ class Template {
         }
         
         if (obj instanceof HTMLFormElement) {
-            // Extract form data
+            // Extract form data with enhanced support for all form elements
             const data = {};
-            const formData = new FormData(obj);
-            for (const [key, value] of formData.entries()) {
-                if (data[key]) {
-                    // Convert to array if multiple values
-                    if (!Array.isArray(data[key])) {
-                        data[key] = [data[key]];
-                    }
-                    data[key].push(value);
-                } else {
-                    data[key] = value;
+            
+            // Process all form elements
+            const elements = obj.elements;
+            for (let i = 0; i < elements.length; i++) {
+                const element = elements[i];
+                if (!element.name) continue;
+                
+                const name = element.name;
+                let value;
+                
+                switch (element.type) {
+                    case 'checkbox':
+                        if (element.checked) {
+                            value = element.value || 'on';
+                            // Handle checkbox groups for arrays
+                            if (name.endsWith('[]')) {
+                                const baseName = name.slice(0, -2);
+                                if (!data[baseName]) data[baseName] = [];
+                                data[baseName].push(value);
+                            } else {
+                                if (data[name]) {
+                                    // Convert to array if multiple checkboxes with same name
+                                    if (!Array.isArray(data[name])) {
+                                        data[name] = [data[name]];
+                                    }
+                                    data[name].push(value);
+                                } else {
+                                    data[name] = value;
+                                }
+                            }
+                        }
+                        break;
+                        
+                    case 'radio':
+                        if (element.checked) {
+                            data[name] = element.value;
+                        }
+                        break;
+                        
+                    case 'select-multiple':
+                        const selectedOptions = [];
+                        for (let j = 0; j < element.options.length; j++) {
+                            if (element.options[j].selected) {
+                                selectedOptions.push(element.options[j].value);
+                            }
+                        }
+                        data[name] = selectedOptions;
+                        break;
+                        
+                    case 'select-one':
+                        data[name] = element.value;
+                        break;
+                        
+                    case 'textarea':
+                        data[name] = element.value;
+                        break;
+                        
+                    case 'text':
+                    case 'password':
+                    case 'email':
+                    case 'number':
+                    case 'tel':
+                    case 'url':
+                    case 'date':
+                    case 'time':
+                    case 'datetime-local':
+                    case 'color':
+                    case 'range':
+                    case 'hidden':
+                        data[name] = element.value;
+                        break;
                 }
             }
+            
             return data;
         }
         
@@ -1281,6 +1448,14 @@ class Template {
         
         if (elements.length === 0) return;
         
+        // Special handling for checkboxes - don't remove them, just update checked state
+        if (elements.length > 0 && elements[0].type === 'checkbox') {
+            elements.forEach(checkbox => {
+                checkbox.checked = values.includes(checkbox.value);
+            });
+            return;
+        }
+        
         const template = elements[0];
         const parent = template.parentElement;
         
@@ -1310,7 +1485,32 @@ class Template {
     _setElementValue(element, value) {
         const stringValue = String(value);
         
-        if (element.hasAttribute('content')) {
+        // Handle form elements to maintain state
+        if (element.tagName === 'INPUT') {
+            switch (element.type) {
+                case 'checkbox':
+                    element.checked = value === element.value || value === true || value === 'on';
+                    break;
+                case 'radio':
+                    element.checked = value === element.value;
+                    break;
+                default:
+                    element.value = stringValue;
+                    break;
+            }
+        } else if (element.tagName === 'SELECT') {
+            // Handle select elements
+            for (let i = 0; i < element.options.length; i++) {
+                const option = element.options[i];
+                if (Array.isArray(value)) {
+                    option.selected = value.includes(option.value);
+                } else {
+                    option.selected = option.value === stringValue;
+                }
+            }
+        } else if (element.tagName === 'TEXTAREA') {
+            element.value = stringValue;
+        } else if (element.hasAttribute('content')) {
             element.setAttribute('content', stringValue);
         } else if (element.tagName === 'A' && element.hasAttribute('href')) {
             element.href = stringValue;
