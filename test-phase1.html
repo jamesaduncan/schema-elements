@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 1 Complete Test Suite</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 1 Test Suite</h1>
+    
+    <!-- Test Data -->
+    <div class="test-section">
+        <h2>Test Data</h2>
+        
+        <!-- Basic example from API doc -->
+        <div id="johndoe" itemref="enc" itemscope itemtype="http://rustybeam.net/schema/Credential">
+            <p>
+                The users' username is <span itemprop="username">johndoe</span>. They
+                have the following roles:
+                <ul>
+                    <li itemprop="role">editor</li>
+                    <li itemprop="role">writer</li>
+                </ul>
+                The users' password is <span itemprop="password">secret</span>.
+            </p>
+        </div>
+        <p>
+            Because we're writing this in the open, passwords aren't encrypted, and are just
+            using <span id="enc" itemprop="encryption">plaintext</span>.
+        </p>
+        
+        <!-- Complex example -->
+        <div id="ahost" itemscope itemtype="http://rustybeam.net/schema/HostConfig">
+            <p>
+                This is the host configuration for <span itemprop="hostname">rustybeam.net</span>.
+            </p>
+            <p>
+                The root directory is at <span itemprop="hostRoot">/var/www/rustybeam.net</span>.
+            </p>
+            <p>
+                It's plugin configuration:
+                <ol>
+                    <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/FileHandlerPlugin">
+                        The FileHandler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_filehandler.so</span>
+                    </li>
+                    <li itemprop="plugin" itemscope itemtype="https://rustybeam.net/schema/ErrorHandlerPlugin">
+                        The Error Handler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_errorhandler.so</span>
+                    </li>
+                </ol>
+            </p>
+        </div>
+        
+        <!-- Item without ID -->
+        <div itemscope itemtype="https://schema.org/Person">
+            <span itemprop="name">Anonymous User</span>
+        </div>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script type="module">
+        import './index.mjs';
+        
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        // Wait for DOM to be ready
+        setTimeout(() => {
+            results.innerHTML = '<h3>Running tests...</h3>';
+            
+            // Test document.microdata basics
+            test('document.microdata exists', () => {
+                assert(document.microdata !== undefined, 'document.microdata should exist');
+                assert(Array.isArray(document.microdata), 'document.microdata should be array-like');
+            });
+            
+            test('document.microdata array access', () => {
+                assert(document.microdata.length >= 3, 'Should have at least 3 microdata items');
+                assert(document.microdata[0] !== undefined, 'Should access by index');
+                assert(document.microdata[0]['@type'] !== undefined, 'Items should have @type');
+            });
+            
+            test('document.microdata named access', () => {
+                assert(document.microdata.johndoe !== undefined, 'Should access by ID');
+                assert(document.microdata.johndoe === document.microdata[0], 'Named and indexed access should match');
+                assert(document.microdata.ahost !== undefined, 'Should access ahost by ID');
+            });
+            
+            test('Object.keys support', () => {
+                const keys = Object.keys(document.microdata);
+                assert(keys.includes('0'), 'Should include numeric indices');
+                assert(keys.includes('johndoe'), 'Should include named keys');
+                assert(keys.includes('ahost'), 'Should include ahost key');
+            });
+            
+            test('Basic property access from API examples', () => {
+                const item = document.microdata[0];
+                assert(item['@type'] === 'Credential', '@type should be Credential');
+                assert(item['@context'] === 'http://rustybeam.net/schema/', '@context should be correct');
+                assert(Array.isArray(item.role), 'role should be array');
+                assert(item.role[0] === 'editor' && item.role[1] === 'writer', 'roles should be correct');
+                assert(item.username === 'johndoe', 'username should be johndoe');
+                assert(item.password === 'secret', 'password should be secret');
+                assert(item.encryption === 'plaintext', 'itemref should work');
+            });
+            
+            test('@id generation', () => {
+                const item = document.microdata.johndoe;
+                assert(item['@id'] === document.baseURI + '#johndoe', '@id should be generated correctly');
+            });
+            
+            test('JSON serialization matches API example', () => {
+                const json = JSON.stringify(document.microdata[0]);
+                const parsed = JSON.parse(json);
+                assert(parsed['@type'] === 'Credential', 'JSON should have @type');
+                assert(parsed['@context'] === 'http://rustybeam.net/schema/', 'JSON should have @context');
+                assert(parsed.username === 'johndoe', 'JSON should have username');
+                assert(Array.isArray(parsed.role), 'JSON should have role array');
+                assert(parsed.password === 'secret', 'JSON should have password');
+                assert(parsed.encryption === 'plaintext', 'JSON should have itemref property');
+            });
+            
+            test('Complex types from API example', () => {
+                const host = document.microdata.ahost;
+                assert(Array.isArray(host.plugin), 'plugin should be array');
+                assert(host.plugin[0].library === 'file:///usr/lib/rustybeam/plugins/librusty_beam_filehandler.so', 
+                       'First plugin library should be correct');
+            });
+            
+            test('Live data - property updates', () => {
+                const original = document.microdata.johndoe.password;
+                document.microdata.johndoe.password = 'new password';
+                const domValue = document.querySelector('#johndoe [itemprop="password"]').textContent;
+                assert(domValue === 'new password', 'DOM should be updated');
+                assert(document.microdata.johndoe.password === 'new password', 'Property should be updated');
+                // Restore
+                document.microdata.johndoe.password = original;
+            });
+            
+            test('Element.microdata property', () => {
+                const element = document.getElementById('johndoe');
+                assert(element.microdata !== undefined, 'Element should have microdata property');
+                assert(element.microdata === document.microdata.johndoe, 'Should return same instance');
+            });
+            
+            test('Dynamic element addition', (done) => {
+                const div = document.createElement('div');
+                div.id = 'dynamic-test';
+                div.setAttribute('itemscope', '');
+                div.setAttribute('itemtype', 'https://schema.org/Thing');
+                div.innerHTML = '<span itemprop="name">Dynamic Item</span>';
+                
+                const initialLength = document.microdata.length;
+                document.body.appendChild(div);
+                
+                // Wait for mutation observer
+                setTimeout(() => {
+                    assert(document.microdata.length > initialLength, 'Collection should grow');
+                    assert(document.microdata['dynamic-test'] !== undefined, 'Should be accessible by ID');
+                    assert(document.microdata['dynamic-test'].name === 'Dynamic Item', 'Should have correct data');
+                    
+                    // Clean up
+                    div.remove();
+                    done();
+                }, 50);
+            });
+            
+            test('Dynamic element removal', (done) => {
+                const div = document.createElement('div');
+                div.id = 'removal-test';
+                div.setAttribute('itemscope', '');
+                div.setAttribute('itemtype', 'https://schema.org/Thing');
+                document.body.appendChild(div);
+                
+                setTimeout(() => {
+                    const lengthBefore = document.microdata.length;
+                    div.remove();
+                    
+                    setTimeout(() => {
+                        assert(document.microdata.length < lengthBefore, 'Collection should shrink');
+                        assert(document.microdata['removal-test'] === undefined, 'Should not be accessible');
+                        done();
+                    }, 50);
+                }, 50);
+            });
+            
+            test('forEach array method', () => {
+                let count = 0;
+                document.microdata.forEach(item => {
+                    assert(item['@type'] !== undefined, 'Each item should have @type');
+                    count++;
+                });
+                assert(count === document.microdata.length, 'Should iterate all items');
+            });
+            
+            test('Only top-level items in collection', () => {
+                // The plugin items should not be in the main collection
+                let hasNestedItems = false;
+                document.microdata.forEach(item => {
+                    if (item['@type'] === 'FileHandlerPlugin' || item['@type'] === 'ErrorHandlerPlugin') {
+                        hasNestedItems = true;
+                    }
+                });
+                assert(!hasNestedItems, 'Collection should not include nested items');
+            });
+            
+            // Display summary
+            setTimeout(() => {
+                const summary = document.getElementById('summary');
+                summary.innerHTML = `
+                    <h2>Test Summary</h2>
+                    <div>Total Tests: ${testCount}</div>
+                    <div>Passed: ${passCount}</div>
+                    <div>Failed: ${testCount - passCount}</div>
+                    <div>${passCount === testCount ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
+                `;
+            }, 500);
+            
+        }, 100);
+    </script>
+</body>
+</html>

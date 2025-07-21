@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MicrodataItem Test</title>
+</head>
+<body>
+    <h1>MicrodataItem Test Suite</h1>
+    
+    <!-- Test Case 1: Basic Microdata -->
+    <div id="johndoe" itemref="enc" itemscope itemtype="http://rustybeam.net/schema/Credential">
+        <p>
+            The users' username is <span itemprop="username">johndoe</span>. They
+            have the following roles:
+            <ul>
+                <li itemprop="role">editor</li>
+                <li itemprop="role">writer</li>
+            </ul>
+            The users' password is <span itemprop="password">secret</span>.
+        </p>
+    </div>
+    <p>
+        Because we're writing this in the open, passwords aren't encrypted, and are just
+        using <span id="enc" itemprop="encryption">plaintext</span>.
+    </p>
+    
+    <!-- Test Case 2: Complex Types -->
+    <div id="ahost" itemscope itemtype="http://rustybeam.net/schema/HostConfig">
+        <p>
+            This is the host configuration for <span itemprop="hostname">rustybeam.net</span>.
+        </p>
+        <p>
+            The root directory is at <span itemprop="hostRoot">/var/www/rustybeam.net</span>.
+        </p>
+        <ol>
+            <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/FileHandlerPlugin">
+                The FileHandler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_filehandler.so</span>
+            </li>
+            <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/ErrorHandlerPlugin">
+                The Error Handler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_errorhandler.so</span>
+            </li>
+        </ol>
+    </div>
+    
+    <div id="test-results"></div>
+    
+    <script type="module">
+        import { MicrodataItem } from './index.mjs';
+        
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        
+        function test(name, fn) {
+            testCount++;
+            try {
+                fn();
+                passCount++;
+                results.innerHTML += `<div style="color: green;">✓ ${name}</div>`;
+            } catch (e) {
+                results.innerHTML += `<div style="color: red;">✗ ${name}: ${e.message}</div>`;
+                console.error(e);
+            }
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        // Test 1: Basic property access
+        test('Basic property access', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            assert(item.username === 'johndoe', 'Username should be johndoe');
+            assert(item.password === 'secret', 'Password should be secret');
+        });
+        
+        // Test 2: JSON-LD properties
+        test('JSON-LD properties', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            assert(item['@type'] === 'Credential', '@type should be Credential');
+            assert(item['@context'] === 'http://rustybeam.net/schema/', '@context should be correct');
+            assert(item['@id'] === document.baseURI + '#johndoe', '@id should include base URI');
+        });
+        
+        // Test 3: Array properties
+        test('Array properties', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            assert(Array.isArray(item.role), 'role should be an array');
+            assert(item.role.length === 2, 'role should have 2 items');
+            assert(item.role[0] === 'editor', 'First role should be editor');
+            assert(item.role[1] === 'writer', 'Second role should be writer');
+        });
+        
+        // Test 4: itemref resolution
+        test('itemref resolution', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            assert(item.encryption === 'plaintext', 'Should resolve itemref');
+        });
+        
+        // Test 5: Property setting
+        test('Property setting', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            item.username = 'janedoe';
+            assert(item.username === 'janedoe', 'Username should be updated');
+            assert(document.querySelector('#johndoe [itemprop="username"]').textContent === 'janedoe', 
+                   'DOM should be updated');
+            // Restore original value
+            item.username = 'johndoe';
+        });
+        
+        // Test 6: Complex nested types
+        test('Complex nested types', () => {
+            const item = new MicrodataItem(document.getElementById('ahost'));
+            assert(item.hostname === 'rustybeam.net', 'hostname should be correct');
+            assert(Array.isArray(item.plugin), 'plugin should be an array');
+            assert(item.plugin.length === 2, 'Should have 2 plugins');
+            assert(item.plugin[0] instanceof MicrodataItem, 'Plugin should be MicrodataItem');
+            assert(item.plugin[0]['@type'] === 'FileHandlerPlugin', 'Plugin type should be correct');
+            assert(item.plugin[0].library.includes('filehandler'), 'Plugin library should be correct');
+        });
+        
+        // Test 7: JSON serialization
+        test('JSON serialization', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            const json = item.toJSON();
+            assert(json['@type'] === 'Credential', 'JSON should have @type');
+            assert(json.username === 'johndoe', 'JSON should have username');
+            assert(Array.isArray(json.role), 'JSON should have role array');
+            assert(json.encryption === 'plaintext', 'JSON should include itemref properties');
+        });
+        
+        // Test 8: Object.keys support
+        test('Object.keys support', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            const keys = Object.keys(item);
+            assert(keys.includes('@type'), 'Keys should include @type');
+            assert(keys.includes('username'), 'Keys should include username');
+            assert(keys.includes('role'), 'Keys should include role');
+            assert(keys.includes('encryption'), 'Keys should include encryption');
+        });
+        
+        // Test 9: JSON.stringify support
+        test('JSON.stringify support', () => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            const jsonString = JSON.stringify(item);
+            const parsed = JSON.parse(jsonString);
+            assert(parsed['@type'] === 'Credential', 'Stringified JSON should have @type');
+            assert(parsed.username === 'johndoe', 'Stringified JSON should have username');
+        });
+        
+        // Display results summary
+        setTimeout(() => {
+            results.innerHTML += `<hr><div><strong>Tests: ${passCount}/${testCount} passed</strong></div>`;
+        }, 100);
+    </script>
+</body>
+</html>

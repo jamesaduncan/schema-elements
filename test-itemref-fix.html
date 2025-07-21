@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ItemRef Fix Test</title>
+</head>
+<body>
+    <h1>Testing ItemRef Fix</h1>
+    
+    <div id="johndoe" itemref="enc" itemscope itemtype="http://rustybeam.net/schema/Credential">
+        <p>
+            The users' username is <span itemprop="username">johndoe</span>.
+            The users' password is <span itemprop="password">secret</span>.
+        </p>
+    </div>
+    <p>
+        Because we're writing this in the open, passwords aren't encrypted, and are just
+        using <span id="enc" itemprop="encryption">plaintext</span>.
+    </p>
+    
+    <script type="module">
+        import { MicrodataItem } from './index.mjs';
+        
+        // Wait a bit for everything to load
+        setTimeout(() => {
+            const item = new MicrodataItem(document.getElementById('johndoe'));
+            
+            console.log('=== Testing itemref resolution ===');
+            console.log('Username:', item.username);
+            console.log('Password:', item.password);
+            console.log('Encryption:', item.encryption);
+            console.log('');
+            
+            console.log('=== All property names ===');
+            console.log('Properties:', item._getAllPropertyNames());
+            console.log('');
+            
+            console.log('=== Object.keys test ===');
+            console.log('Keys:', Object.keys(item));
+            console.log('');
+            
+            console.log('=== JSON serialization ===');
+            console.log('JSON:', JSON.stringify(item, null, 2));
+            
+            // Display results
+            document.body.innerHTML += `
+                <h2>Results:</h2>
+                <pre>
+Username: ${item.username}
+Password: ${item.password}
+Encryption: ${item.encryption}
+
+All Properties: ${JSON.stringify(item._getAllPropertyNames())}
+
+Object.keys: ${JSON.stringify(Object.keys(item))}
+
+JSON:
+${JSON.stringify(item, null, 2)}
+                </pre>
+            `;
+            
+            // Run tests
+            const tests = [];
+            tests.push(['Encryption property exists', item.encryption === 'plaintext']);
+            tests.push(['Object.keys includes encryption', Object.keys(item).includes('encryption')]);
+            tests.push(['JSON includes encryption', JSON.stringify(item).includes('"encryption":"plaintext"')]);
+            
+            document.body.innerHTML += '<h2>Test Results:</h2>';
+            tests.forEach(([name, result]) => {
+                document.body.innerHTML += `<div style="color: ${result ? 'green' : 'red'}">${result ? '✓' : '✗'} ${name}</div>`;
+            });
+            
+        }, 100);
+    </script>
+</body>
+</html>

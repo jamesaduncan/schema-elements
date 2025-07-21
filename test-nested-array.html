@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Nested Array Test</title>
+</head>
+<body>
+    <h1>Testing Nested Itemscope Arrays</h1>
+    
+    <div id="ahost" itemscope itemtype="http://rustybeam.net/schema/HostConfig">
+        <p>
+            This is the host configuration for <span itemprop="hostname">rustybeam.net</span>.
+        </p>
+        <p>
+            The root directory is at <span itemprop="hostRoot">/var/www/rustybeam.net</span>.
+        </p>
+        <ol>
+            <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/FileHandlerPlugin">
+                The FileHandler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_filehandler.so</span>
+            </li>
+            <li itemprop="plugin" itemscope itemtype="http://rustybeam.net/schema/ErrorHandlerPlugin">
+                The Error Handler library is at <span itemprop="library">file:///usr/lib/rustybeam/plugins/librusty_beam_errorhandler.so</span>
+            </li>
+        </ol>
+    </div>
+    
+    <script type="module">
+        import { MicrodataItem } from './index.mjs';
+        
+        setTimeout(() => {
+            const item = new MicrodataItem(document.getElementById('ahost'));
+            
+            console.log('=== Testing nested itemscope arrays ===');
+            console.log('hostname:', item.hostname);
+            console.log('hostRoot:', item.hostRoot);
+            console.log('plugin:', item.plugin);
+            console.log('Is plugin an array?', Array.isArray(item.plugin));
+            console.log('Plugin length:', item.plugin?.length);
+            
+            if (Array.isArray(item.plugin)) {
+                console.log('Plugin[0]:', item.plugin[0]);
+                console.log('Plugin[0] is MicrodataItem?', item.plugin[0] instanceof MicrodataItem);
+                console.log('Plugin[0] @type:', item.plugin[0]['@type']);
+                console.log('Plugin[0] library:', item.plugin[0].library);
+                console.log('');
+                console.log('Plugin[1]:', item.plugin[1]);
+                console.log('Plugin[1] @type:', item.plugin[1]['@type']);
+                console.log('Plugin[1] library:', item.plugin[1].library);
+            }
+            
+            // Display results
+            document.body.innerHTML += `
+                <h2>Results:</h2>
+                <pre>
+hostname: ${item.hostname}
+hostRoot: ${item.hostRoot}
+plugin is array: ${Array.isArray(item.plugin)}
+plugin length: ${item.plugin?.length}
+
+${Array.isArray(item.plugin) ? `Plugin[0] @type: ${item.plugin[0]['@type']}
+Plugin[0] library: ${item.plugin[0].library}
+
+Plugin[1] @type: ${item.plugin[1]['@type']}
+Plugin[1] library: ${item.plugin[1].library}` : 'Plugin is not an array!'}
+                </pre>
+            `;
+            
+            // Test results
+            const tests = [];
+            tests.push(['plugin is array', Array.isArray(item.plugin)]);
+            tests.push(['plugin has 2 elements', item.plugin?.length === 2]);
+            tests.push(['plugin[0] is MicrodataItem', item.plugin?.[0] instanceof MicrodataItem]);
+            tests.push(['plugin[0] has correct type', item.plugin?.[0]['@type'] === 'FileHandlerPlugin']);
+            tests.push(['plugin[1] has correct type', item.plugin?.[1]['@type'] === 'ErrorHandlerPlugin']);
+            
+            document.body.innerHTML += '<h2>Test Results:</h2>';
+            tests.forEach(([name, result]) => {
+                document.body.innerHTML += `<div style="color: ${result ? 'green' : 'red'}">${result ? '✓' : '✗'} ${name}</div>`;
+            });
+            
+        }, 100);
+    </script>
+</body>
+</html>

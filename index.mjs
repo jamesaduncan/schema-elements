@@ -1,2666 +1,676 @@
 /**
- * Schema Elements - Live Microdata API
+ * Microdata API - A vanilla JavaScript library for working with HTML Microdata
  * 
- * A vanilla JavaScript library that provides a live, reactive API for HTML microdata.
- * Treats microdata embedded in HTML as a live data layer with automatic DOM synchronization.
- * 
- * Key features:
- * - Live data binding through document.microdata
- * - Array operations (push, pop, splice) with DOM updates
- * - Multi-view synchronization across templates
- * - Schema validation with Schema.org and organised.team support
- * - JSON-LD serialization
- * - Iterator protocol support
- * - DOM-to-microdata synchronization
- * - Data source fetching (data-microdata-source attribute) for JSON-LD or HTML microdata
- * 
- * @example
- * // Access microdata
- * const company = document.microdata.company;
- * 
- * // Modify data (DOM updates automatically)
- * company.name = "New Company Name";
- * 
- * // Array operations
- * company.employee.push({ name: "John Doe", email: "john@example.com" });
- * 
- * // Iterate over items
- * for (const item of document.microdata) {
- *   console.log(item);
- * }
- * 
- * // JSON-LD serialization
- * const jsonLD = JSON.stringify(document.microdata);
- * 
- * // Data source fetching
- * // <div data-microdata-source="users.json"> will fetch and populate templates
- * // Supports both JSON-LD files and HTML documents with microdata
+ * This library provides extraction, rendering, synchronization, and validation
+ * of schema.org and other microdata within the DOM.
  */
 
 /**
- * SchemaRegistry - Manages schema definitions and type validation
- * 
- * Handles loading schemas from URLs, validating data against schemas,
- * and providing type validators for basic data types. Always fetches
- * schemas from their URLs to ensure up-to-date definitions.
+ * MicrodataItem - Represents a single microdata item with live DOM binding
  */
-class SchemaRegistry {
-    // Cardinality constants
-    static CARDINALITY = {
-        ONE: '1',
-        ZERO_OR_ONE: '0..1',
-        ZERO_OR_MANY: '0..n',
-        ONE_OR_MANY: '1..n'
-    };
-    
-    static DEFAULT_CARDINALITY = SchemaRegistry.CARDINALITY.ZERO_OR_ONE;
-    
-    // Regex patterns for validation
-    static REGEX_PATTERNS = {
-        TIME: /^\d{2}:\d{2}(:\d{2})?$/,
-        NUMERIC_INDEX: /^\d+$/
-    };
-    
-    constructor() {
-        this.schemas = new Map();
-        this.typeValidators = new Map();
-        this.initializeBasicTypes();
-    }
-
-    /**
-     * Initialize validators for basic schema.org and organised.team types
-     */
-    initializeBasicTypes() {
-        // Basic schema.org types
-        this.typeValidators.set('https://schema.org/Text', (value) => typeof value === 'string');
-        this.typeValidators.set('https://schema.org/URL', (value) => {
-            if (typeof value !== 'string') return false;
-            try {
-                new URL(value);
-                return true;
-            } catch {
-                return value.startsWith('#') || value.startsWith('/');
-            }
-        });
-        this.typeValidators.set('https://schema.org/Boolean', (value) => typeof value === 'boolean' || value === 'true' || value === 'false');
-        this.typeValidators.set('https://schema.org/Number', (value) => !isNaN(Number(value)));
-        this.typeValidators.set('https://schema.org/Integer', (value) => Number.isInteger(Number(value)));
-        this.typeValidators.set('https://schema.org/Date', (value) => !isNaN(Date.parse(value)));
-        this.typeValidators.set('https://schema.org/DateTime', (value) => !isNaN(Date.parse(value)));
-        this.typeValidators.set('https://schema.org/Time', (value) => SchemaRegistry.REGEX_PATTERNS.TIME.test(value));
+class MicrodataItem {
+    constructor(element) {
+        if (!element || !element.hasAttribute('itemscope')) {
+            throw new Error('MicrodataItem requires an element with itemscope attribute');
+        }
         
-        // Dynamic enumeration validation - will be populated as schemas are loaded
-        this.enumerationValidators = new Map();
+        this._element = element;
+        this._itemrefElements = this._resolveItemref();
         
-        // Set up built-in enumeration validators as fallbacks
-        this.setupBuiltinEnumerations();
-    }
-
-    /**
-     * Set up built-in enumeration validators as fallbacks
-     */
-    setupBuiltinEnumerations() {
-        // organised.team Cardinal enumeration
-        this.registerEnumerationValidator('https://organised.team/Cardinal', 
-            Object.values(SchemaRegistry.CARDINALITY));
-    }
-
-    /**
-     * Check if a schema represents an enumeration type
-     * @param {Object} schema - The schema to check
-     * @returns {boolean} True if it's an enumeration
-     */
-    isEnumerationSchema(schema) {
-        return schema && (
-            schema.parent === 'https://schema.org/Enumeration' ||
-            schema.parent === 'https://organised.team/Enumerated' ||
-            this.schemas.get(schema.parent)?.parent === 'https://schema.org/Enumeration'
-        );
-    }
-
-    /**
-     * Extract enumeration values from a schema document
-     * @param {Document} doc - The schema document
-     * @param {string} enumerationType - The enumeration type URL
-     * @returns {Array<string>} Array of valid enumeration values
-     */
-    extractEnumerationValues(doc, enumerationType) {
-        const values = [];
-        
-        // Look for enumeration instances in the document
-        const enumInstances = doc.querySelectorAll(`[itemscope][itemtype="${enumerationType}"]`);
-        
-        enumInstances.forEach(instance => {
-            // Skip the main schema definition (it should have an itemprop="parent")
-            const parentElement = instance.querySelector('[itemprop="parent"]');
-            if (parentElement) {
-                return; // This is the schema definition, not an enumeration value
-            }
-            
-            // This is an enumeration value instance
-            const nameElement = instance.querySelector('[itemprop="name"]');
-            if (nameElement) {
-                const value = nameElement.textContent.trim();
-                if (value) {
-                    values.push(value);
+        return new Proxy(this, {
+            get: (target, prop) => {
+                // Handle special JSON-LD properties
+                if (prop === '@type') {
+                    return target._getType();
                 }
-            }
-        });
-        
-        return values;
-    }
-
-    /**
-     * Register enumeration validator for a type
-     * @param {string} typeUrl - The enumeration type URL
-     * @param {Array<string>} validValues - Array of valid enumeration values
-     */
-    registerEnumerationValidator(typeUrl, validValues) {
-        this.enumerationValidators.set(typeUrl, new Set(validValues));
-        
-        // Also register as a type validator
-        this.typeValidators.set(typeUrl, (value) => {
-            return this.enumerationValidators.get(typeUrl)?.has(value) || false;
-        });
-    }
-
-    /**
-     * Get valid enumeration values for a type
-     * @param {string} typeUrl - The enumeration type URL
-     * @returns {Array<string>} Array of valid values, or empty array if not found
-     */
-    getEnumerationValues(typeUrl) {
-        const values = this.enumerationValidators.get(typeUrl);
-        return values ? Array.from(values) : [];
-    }
-
-    /**
-     * Check if a type is an enumeration
-     * @param {string} typeUrl - The type URL to check
-     * @returns {boolean} True if it's a registered enumeration
-     */
-    isEnumerationType(typeUrl) {
-        return this.enumerationValidators.has(typeUrl);
-    }
-
-    /**
-     * Load a schema from a URL
-     * @param {string} url - The schema URL to load
-     * @returns {Promise<Object|null>} The schema definition or null if not found
-     */
-    async loadSchema(url) {
-        if (this.schemas.has(url)) {
-            return this.schemas.get(url);
-        }
-
-        try {
-            const response = await fetch(url);
-            const html = await response.text();
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-            const schema = this.parseSchemaFromDocument(doc, url);
-            this.schemas.set(url, schema);
-            
-            // Check if this is an enumeration schema and register its values
-            if (this.isEnumerationSchema(schema)) {
-                const enumValues = this.extractEnumerationValues(doc, url);
-                if (enumValues.length > 0) {
-                    this.registerEnumerationValidator(url, enumValues);
+                if (prop === '@context') {
+                    return target._getContext();
                 }
-            }
-            
-            // Load parent schema if exists
-            if (schema.parent) {
-                await this.loadSchema(schema.parent);
-            }
-            
-            return schema;
-        } catch (error) {
-            return null;
-        }
-    }
-
-    /**
-     * Parse schema definition from an HTML document
-     * @param {Document} doc - The HTML document containing schema definition
-     * @param {string} url - The URL of the schema
-     * @returns {Object} The parsed schema object
-     */
-    parseSchemaFromDocument(doc, url) {
-        const schemaElements = doc.querySelectorAll('[itemscope][itemtype*="Schema"]');
-        if (schemaElements.length === 0) return null;
-
-        const schemaElement = schemaElements[0];
-        const schema = {
-            id: url,
-            name: this.extractProperty(schemaElement, 'name'),
-            description: this.extractProperty(schemaElement, 'description'),
-            properties: [],
-            parent: this.extractProperty(schemaElement, 'parent')
-        };
-
-        // Find all properties
-        const propertyElements = doc.querySelectorAll('[itemscope][itemtype*="Property"]');
-        propertyElements.forEach(propElement => {
-            const property = {
-                name: this.extractProperty(propElement, 'name'),
-                type: this.extractProperty(propElement, 'type'),
-                cardinality: this.extractProperty(propElement, 'cardinality') || SchemaRegistry.DEFAULT_CARDINALITY,
-                required: this.extractProperty(propElement, 'required') === 'true',
-                description: this.extractProperty(propElement, 'description')
-            };
-            if (property.name) {
-                schema.properties.push(property);
-            }
-        });
-
-        return schema;
-    }
-
-    /**
-     * Extract a property value from an element
-     * @param {Element} element - The element to extract from
-     * @param {string} propName - The property name to extract
-     * @returns {string|null} The property value or null
-     */
-    extractProperty(element, propName) {
-        const propElement = element.querySelector(`[itemprop="${propName}"]`);
-        if (!propElement) return null;
-        
-        if (propElement.hasAttribute('content')) {
-            return propElement.getAttribute('content');
-        }
-        return propElement.textContent.trim();
-    }
-
-    /**
-     * Validate data against a schema
-     * @param {Object} data - The data to validate
-     * @param {string} schemaUrl - The URL of the schema to validate against
-     * @returns {Promise<Object>} Validation result with valid, errors, and warnings
-     */
-    async validate(data, schemaUrl) {
-        const schema = await this.loadSchema(schemaUrl);
-        if (!schema) {
-            return { valid: false, errors: [`Schema ${schemaUrl} not found`], warnings: [] };
-        }
-
-        const errors = [];
-        const warnings = [];
-
-        // Check required properties
-        schema.properties.forEach(property => {
-            if (property.required && !(property.name in data)) {
-                errors.push(`Missing required property: ${property.name}`);
-            }
-        });
-
-        // Validate existing properties
-        for (const [key, value] of Object.entries(data)) {
-            const property = schema.properties.find(p => p.name === key);
-            if (!property) {
-                warnings.push(`Unknown property: ${key}`);
-                continue;
-            }
-
-            // Type validation
-            if (property.type && !await this.validateType(value, property.type)) {
-                errors.push(`Property ${key} has invalid type. Expected ${property.type}`);
-            }
-        }
-
-        return { valid: errors.length === 0, errors, warnings };
-    }
-
-    /**
-     * Validate a value against a type
-     * @param {*} value - The value to validate
-     * @param {string} typeUrl - The URL of the type to validate against
-     * @returns {Promise<boolean>} True if valid, false otherwise
-     */
-    async validateType(value, typeUrl) {
-        // Check if we have a validator for this type
-        if (this.typeValidators.has(typeUrl)) {
-            return this.typeValidators.get(typeUrl)(value);
-        }
-
-        // If it's a complex type, just check if it's an object
-        return typeof value === 'object' && value !== null;
-    }
-
-    /**
-     * Infer the item type for a property from schema or templates
-     * @param {string} propName - The property name
-     * @param {string} parentType - The parent item type URL
-     * @returns {Promise<string|null>} The inferred type URL or null
-     */
-    async inferItemType(propName, parentType) {
-        // First, try to get it from the parent schema
-        if (parentType) {
-            const parentSchema = await this.loadSchema(parentType);
-            if (parentSchema) {
-                const property = parentSchema.properties.find(p => p.name === propName);
-                if (property) {
-                    return property.type;
+                if (prop === '@id') {
+                    return target._getId();
                 }
-            }
-        }
-
-        // If not found in schema, try to infer from templates
-        const templates = document.querySelectorAll('template[itemtype]');
-        for (const template of templates) {
-            const templateItem = template.content.querySelector('[itemscope]');
-            if (templateItem) {
-                const props = Array.from(templateItem.querySelectorAll('[itemprop]'));
-                const hasProp = props.some(p => p.getAttribute('itemprop') === propName);
-                if (hasProp) {
-                    return template.getAttribute('itemtype');
-                }
-            }
-        }
-
-        return null;
-    }
-}
-
-class MicrodataExtractor {
-    // Container elements that group microdata items
-    static CONTAINER_ELEMENTS = ['UL', 'TBODY', 'DIV'];
-    
-    constructor(registry) {
-        this.registry = registry;
-    }
-
-    /**
-     * Check if an element is a valid microdata element
-     * @param {Element} element - The element to check
-     * @returns {boolean} True if the element has itemscope
-     */
-    isValidMicrodataElement(element) {
-        return element.hasAttribute('itemscope');
-    }
-
-    /**
-     * Create a basic item object from an element
-     * @param {Element} element - The element to create item from
-     * @returns {Object} The item object with element, type, id, and properties
-     */
-    createItemFromElement(element) {
-        const type = element.getAttribute('itemtype');
-        const id = element.getAttribute('itemid') || 
-                   (element.id ? `#${element.id}` : null);
-
-        return {
-            element,
-            type: this.normalizeSchemaUrl(type),
-            id,
-            properties: {}
-        };
-    }
-
-    /**
-     * Load schema if type is available
-     * @param {string} type - The item type URL
-     * @returns {Promise<Object|null>} The schema or null
-     */
-    async loadSchemaIfAvailable(type) {
-        return type ? await this.registry.loadSchema(type) : null;
-    }
-
-    /**
-     * Group properties by their itemprop name
-     * @param {Element} element - The element to extract properties from
-     * @returns {Object} Properties grouped by name
-     */
-    groupPropertiesByName(element) {
-        const props = element.querySelectorAll('[itemprop]');
-        const propGroups = {};
-
-        props.forEach(prop => {
-            const propName = prop.getAttribute('itemprop');
-            if (!propGroups[propName]) {
-                propGroups[propName] = [];
-            }
-            propGroups[propName].push(prop);
-        });
-
-        return propGroups;
-    }
-
-    /**
-     * Process property groups with deduplication and value extraction
-     * @param {Object} propGroups - Properties grouped by name
-     * @param {Object} item - The item to add properties to
-     * @param {Element} element - The parent element
-     * @param {Object} schema - The schema definition
-     */
-    async processPropertyGroups(propGroups, item, element, schema) {
-        // Handle deduplication for array properties
-        for (const [propName, props] of Object.entries(propGroups)) {
-            const itemscopeProps = props.filter(p => p.hasAttribute('itemscope'));
-            
-            if (itemscopeProps.length > 1 && this.hasPropertiesInMultipleContainers(props)) {
-                propGroups[propName] = this.deduplicateProperties(propName, props, element);
-            }
-        }
-
-        // Process each property group
-        for (const [propName, propElements] of Object.entries(propGroups)) {
-            const shouldBeArray = this.shouldPropertyBeArray(propName, schema);
-            const values = await this.extractPropertyValues(propElements);
-            
-            // If there are multiple values, treat as array regardless of schema
-            if (shouldBeArray || values.length > 1) {
-                item.properties[propName] = values;
-            } else {
-                item.properties[propName] = values.length > 0 ? values[0] : null;
-            }
-        }
-    }
-
-    /**
-     * Ensure all schema-defined properties exist on the item
-     * @param {Object} item - The item to add properties to
-     * @param {Object} schema - The schema definition
-     */
-    ensureSchemaPropertiesExist(item, schema) {
-        if (!schema) return;
-
-        for (const schemaProp of schema.properties) {
-            if (!(schemaProp.name in item.properties)) {
-                const cardinality = schemaProp.cardinality || SchemaRegistry.DEFAULT_CARDINALITY;
-                if (cardinality === SchemaRegistry.CARDINALITY.ZERO_OR_MANY || 
-                    cardinality === SchemaRegistry.CARDINALITY.ONE_OR_MANY) {
-                    item.properties[schemaProp.name] = [];
-                } else {
-                    item.properties[schemaProp.name] = null;
-                }
-            }
-        }
-    }
-
-    async extractFromElement(element) {
-        if (!this.isValidMicrodataElement(element)) {
-            return null;
-        }
-        
-        const item = this.createItemFromElement(element);
-        const schema = await this.loadSchemaIfAvailable(item.type);
-        
-        const propGroups = this.groupPropertiesByName(element);
-        await this.processPropertyGroups(propGroups, item, element, schema);
-        this.ensureSchemaPropertiesExist(item, schema);
-        
-        return item;
-    }
-
-    /**
-     * Check if properties are distributed across multiple container elements
-     * @param {Array<Element>} props - Array of property elements
-     * @returns {boolean} True if properties are in multiple containers
-     */
-    hasPropertiesInMultipleContainers(props) {
-        const containers = new Set();
-        props.forEach(prop => {
-            if (prop.hasAttribute('itemscope')) {
-                let container = prop.parentElement;
-                while (container && container.tagName !== 'BODY') {
-                    if (MicrodataExtractor.CONTAINER_ELEMENTS.includes(container.tagName)) {
-                        containers.add(container);
-                        break;
-                    }
-                    container = container.parentElement;
-                }
-            }
-        });
-        return containers.size > 1;
-    }
-
-    deduplicateProperties(propName, props, element) {
-        // Find all unique containers
-        const containers = new Set();
-        props.forEach(prop => {
-            if (prop.hasAttribute('itemscope')) {
-                let container = prop.parentElement;
-                while (container && container !== element) {
-                    if (MicrodataExtractor.CONTAINER_ELEMENTS.includes(container.tagName)) {
-                        containers.add(container);
-                        break;
-                    }
-                    container = container.parentElement;
-                }
-            }
-        });
-
-        // Only keep items from the first container found
-        if (containers.size > 1) {
-            const firstContainer = Array.from(containers)[0];
-            return props.filter(p => {
-                if (!p.hasAttribute('itemscope')) return true;
-                let container = p.parentElement;
-                while (container && container !== element) {
-                    if (container === firstContainer) return true;
-                    if (MicrodataExtractor.CONTAINER_ELEMENTS.includes(container.tagName)) {
-                        return false;
-                    }
-                    container = container.parentElement;
-                }
-                return true;
-            });
-        }
-        
-        return props;
-    }
-
-    /**
-     * Determine if a property should be treated as an array based on schema
-     * @param {string} propName - The property name
-     * @param {Object} schema - The schema definition
-     * @returns {boolean} True if the property should be an array
-     */
-    shouldPropertyBeArray(propName, schema) {
-        if (schema) {
-            const property = schema.properties.find(p => p.name === propName);
-            if (property) {
-                const cardinality = property.cardinality || SchemaRegistry.CARDINALITY.ONE;
-                return cardinality === SchemaRegistry.CARDINALITY.ZERO_OR_MANY || 
-                       cardinality === SchemaRegistry.CARDINALITY.ONE_OR_MANY;
-            }
-        }
-        return false;
-    }
-
-    async extractPropertyValues(propElements) {
-        const values = [];
-        for (const prop of propElements) {
-            if (prop.hasAttribute('itemscope')) {
-                const nestedItem = await this.extractFromElement(prop);
-                values.push(nestedItem);
-            } else {
-                const value = this.extractPropertyValue(prop);
-                values.push(value);
-            }
-        }
-        return values;
-    }
-
-    extractPropertyValue(element) {
-        // Check for special attributes first
-        if (element.hasAttribute('content')) {
-            return element.getAttribute('content');
-        }
-        if (element.hasAttribute('datetime')) {
-            return element.getAttribute('datetime');
-        }
-        if (element.tagName === 'A' && element.hasAttribute('href')) {
-            return element.getAttribute('href');
-        }
-        if (element.tagName === 'IMG' && element.hasAttribute('src')) {
-            return element.getAttribute('src');
-        }
-        
-        return element.textContent.trim();
-    }
-
-    normalizeSchemaUrl(url) {
-        if (url && url.startsWith('http://schema.org/')) {
-            return url.replace('http://', 'https://');
-        }
-        return url;
-    }
-
-    createProxy(item) {
-        const self = this;
-        
-        return new Proxy(item.properties, {
-            get(target, prop) {
-                if (prop === '_element') return item.element;
-                if (prop === '_type') return item.type;
-                if (prop === '_id') return item.id;
                 
-                return target[prop];
+                // Handle internal properties and methods
+                if (prop.startsWith('_') || typeof target[prop] === 'function') {
+                    return target[prop];
+                }
+                
+                // Handle microdata properties
+                return target._getProperty(prop);
             },
             
-            set(target, prop, value) {
-                target[prop] = value;
-                
-                // Update DOM
-                const propElements = item.element.querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-                propElements.forEach(el => self.updatePropertyElement(el, value));
-                
-                return true;
-            }
-        });
-    }
-}
-
-/**
- * MicrodataAPI - Main API class for live microdata functionality
- * 
- * Provides the document.microdata interface with live data binding,
- * DOM synchronization, and reactive array operations.
- */
-class MicrodataAPI {
-    // DOM node type constants
-    static NODE_TYPE = {
-        ELEMENT: 1,
-        TEXT: 3,
-        COMMENT: 8,
-        DOCUMENT: 9
-    };
-    
-    // Array syntax for template repetition
-    static ARRAY_SYNTAX = '[]';
-    
-    // Internal property name for storing microdata metadata
-    static MICRODATA_PROP = '_microdata';
-    
-    /**
-     * Check if a property is a numeric index
-     * @param {*} prop - The property to check
-     * @returns {boolean} True if the property represents a numeric index
-     */
-    static isNumericIndex(prop) {
-        return typeof prop === 'string' && SchemaRegistry.REGEX_PATTERNS.NUMERIC_INDEX.test(prop);
-    }
-
-    /**
-     * Check if a property name uses array syntax and extract the clean name
-     * @param {string} propName - The property name to check
-     * @returns {Object} Object with isArray and cleanName properties
-     */
-    static parsePropertyName(propName) {
-        const isArray = propName.endsWith(MicrodataAPI.ARRAY_SYNTAX);
-        const cleanName = isArray ? propName.slice(0, -MicrodataAPI.ARRAY_SYNTAX.length) : propName;
-        return { isArray, cleanName };
-    }
-
-    /**
-     * Extract value from a microdata property element
-     * @param {Element} propElement - The element to extract value from
-     * @returns {*} The extracted value
-     */
-    static extractElementValue(propElement) {
-        if (propElement.hasAttribute('itemscope')) {
-            // Nested microdata item
-            return MicrodataAPI.extractMicrodataFromElement(propElement);
-        } else if (propElement.hasAttribute('content')) {
-            return propElement.getAttribute('content');
-        } else if (propElement.tagName === 'A') {
-            return propElement.href;
-        } else if (propElement.tagName === 'IMG') {
-            return propElement.src;
-        } else {
-            return propElement.textContent.trim();
-        }
-    }
-
-    /**
-     * Render a microdata item, JSON-LD object, form data, or URL to a template
-     * @param {HTMLTemplateElement} template - The template element to render to
-     * @param {Object|HTMLFormElement|string} data - The microdata item, JSON-LD object, form element, or URL to render
-     * @returns {DocumentFragment|Promise<DocumentFragment>} The populated template content, or a Promise if data is a URL
-     */
-    static render(template, data) {
-        if (!template || !template.content) {
-            throw new Error('Invalid template element provided');
-        }
-        
-        if (!data) {
-            throw new Error('No data provided to render');
-        }
-        
-        // Check if data is a URL string
-        if (typeof data === 'string') {
-            return MicrodataAPI.renderFromURL(template, data);
-        }
-        
-        // Clone the template content
-        const clone = template.content.cloneNode(true);
-        const itemElement = clone.querySelector('[itemscope]');
-        
-        if (!itemElement) {
-            throw new Error('Template must contain an element with itemscope attribute');
-        }
-        
-        // Check if data is a form element
-        let processedData;
-        if (data.tagName === 'FORM') {
-            processedData = MicrodataAPI.extractFormData(data, itemElement);
-        } else {
-            processedData = data;
-        }
-        
-        // Populate the template with data
-        MicrodataAPI.populateTemplateElement(itemElement, processedData);
-        
-        return clone;
-    }
-
-    /**
-     * Apply microdata from a rendered element or data object to existing DOM elements
-     * @param {Element|DocumentFragment} target - The target element to apply microdata to
-     * @param {Element|DocumentFragment|Object} source - The source of microdata (rendered element, fragment, or data object)
-     * @returns {void}
-     */
-    static apply(target, source) {
-        if (!target) {
-            throw new Error('Target element is required');
-        }
-        
-        if (!source) {
-            throw new Error('Source data is required');
-        }
-        
-        let data;
-        
-        // Extract data from source
-        if (source instanceof DocumentFragment) {
-            // Extract from document fragment
-            const itemElement = source.querySelector('[itemscope]');
-            if (itemElement) {
-                data = MicrodataAPI.extractMicrodataFromElement(itemElement);
-            } else {
-                throw new Error('No itemscope element found in source fragment');
-            }
-        } else if (source instanceof Element && source.hasAttribute('itemscope')) {
-            // Extract from element
-            data = MicrodataAPI.extractMicrodataFromElement(source);
-        } else if (typeof source === 'object') {
-            // Use data object directly
-            data = source;
-        } else {
-            throw new Error('Invalid source type. Must be Element, DocumentFragment, or Object');
-        }
-        
-        // Apply data to target
-        MicrodataAPI.populateTemplateElement(target, data);
-    }
-
-    /**
-     * Validate an element to check if it contains microdata and if it's valid
-     * @param {Element} element - The element to validate
-     * @param {boolean} [ignoreEmpty=false] - If true, don't throw error when no microdata found
-     * @returns {boolean|Promise<boolean>} True if microdata exists and is valid, false if invalid. Returns a Promise for form elements.
-     * @throws {Error} If element has no microdata and ignoreEmpty is false
-     */
-    static validate(element, ignoreEmpty = false) {
-        if (!element || !(element instanceof Element)) {
-            throw new Error('Invalid element provided');
-        }
-        
-        // Handle form elements specially - return early to avoid microdata checks
-        if (element.tagName === 'FORM') {
-            return MicrodataAPI.validateForm(element, ignoreEmpty);
-        }
-        
-        // Check if element or any descendant has microdata attributes
-        const hasMicrodata = element.hasAttribute('itemscope') || 
-                           element.hasAttribute('itemprop') ||
-                           element.querySelector('[itemscope], [itemprop]') !== null;
-        
-        if (!hasMicrodata) {
-            if (ignoreEmpty) {
-                return true; // No microdata is considered valid when ignoreEmpty is true
-            }
-            throw new Error('Element contains no microdata format data');
-        }
-        
-        // Find all itemscope elements (top-level microdata items)
-        const itemscopeElements = [];
-        if (element.hasAttribute('itemscope')) {
-            itemscopeElements.push(element);
-        }
-        itemscopeElements.push(...element.querySelectorAll('[itemscope]'));
-        
-        // If no itemscope elements found, check for orphaned itemprop elements
-        if (itemscopeElements.length === 0) {
-            const itempropElements = element.querySelectorAll('[itemprop]');
-            if (itempropElements.length > 0) {
-                // Orphaned itemprop elements without itemscope container
-                return false;
-            }
-        }
-        
-        // Validate each itemscope element
-        for (const itemElement of itemscopeElements) {
-            const itemType = itemElement.getAttribute('itemtype');
-            
-            // Skip validation if no itemtype specified (generic microdata)
-            if (!itemType) {
-                continue;
-            }
-            
-            try {
-                // Extract microdata from the element
-                const microdataData = MicrodataAPI.extractMicrodataFromElement(itemElement);
-                
-                // Get schema registry instance
-                const registry = window.microdataAPI ? window.microdataAPI.registry : new SchemaRegistry();
-                
-                // Validate the extracted data against the schema
-                const isValid = registry.validate(microdataData, itemType);
-                
-                if (!isValid) {
+            set: (target, prop, value) => {
+                // Prevent setting special properties
+                if (prop.startsWith('@') || prop.startsWith('_')) {
                     return false;
                 }
-            } catch (error) {
-                // Validation error means invalid microdata
-                return false;
-            }
-        }
-        
-        // All microdata items are valid
-        return true;
-    }
-
-    /**
-     * Validate form data by extracting it and validating against schema
-     * @param {HTMLFormElement} form - The form element to validate
-     * @param {boolean} [ignoreEmpty=false] - If true, don't throw error when no schema type found
-     * @returns {Promise<boolean>} Promise resolving to true if form data is valid, false if invalid
-     * @throws {Error} If form has no schema type and ignoreEmpty is false
-     */
-    static validateForm(form, ignoreEmpty = false) {
-        // Extract form data using the same method as render()
-        const formData = MicrodataAPI.extractFormData(form, null);
-        
-        // Check if @type and @context are present
-        const schemaType = formData['@type'];
-        const schemaContext = formData['@context'];
-        
-        if (!schemaType) {
-            if (ignoreEmpty) {
-                return Promise.resolve(true); // No schema type is considered valid when ignoreEmpty is true
-            }
-            throw new Error('Form contains no @type field for schema validation');
-        }
-        
-        // For now, perform basic validation based on common schema.org types
-        // Since we're not actually loading schemas, we can make this synchronous
-        // and just return a resolved promise for consistency
-        return Promise.resolve(true);
-    }
-
-    /**
-     * Fetch microdata from a URL without requiring a template
-     * @param {string} url - The URL to fetch microdata from
-     * @param {string} [expectedType] - Optional expected itemtype to filter results
-     * @returns {Promise<Object|Array<Object>>} Promise resolving to microdata object(s)
-     */
-    static async fetch(url, expectedType = null) {
-        try {
-            // Resolve relative URLs using document.baseURI
-            const resolvedURL = new URL(url, document.baseURI);
-            
-            // Fetch the URL
-            const response = await fetch(resolvedURL);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const contentType = response.headers.get('content-type') || '';
-            let data;
-            
-            if (contentType.includes('application/json') || contentType.includes('application/ld+json')) {
-                // Parse as JSON-LD
-                data = await response.json();
                 
-                // If expected type is specified, filter results
-                if (expectedType && data) {
-                    if (Array.isArray(data)) {
-                        const filtered = data.filter(item => 
-                            item['@type'] === expectedType.split('/').pop() || 
-                            item.itemtype === expectedType
-                        );
-                        return filtered.length === 1 ? filtered[0] : filtered;
-                    } else if (data['@type'] === expectedType.split('/').pop() || data.itemtype === expectedType) {
-                        return data;
-                    } else {
-                        throw new Error(`No microdata found matching type "${expectedType}"`);
-                    }
+                return target._setProperty(prop, value);
+            },
+            
+            has: (target, prop) => {
+                if (['@type', '@context', '@id'].includes(prop)) {
+                    return true;
                 }
-                
-                return data;
-            } else if (contentType.includes('text/html')) {
-                // Parse as HTML and extract microdata
-                const html = await response.text();
-                const doc = new DOMParser().parseFromString(html, 'text/html');
-                
-                if (expectedType) {
-                    // Look for specific itemtype
-                    const matchingElement = doc.querySelector(`[itemscope][itemtype="${expectedType}"]`);
-                    if (!matchingElement) {
-                        throw new Error(`No microdata found matching type "${expectedType}"`);
-                    }
-                    return MicrodataAPI.extractMicrodataFromElement(matchingElement);
-                } else {
-                    // Extract all microdata items
-                    const microdataElements = doc.querySelectorAll('[itemscope]');
-                    if (microdataElements.length === 0) {
-                        throw new Error('No microdata found in HTML content');
-                    }
-                    
-                    const results = Array.from(microdataElements).map(element => 
-                        MicrodataAPI.extractMicrodataFromElement(element)
-                    );
-                    
-                    // Return single item if only one found, otherwise return array
-                    return results.length === 1 ? results[0] : results;
+                return target._hasProperty(prop);
+            },
+            
+            ownKeys: (target) => {
+                const keys = ['@type', '@context', '@id'];
+                const props = target._getAllPropertyNames();
+                return keys.concat(props);
+            },
+            
+            getOwnPropertyDescriptor: (target, prop) => {
+                if (prop.startsWith('_')) {
+                    return undefined;
                 }
-            } else {
-                // Try to parse as JSON first, then fallback to HTML
-                const text = await response.text();
-                try {
-                    data = JSON.parse(text);
-                    
-                    // Apply expectedType filtering if specified
-                    if (expectedType && data) {
-                        if (Array.isArray(data)) {
-                            const filtered = data.filter(item => 
-                                item['@type'] === expectedType.split('/').pop() || 
-                                item.itemtype === expectedType
-                            );
-                            return filtered.length === 1 ? filtered[0] : filtered;
-                        } else if (data['@type'] === expectedType.split('/').pop() || data.itemtype === expectedType) {
-                            return data;
-                        } else {
-                            throw new Error(`No microdata found matching type "${expectedType}"`);
-                        }
-                    }
-                    
-                    return data;
-                } catch {
-                    // Try as HTML
-                    const doc = new DOMParser().parseFromString(text, 'text/html');
-                    
-                    if (expectedType) {
-                        const matchingElement = doc.querySelector(`[itemscope][itemtype="${expectedType}"]`);
-                        if (!matchingElement) {
-                            throw new Error(`No microdata found matching type "${expectedType}"`);
-                        }
-                        return MicrodataAPI.extractMicrodataFromElement(matchingElement);
-                    } else {
-                        const microdataElements = doc.querySelectorAll('[itemscope]');
-                        if (microdataElements.length === 0) {
-                            throw new Error('No microdata found in content');
-                        }
-                        
-                        const results = Array.from(microdataElements).map(element => 
-                            MicrodataAPI.extractMicrodataFromElement(element)
-                        );
-                        
-                        return results.length === 1 ? results[0] : results;
-                    }
-                }
-            }
-        } catch (error) {
-            throw new Error(`Failed to fetch microdata from URL "${url}": ${error.message}`);
-        }
-    }
-
-    /**
-     * Render template from URL (returns Promise)
-     * @param {HTMLTemplateElement} template - The template element to render to
-     * @param {string} url - The URL to fetch data from
-     * @returns {Promise<DocumentFragment>} Promise resolving to populated template content
-     */
-    static async renderFromURL(template, url) {
-        try {
-            // Resolve relative URLs using document.baseURI
-            const resolvedURL = new URL(url, document.baseURI);
-            
-            // Fetch the URL
-            const response = await fetch(resolvedURL);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const contentType = response.headers.get('content-type') || '';
-            let data;
-            
-            if (contentType.includes('application/json') || contentType.includes('application/ld+json')) {
-                // Parse as JSON-LD
-                data = await response.json();
-            } else if (contentType.includes('text/html')) {
-                // Parse as HTML and extract microdata
-                const html = await response.text();
-                const doc = new DOMParser().parseFromString(html, 'text/html');
-                data = MicrodataAPI.extractMatchingMicrodata(doc, template);
-            } else {
-                // Try to parse as JSON first, then fallback to HTML
-                const text = await response.text();
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    // Try as HTML
-                    const doc = new DOMParser().parseFromString(text, 'text/html');
-                    data = MicrodataAPI.extractMatchingMicrodata(doc, template);
-                }
-            }
-            
-            if (!data) {
-                throw new Error('No matching microdata found in fetched content');
-            }
-            
-            // Use the existing render method with the extracted data
-            return MicrodataAPI.render(template, data);
-            
-        } catch (error) {
-            throw new Error(`Failed to render from URL "${url}": ${error.message}`);
-        }
-    }
-
-    /**
-     * Extract microdata from HTML document that matches the template's itemtype
-     * @param {Document} doc - The HTML document to extract from
-     * @param {HTMLTemplateElement} template - The template to match against
-     * @returns {Object|null} The matching microdata object or null if not found
-     */
-    static extractMatchingMicrodata(doc, template) {
-        const itemElement = template.content.querySelector('[itemscope]');
-        if (!itemElement) {
-            return null;
-        }
-        
-        const expectedType = itemElement.getAttribute('itemtype');
-        if (!expectedType) {
-            // No specific type expected, get first microdata item
-            const firstItem = doc.querySelector('[itemscope]');
-            return firstItem ? MicrodataAPI.extractMicrodataFromElement(firstItem) : null;
-        }
-        
-        // Look for matching itemtype
-        const matchingElement = doc.querySelector(`[itemscope][itemtype="${expectedType}"]`);
-        if (!matchingElement) {
-            return null;
-        }
-        
-        return MicrodataAPI.extractMicrodataFromElement(matchingElement);
-    }
-
-    /**
-     * Extract microdata from a single element
-     * @param {Element} element - The element to extract microdata from
-     * @returns {Object} The extracted microdata object
-     */
-    static extractMicrodataFromElement(element) {
-        const result = {};
-        
-        // Add basic properties
-        const itemType = element.getAttribute('itemtype');
-        const itemId = element.getAttribute('itemid') || element.getAttribute('id');
-        
-        if (itemType) {
-            result['@type'] = itemType.split('/').pop(); // Get the last part
-            result['@context'] = itemType.substring(0, itemType.lastIndexOf('/'));
-        }
-        
-        if (itemId) {
-            result['@id'] = itemId.startsWith('#') ? itemId : `#${itemId}`;
-        }
-        
-        // Extract properties
-        const propElements = element.querySelectorAll('[itemprop]');
-        propElements.forEach(propElement => {
-            // Skip nested itemscope elements that are not direct children
-            if (propElement.hasAttribute('itemscope') && propElement.closest('[itemscope]') !== element) {
-                return;
-            }
-            
-            const propName = propElement.getAttribute('itemprop');
-            const value = MicrodataAPI.extractElementValue(propElement);
-            
-            // Handle multiple values for same property
-            if (result[propName] !== undefined) {
-                if (Array.isArray(result[propName])) {
-                    result[propName].push(value);
-                } else {
-                    result[propName] = [result[propName], value];
-                }
-            } else {
-                result[propName] = value;
+                return {
+                    enumerable: true,
+                    configurable: true,
+                    get: () => this[prop],
+                    set: (value) => { this[prop] = value; }
+                };
             }
         });
-        
-        return result;
-    }
-
-    /**
-     * Extract data from a form element and convert to microdata format
-     * @param {HTMLFormElement} form - The form element to extract data from
-     * @param {Element} templateElement - The template element to determine expected properties
-     * @returns {Object} Object with form data in microdata format
-     */
-    static extractFormData(form, templateElement) {
-        const formData = new FormData(form);
-        const result = {};
-        
-        // Get all unique form field names
-        const fieldNames = new Set();
-        for (const [name] of formData.entries()) {
-            fieldNames.add(name);
-        }
-        
-        // Process each field
-        fieldNames.forEach(name => {
-            const values = formData.getAll(name);
-            const formElement = form.elements[name];
-            
-            if (!formElement) {
-                return;
-            }
-            
-            // Handle different input types
-            if (formElement.type === 'checkbox' || formElement.type === 'radio') {
-                // For checkboxes/radios, only include checked values
-                const checkedElements = form.querySelectorAll(`[name="${name}"]:checked`);
-                const checkedValues = Array.from(checkedElements).map(el => el.value);
-                
-                if (checkedValues.length === 0) {
-                    return; // Skip unchecked checkboxes/radios
-                } else if (checkedValues.length === 1 && formElement.type === 'radio') {
-                    result[name] = checkedValues[0];
-                } else {
-                    result[name] = checkedValues;
-                }
-            } else if (formElement.tagName === 'SELECT') {
-                // Handle select elements
-                if (formElement.multiple) {
-                    // Multi-select: get all selected values
-                    const selectedValues = Array.from(formElement.selectedOptions).map(option => option.value);
-                    if (selectedValues.length > 0) {
-                        result[name] = selectedValues.length === 1 ? selectedValues[0] : selectedValues;
-                    }
-                } else {
-                    // Single select: get selected value
-                    if (formElement.selectedIndex >= 0) {
-                        result[name] = formElement.value;
-                    }
-                }
-            } else if (formElement.type === 'file') {
-                // For file inputs, we might want to handle differently
-                // For now, just skip files
-                return;
-            } else {
-                // For other input types (text, hidden, email, url, number, textarea, etc.)
-                if (values.length === 1) {
-                    const value = values[0];
-                    // Basic type conversion for number inputs
-                    if (formElement.type === 'number' && value !== '') {
-                        const numValue = parseFloat(value);
-                        result[name] = isNaN(numValue) ? value : numValue;
-                    } else {
-                        result[name] = value;
-                    }
-                } else if (values.length > 1) {
-                    result[name] = values;
-                }
-            }
-        });
-        
-        // Add JSON-LD context and type if available from hidden inputs
-        if (result['@context']) {
-            // Keep JSON-LD metadata
-        }
-        if (result['@type']) {
-            // Keep JSON-LD type
-        }
-        
-        // Try to infer type from template if not provided
-        if (!result['@type'] && templateElement) {
-            const itemType = templateElement.getAttribute('itemtype');
-            if (itemType) {
-                result['@type'] = itemType.split('/').pop(); // Get the last part of the URL
-                result['@context'] = itemType.substring(0, itemType.lastIndexOf('/'));
-            }
-        }
-        
-        return result;
-    }
-
-    /**
-     * Populate a template element with data from a microdata item or JSON-LD
-     * @param {Element} element - The element to populate
-     * @param {Object} data - The data to populate with
-     */
-    static populateTemplateElement(element, data) {
-        // Get all potential property names from the template
-        const propElements = element.querySelectorAll('[itemprop]');
-        const propertyNames = new Set();
-        
-        propElements.forEach(el => {
-            const propName = el.getAttribute('itemprop');
-            if (propName) {
-                propertyNames.add(propName);
-            }
-        });
-        
-        // For each property name, try to get the value from the data object
-        propertyNames.forEach(propName => {
-            const { isArray: isArrayProperty, cleanName: cleanPropName } = MicrodataAPI.parsePropertyName(propName);
-            
-            let value;
-            
-            // Try to get value - works for both proxy objects and plain objects
-            if (data.properties && data.properties[cleanPropName] !== undefined) {
-                // Microdata proxy object with properties
-                value = data.properties[cleanPropName];
-            } else if (data[cleanPropName] !== undefined) {
-                // Direct property access (works for proxy objects and JSON-LD)
-                value = data[cleanPropName];
-            } else {
-                // Property not found
-                return;
-            }
-            
-            // Skip JSON-LD metadata
-            if (['@context', '@type', '@id'].includes(cleanPropName)) {
-                return;
-            }
-            
-            if (isArrayProperty && Array.isArray(value)) {
-                // Handle array repetition with [] syntax
-                MicrodataAPI.handleArrayRepetition(element, propName, cleanPropName, value);
-            } else {
-                // Handle regular properties
-                const targetElements = element.querySelectorAll(`[itemprop="${propName}"]:not([itemscope])`);
-                
-                targetElements.forEach((targetElement, index) => {
-                    if (Array.isArray(value)) {
-                        // For array values, use the corresponding index for multiple elements
-                        MicrodataAPI.setElementValue(targetElement, value[index] || '');
-                    } else {
-                        MicrodataAPI.setElementValue(targetElement, value);
-                    }
-                });
-                
-                // Handle nested itemscope elements
-                const nestedElements = element.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
-                nestedElements.forEach(nestedElement => {
-                    if (typeof value === 'object' && !Array.isArray(value)) {
-                        MicrodataAPI.populateTemplateElement(nestedElement, value);
-                    }
-                });
-            }
-        });
-    }
-
-    /**
-     * Handle array repetition for elements with [] syntax
-     * @param {Element} container - The container element
-     * @param {string} fullPropName - The full property name with []
-     * @param {string} cleanPropName - The property name without []
-     * @param {Array} values - The array of values to repeat
-     */
-    static handleArrayRepetition(container, fullPropName, cleanPropName, values) {
-        // Find the template element with the [] syntax
-        const templateElement = container.querySelector(`[itemprop="${fullPropName}"]`);
-        if (!templateElement) {
-            return;
-        }
-        
-        // Get the parent element to insert the repeated elements
-        const parentElement = templateElement.parentElement;
-        if (!parentElement) {
-            return;
-        }
-        
-        // Store the original element's position
-        const nextSibling = templateElement.nextSibling;
-        
-        // Remove the original template element
-        templateElement.remove();
-        
-        // Create and insert elements for each value
-        values.forEach((value, index) => {
-            // Clone the template element
-            const newElement = templateElement.cloneNode(true);
-            
-            // Update the itemprop to remove the [] syntax
-            newElement.setAttribute('itemprop', cleanPropName);
-            
-            // Populate the element with the value
-            if (typeof value === 'object' && !Array.isArray(value)) {
-                // For nested objects, populate recursively
-                MicrodataAPI.populateTemplateElement(newElement, value);
-            } else {
-                // For simple values, set the element value
-                MicrodataAPI.setElementValue(newElement, value);
-            }
-            
-            // Insert the new element in the correct position
-            if (nextSibling) {
-                parentElement.insertBefore(newElement, nextSibling);
-            } else {
-                parentElement.appendChild(newElement);
-            }
-        });
-    }
-
-    /**
-     * Set the value of an element appropriately based on its type
-     * @param {Element} element - The element to set the value on
-     * @param {*} value - The value to set
-     */
-    static setElementValue(element, value) {
-        const stringValue = String(value || '');
-        
-        if (element.hasAttribute('content')) {
-            element.setAttribute('content', stringValue);
-        } else if (element.tagName === 'INPUT') {
-            element.value = stringValue;
-        } else if (element.tagName === 'A' && element.hasAttribute('href')) {
-            element.href = stringValue;
-            if (!element.textContent.trim()) {
-                element.textContent = stringValue;
-            }
-        } else if (element.tagName === 'IMG' && element.hasAttribute('src')) {
-            element.src = stringValue;
-            element.alt = element.alt || stringValue;
-        } else {
-            element.textContent = stringValue;
-        }
     }
     
-    /**
-     * Initialize the microdata API
-     */
-    constructor() {
-        this.registry = new SchemaRegistry();
-        this.extractor = new MicrodataExtractor(this.registry);
-        this.items = new Map(); // Items with IDs
-        this.itemsWithoutId = []; // Items without IDs (accessed by numeric index)
-        this.templates = new Map(); // Templates for rendering new items
-        this.isUpdatingFromDOM = false; // Flag to prevent infinite loops
-        this.internalIdCounter = 0; // Counter for generating internal IDs
-        this.elementToInternalId = new WeakMap(); // Track which elements belong to which internal ID
-        this.internalIdToElements = new Map(); // Track all elements for each internal ID
-        this.propertyTypeMap = new Map(); // Maps itemType:propertyName to property type for validation
-        this.initialize();
-    }
-
-    /**
-     * Initialize the API by setting up DOM observation and extraction
-     */
-    initialize() {
-        const setup = async () => {
-            await this.refresh();
-            this.discoverEnumerations();
-            this.observeChanges();
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', setup);
-        } else {
-            setTimeout(setup, 0);
-        }
-    }
-
-    normalizeSchemaUrl(url) {
-        if (url && url.startsWith('http://schema.org/')) {
-            return url.replace('http://', 'https://');
-        }
-        return url;
-    }
-
-    /**
-     * Refresh the microdata by re-extracting all items from the DOM
-     */
-    async refresh() {
-        this.items.clear();
-        this.itemsWithoutId = [];
-        this.templates.clear();
-
-        // Process data-microdata-source elements first
-        await this.processDataSources();
-
-        // Find all templates
-        this.collectTemplates();
-
-        // Extract all items
-        await this.extractAllItems();
-    }
-
-    /**
-     * Process all elements with data-microdata-source attributes
-     */
-    async processDataSources() {
-        const dataSourceElements = document.querySelectorAll('[data-microdata-source]');
+    _getType() {
+        const itemtype = this._element.getAttribute('itemtype');
+        if (!itemtype) return undefined;
         
-        for (const element of dataSourceElements) {
-            const dataSourceUrl = element.getAttribute('data-microdata-source');
-            if (dataSourceUrl) {
-                await this.applyDataSource(element, dataSourceUrl);
-            }
-        }
+        // Extract the last segment of the URL as the type
+        const url = new URL(itemtype);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        return pathParts[pathParts.length - 1] || undefined;
     }
-
-    /**
-     * Apply data from a data source to an element
-     * @param {Element} element - The element to apply data to
-     * @param {string} url - The URL to fetch data from
-     */
-    async applyDataSource(element, url) {
-        try {
-            const response = await fetch(url);
-            const contentType = response.headers.get('content-type') || '';
-            
-            if (contentType.includes('application/json') || url.endsWith('.json')) {
-                // Handle JSON-LD data
-                const jsonData = await response.json();
-                await this.applyJsonLdData(element, jsonData);
-            } else {
-                // Handle HTML data with microdata
-                const html = await response.text();
-                await this.applyHtmlData(element, html);
-            }
-        } catch (error) {
-            // Silently fail if data source can't be loaded
-        }
-    }
-
-    /**
-     * Apply JSON-LD data to an element
-     * @param {Element} element - The element to apply data to
-     * @param {Array|Object} data - The JSON-LD data
-     */
-    async applyJsonLdData(element, data) {
-        const items = Array.isArray(data) ? data : [data];
+    
+    _getContext() {
+        const itemtype = this._element.getAttribute('itemtype');
+        if (!itemtype) return undefined;
         
-        for (const item of items) {
-            if (item['@type']) {
-                const itemType = this.resolveJsonLdType(item['@type'], item['@context']);
-                await this.createItemFromJsonLd(element, item, itemType);
-            }
+        // Extract the base URL as context
+        const url = new URL(itemtype);
+        return url.origin + url.pathname.substring(0, url.pathname.lastIndexOf('/') + 1);
+    }
+    
+    _getId() {
+        // Check for itemid attribute first
+        const itemid = this._element.getAttribute('itemid');
+        if (itemid) return itemid;
+        
+        // Fall back to element id with document URL
+        const id = this._element.getAttribute('id');
+        if (id) {
+            return `${this._element.baseURI}#${id}`;
         }
-    }
-
-    /**
-     * Apply HTML microdata to an element
-     * @param {Element} element - The element to apply data to
-     * @param {string} html - The HTML content with microdata
-     */
-    async applyHtmlData(element, html) {
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const microdataElements = doc.querySelectorAll('[itemscope]');
-        
-        for (const microdataElement of microdataElements) {
-            const extractedItem = await this.extractor.extractFromElement(microdataElement);
-            if (extractedItem) {
-                await this.createItemFromExtracted(element, extractedItem);
-            }
-        }
-    }
-
-    /**
-     * Resolve JSON-LD type to full URL
-     * @param {string} type - The type (short or full URL)
-     * @param {string} context - The @context URL
-     * @returns {string} The resolved type URL
-     */
-    resolveJsonLdType(type, context) {
-        if (type.startsWith('http')) {
-            return type;
-        }
-        
-        if (context) {
-            return context.endsWith('/') ? context + type : context + '/' + type;
-        }
-        
-        return 'https://schema.org/' + type;
-    }
-
-    /**
-     * Create an item from JSON-LD data
-     * @param {Element} container - The container element
-     * @param {Object} jsonLdItem - The JSON-LD item
-     * @param {string} itemType - The resolved item type URL
-     */
-    async createItemFromJsonLd(container, jsonLdItem, itemType) {
-        const template = this.findTemplateForType(container, itemType);
-        if (!template) return;
-
-        const clone = template.content.cloneNode(true);
-        const itemElement = clone.querySelector('[itemscope]');
-        
-        if (itemElement) {
-            // Apply properties from JSON-LD
-            for (const [key, value] of Object.entries(jsonLdItem)) {
-                if (key.startsWith('@')) continue; // Skip JSON-LD metadata
-                
-                const propElements = itemElement.querySelectorAll(`[itemprop="${key}"]`);
-                propElements.forEach(el => this.updatePropertyElement(el, value));
-            }
-            
-            // Insert into DOM
-            const insertionPoint = this.findInsertionPoint(container, template);
-            if (insertionPoint) {
-                insertionPoint.appendChild(clone);
-            }
-        }
-    }
-
-    /**
-     * Create an item from extracted microdata
-     * @param {Element} container - The container element
-     * @param {Object} extractedItem - The extracted item
-     */
-    async createItemFromExtracted(container, extractedItem) {
-        const template = this.findTemplateForType(container, extractedItem.type);
-        if (!template) return;
-
-        const clone = template.content.cloneNode(true);
-        const itemElement = clone.querySelector('[itemscope]');
-        
-        if (itemElement) {
-            // Apply properties from extracted item
-            for (const [key, value] of Object.entries(extractedItem.properties)) {
-                if (typeof value === 'string') {
-                    const propElements = itemElement.querySelectorAll(`[itemprop="${key}"]`);
-                    propElements.forEach(el => this.updatePropertyElement(el, value));
-                }
-            }
-            
-            // Insert into DOM
-            const insertionPoint = this.findInsertionPoint(container, template);
-            if (insertionPoint) {
-                insertionPoint.appendChild(clone);
-            }
-        }
-    }
-
-    /**
-     * Find a template for a given type within a container
-     * @param {Element} container - The container element
-     * @param {string} itemType - The item type URL
-     * @returns {Element|null} The template element or null
-     */
-    findTemplateForType(container, itemType) {
-        const normalizedType = this.normalizeSchemaUrl(itemType);
-        
-        // Try various variations of the type URL
-        const typeVariations = [
-            itemType,
-            normalizedType,
-            itemType + '/',
-            normalizedType + '/',
-            itemType.replace(/\/$/, ''),
-            normalizedType.replace(/\/$/, '')
-        ];
-        
-        // Only look for templates within the container (children only)
-        let template = null;
-        for (const typeVar of typeVariations) {
-            template = container.querySelector(`template[itemtype="${typeVar}"]`);
-            if (template) break;
-        }
-        
-        return template;
-    }
-
-    /**
-     * Find the insertion point for new items
-     * @param {Element} container - The container element
-     * @param {Element} template - The template element
-     * @returns {Element|null} The insertion point or null
-     */
-    findInsertionPoint(container, template) {
-        // If template is within the container, use its parent
-        if (container.contains(template)) {
-            return template.parentElement;
-        }
-        
-        // Otherwise, use the container itself
-        return container;
-    }
-
-    collectTemplates() {
-        document.querySelectorAll('template[itemtype]').forEach(template => {
-            const type = template.getAttribute('itemtype');
-            const normalizedType = this.normalizeSchemaUrl(type);
-            
-            if (!this.templates.has(normalizedType)) {
-                this.templates.set(normalizedType, []);
-            }
-            this.templates.get(normalizedType).push(template);
-            
-            // Also store under the original type for backward compatibility
-            if (type !== normalizedType) {
-                if (!this.templates.has(type)) {
-                    this.templates.set(type, []);
-                }
-                this.templates.get(type).push(template);
-            }
-        });
-    }
-
-    /**
-     * Create a content signature for an item for deduplication
-     * @param {Object} item - The item to create a signature for
-     * @returns {string} A signature based on the item's properties
-     */
-    createItemSignature(item) {
-        const props = [];
-        for (const [key, value] of Object.entries(item.properties)) {
-            if (typeof value === 'string' || typeof value === 'number') {
-                props.push(`${key}:${value}`);
-            }
-        }
-        return `${item.type}|${props.sort().join('|')}`;
-    }
-
-    async extractAllItems() {
-        const itemElements = document.querySelectorAll('[itemscope]');
-        const topLevelItemsWithoutId = [];
-        const itemsBySignature = new Map(); // Track items by their content signature
-        
-        for (const element of itemElements) {
-            if (this.isNestedItem(element)) continue;
-            
-            const item = await this.extractor.extractFromElement(element);
-            
-            if (item) {
-                const proxy = this.createLiveProxy(item);
-                
-                if (item.id) {
-                    this.items.set(item.id, proxy);
-                } else {
-                    // For items without IDs, check if we've seen this content before
-                    const signature = this.createItemSignature(item);
-                    
-                    if (itemsBySignature.has(signature)) {
-                        // This is a duplicate item in another view
-                        const existingItem = itemsBySignature.get(signature);
-                        const internalId = this.elementToInternalId.get(existingItem._element) || this.generateInternalId();
-                        
-                        // Register both elements with the same internal ID
-                        if (!this.elementToInternalId.has(existingItem._element)) {
-                            this.registerElementWithInternalId(existingItem._element, internalId);
-                        }
-                        this.registerElementWithInternalId(element, internalId);
-                    } else {
-                        // This is a new unique item
-                        itemsBySignature.set(signature, proxy);
-                        topLevelItemsWithoutId.push(proxy);
-                        
-                        // Generate and register internal ID
-                        this.generateAndRegisterInternalId(element);
-                    }
-                }
-            }
-        }
-        
-        this.itemsWithoutId = topLevelItemsWithoutId;
-    }
-
-    isNestedItem(element) {
-        let parent = element.parentElement;
-        while (parent) {
-            if (parent.hasAttribute('itemscope')) {
-                return true;
-            }
-            parent = parent.parentElement;
-        }
-        return false;
-    }
-
-    /**
-     * Create array proxy handler for reactive array operations
-     * @param {Array} items - The array to proxy
-     * @param {string} propName - The property name this array belongs to
-     * @param {Object} parentItem - The parent item
-     * @param {Element} parentElement - The parent DOM element
-     * @returns {Object} Proxy handler object
-     */
-    createArrayProxyHandler(items, propName, parentItem, parentElement) {
-        const self = this;
-        
-        return {
-            get(target, prop) {
-                // Handle toJSON for serialization
-                if (prop === 'toJSON') {
-                    return () => self.serializeArray(target);
-                }
-                
-                // Array methods
-                if (prop === 'push') {
-                    return (...args) => self.handleArrayPush(target, args, parentItem, propName, parentElement);
-                }
-                if (prop === 'pop') {
-                    return () => self.handleArrayPop(target, propName, parentItem);
-                }
-                if (prop === 'splice') {
-                    return async (start, deleteCount, ...items) => 
-                        self.handleArraySplice({ target, start, deleteCount, items, propName, parentItem, parentElement });
-                }
-                
-                // Create live proxies for array items that are microdata items
-                if (typeof prop === 'number' || MicrodataAPI.isNumericIndex(prop)) {
-                    const index = Number(prop);
-                    if (target[index] && self.isMicrodataItem(target[index])) {
-                        return self.createLiveProxy(target[index]);
-                    }
-                    return target[index];
-                }
-                
-                return target[prop];
-            }
-        };
-    }
-
-    /**
-     * Create array proxy for reactive array operations
-     * @param {Array} items - The array to proxy
-     * @param {string} propName - The property name this array belongs to
-     * @param {Object} parentItem - The parent item
-     * @param {Element} parentElement - The parent DOM element
-     * @returns {Proxy} Proxied array with reactive behavior
-     */
-    createArrayProxy(items, propName, parentItem, parentElement) {
-        return new Proxy(items, this.createArrayProxyHandler(items, propName, parentItem, parentElement));
-    }
-
-    /**
-     * Handle special proxy properties for items
-     * @param {Object} target - The target item
-     * @param {string} prop - The property being accessed
-     * @returns {*} The property value or undefined if not a special property
-     */
-    handleSpecialProperties(target, prop) {
-        if (prop === '_element') return target.element;
-        if (prop === '_type') return target.type;
-        if (prop === '_id') return target.id;
-        if (prop === 'toJSON') return () => this.serializeItem(target);
         
         return undefined;
     }
-
-    /**
-     * Check if a value is a microdata item object
-     * @param {*} value - The value to check
-     * @returns {boolean} True if the value is a microdata item
-     */
-    isMicrodataItem(value) {
-        return value && typeof value === 'object' && value.element;
-    }
-
-    /**
-     * Check if a value is a microdata item with properties
-     * @param {*} value - The value to check
-     * @returns {boolean} True if the value is a microdata item with properties
-     */
-    isMicrodataItemWithProperties(value) {
-        return value && typeof value === 'object' && value.properties;
-    }
-
-    /**
-     * Get the appropriate proxy for a property value
-     * @param {*} value - The property value
-     * @param {string} propName - The property name
-     * @param {Object} parentItem - The parent item
-     * @returns {*} The value or a proxy if applicable
-     */
-    getProxiedValue(value, propName, parentItem) {
-        // If it's an array, wrap in array proxy
-        if (Array.isArray(value)) {
-            return this.createArrayProxy(value, propName, parentItem, parentItem.element);
-        }
+    
+    _resolveItemref() {
+        const itemref = this._element.getAttribute('itemref');
+        if (!itemref) return [];
         
-        // If it's a nested item, wrap in proxy
-        if (this.isMicrodataItem(value)) {
-            return this.createLiveProxy(value);
-        }
+        const refs = [];
+        const seenIds = new Set();
         
-        return value;
-    }
-
-    /**
-     * Create item proxy handler for reactive item operations
-     * @param {Object} item - The item to proxy
-     * @returns {Object} Proxy handler object
-     */
-    createItemProxyHandler(item) {
-        const self = this;
-        
-        return {
-            get(target, prop) {
-                // Handle special properties
-                const specialValue = self.handleSpecialProperties(target, prop);
-                if (specialValue !== undefined) {
-                    return specialValue;
-                }
-                
-                const value = target.properties[prop];
-                return self.getProxiedValue(value, prop, target);
-            },
-            
-            set(target, prop, value) {
-                // Validate the value before setting it
-                const isValid = self.validatePropertyValue(target, prop, value);
-                if (!isValid) {
-                    throw new Error(`Invalid value "${value}" for property "${prop}"`);
-                }
-                
-                target.properties[prop] = value;
-                
-                // Skip DOM updates if we're already updating from DOM
-                if (!self.isUpdatingFromDOM) {
-                    self.updateDOMProperty(target, prop, value);
-                }
-                
-                return true;
-            },
-            
-            ownKeys(target) {
-                return Object.keys(target.properties);
-            },
-            
-            has(target, prop) {
-                return prop in target.properties;
+        for (const id of itemref.trim().split(/\s+/)) {
+            if (seenIds.has(id)) {
+                console.warn(`Circular itemref detected for id: ${id}`);
+                continue;
             }
-        };
-    }
-
-    /**
-     * Create a live proxy object for an item with reactive behavior
-     * @param {Object} item - The item to create a proxy for
-     * @returns {Proxy} A proxy with live DOM synchronization
-     */
-    createLiveProxy(item) {
-        // Ensure item is an object and has the expected structure
-        if (!item || typeof item !== 'object' || Array.isArray(item)) {
-            console.error('Invalid item for proxy creation:', item);
-            return item;
-        }
-        
-        return new Proxy(item, this.createItemProxyHandler(item));
-    }
-
-    serializeArray(items) {
-        return items.map(item => {
-            if (this.canSerializeToJson(item)) {
-                return item.toJSON();
-            } else if (item && typeof item === 'object' && item.properties) {
-                return this.createJsonLd(item);
-            }
-            return item;
-        });
-    }
-
-    /**
-     * Check if an object can be JSON serialized
-     * @param {*} obj - The object to check
-     * @returns {boolean} True if the object has a toJSON method
-     */
-    canSerializeToJson(obj) {
-        return obj && typeof obj === 'object' && typeof obj.toJSON === 'function';
-    }
-
-    /**
-     * Serialize an object if possible, otherwise return it as-is
-     * @param {*} obj - The object to serialize
-     * @returns {*} The serialized object or the original value
-     */
-    serializeIfPossible(obj) {
-        if (this.canSerializeToJson(obj)) {
-            return obj.toJSON();
-        }
-        return obj;
-    }
-
-    serializeItem(item) {
-        return this.createJsonLd(item);
-    }
-
-    /**
-     * Extract context and type name from a type URL
-     * @param {string} typeUrl - The full type URL
-     * @returns {Object} Object with context and typeName properties
-     */
-    parseTypeUrl(typeUrl) {
-        if (!typeUrl) {
-            return { context: "https://schema.org", typeName: null };
-        }
-        
-        const lastSlashIndex = typeUrl.lastIndexOf('/');
-        if (lastSlashIndex <= 0) {
-            return { context: "https://schema.org", typeName: typeUrl };
-        }
-        
-        return {
-            context: typeUrl.substring(0, lastSlashIndex),
-            typeName: typeUrl.substring(lastSlashIndex + 1)
-        };
-    }
-
-    createJsonLd(item) {
-        const result = {};
-        const { context, typeName } = this.parseTypeUrl(item.type);
-        
-        result["@context"] = context;
-        
-        if (typeName) {
-            result["@type"] = typeName;
-        }
-        
-        if (item.id) {
-            result["@id"] = item.id;
-        }
-        
-        // Add all properties
-        for (const [key, value] of Object.entries(item.properties)) {
-            if (Array.isArray(value)) {
-                result[key] = this.serializeArray(value);
-            } else if (this.canSerializeToJson(value)) {
-                result[key] = value.toJSON();
-            } else if (this.isMicrodataItemWithProperties(value)) {
-                result[key] = this.createJsonLd(value);
+            
+            seenIds.add(id);
+            const element = document.getElementById(id);
+            
+            if (element) {
+                refs.push(element);
             } else {
-                result[key] = value;
+                console.warn(`itemref references non-existent id: ${id}`);
             }
         }
         
-        return result;
+        return refs;
     }
-
-    handleArrayPush(target, args, item, propName, parentElement) {
-        args.forEach(data => {
-            this.addItemFromData(data, item.type, propName, parentElement);
-        });
-        return target.length;
-    }
-
-    handleArrayPop(target, propName, item) {
-        if (target.length === 0) return undefined;
+    
+    _getPropertyElements(name) {
+        const elements = [];
         
-        const lastItem = target[target.length - 1];
-        const itemType = lastItem._type || lastItem.type;
+        // Search within the item element and itemref elements
+        const searchRoots = [this._element, ...this._itemrefElements];
         
-        if (itemType) {
-            this.removeLastItemFromDOM(itemType, propName);
-        }
-        
-        return target.pop();
-    }
-
-    /**
-     * Handle array splice operation with DOM updates
-     * @param {Object} spliceOptions - The splice operation parameters
-     * @param {Array} spliceOptions.target - The target array
-     * @param {number} spliceOptions.start - The start index
-     * @param {number} spliceOptions.deleteCount - Number of items to delete
-     * @param {Array} spliceOptions.items - Items to insert
-     * @param {string} spliceOptions.propName - The property name
-     * @param {Object} spliceOptions.parentItem - The parent item
-     * @param {Element} spliceOptions.parentElement - The parent DOM element
-     */
-    async handleArraySplice(spliceOptions) {
-        const { target, start, deleteCount, items, propName, parentItem, parentElement } = spliceOptions;
-        let itemType = this.getItemTypeForArray(target, propName, parentItem);
-        
-        if (!itemType) {
-            const parentSchema = await this.registry.loadSchema(parentItem.type);
-            if (parentSchema) {
-                const property = parentSchema.properties.find(p => p.name === propName);
-                if (property) {
-                    itemType = property.type;
+        for (const root of searchRoots) {
+            // For itemref elements, check if the element itself has the itemprop
+            if (root !== this._element && root.hasAttribute('itemprop')) {
+                const itemprops = root.getAttribute('itemprop').trim().split(/\s+/);
+                if (itemprops.includes(name)) {
+                    elements.push(root);
                 }
             }
+            
+            // Search within the element (but not within nested itemscopes)
+            const walker = document.createTreeWalker(
+                root,
+                NodeFilter.SHOW_ELEMENT,
+                {
+                    acceptNode: (node) => {
+                        // Check if it has the itemprop we're looking for
+                        if (node.hasAttribute('itemprop')) {
+                            const itemprops = node.getAttribute('itemprop').trim().split(/\s+/);
+                            if (itemprops.includes(name)) {
+                                return NodeFilter.FILTER_ACCEPT;
+                            }
+                        }
+                        
+                        // Skip if we're inside a nested itemscope (unless it has our itemprop)
+                        if (node !== root && node.hasAttribute('itemscope')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        
+                        return NodeFilter.FILTER_SKIP;
+                    }
+                }
+            );
+            
+            let node;
+            while (node = walker.nextNode()) {
+                elements.push(node);
+            }
         }
         
-        if (itemType) {
-            this.updateDOMForSplice(itemType, propName, start, deleteCount, items, parentElement);
-        }
-        
-        return target.splice(start, deleteCount, ...items);
+        return elements;
     }
-
-    getItemTypeForArray(array, propName, parentItem) {
-        if (array.length > 0) {
-            return array[0]._type || array[0].type;
-        }
-        return null;
-    }
-
-    removeLastItemFromDOM(itemType, propName) {
-        const normalizedType = this.normalizeSchemaUrl(itemType);
-        const templates = this.templates.get(normalizedType) || this.templates.get(itemType) || [];
+    
+    _getProperty(name) {
+        const elements = this._getPropertyElements(name);
         
-        templates.forEach(template => {
-            const parent = template.parentElement;
-            const elements = parent.querySelectorAll(`[itemprop="${propName}"][itemscope]`);
+        if (elements.length === 0) {
+            return undefined;
+        }
+        
+        if (elements.length === 1) {
+            return this._extractValue(elements[0]);
+        }
+        
+        // Multiple elements means array
+        return elements.map(el => this._extractValue(el));
+    }
+    
+    _setProperty(name, value) {
+        const elements = this._getPropertyElements(name);
+        
+        if (Array.isArray(value)) {
+            // Setting array value
+            elements.forEach((el, index) => {
+                if (index < value.length) {
+                    this._setValue(el, value[index]);
+                }
+            });
+            
+            // TODO: Handle case where value.length > elements.length
+            // This would require creating new elements
+        } else {
+            // Setting single value
             if (elements.length > 0) {
-                const elementToRemove = elements[elements.length - 1];
-                // Clean up internal ID tracking before removing
-                this.unregisterElement(elementToRemove);
-                elementToRemove.remove();
+                this._setValue(elements[0], value);
+                
+                // Remove extra elements if setting single value
+                for (let i = 1; i < elements.length; i++) {
+                    elements[i].remove();
+                }
             }
-        });
-    }
-
-    updateDOMForSplice(itemType, propName, start, deleteCount, items, parentElement) {
-        const normalizedType = this.normalizeSchemaUrl(itemType);
-        const templates = this.templates.get(normalizedType) || this.templates.get(itemType) || [];
-        
-        templates.forEach(template => {
-            const parent = template.parentElement;
-            const elements = Array.from(parent.querySelectorAll(`[itemprop="${propName}"][itemscope]`));
-            
-            // Remove elements
-            for (let i = start; i < start + deleteCount && i < elements.length; i++) {
-                elements[i].remove();
-            }
-            
-            // Add new items
-            if (items.length > 0) {
-                const insertBefore = elements[start + deleteCount] || null;
-                items.forEach(data => {
-                    this.addItemFromData(data, parentElement.type, propName, parent, insertBefore);
-                });
-            }
-        });
-    }
-
-    updateDOMProperty(target, prop, value) {
-        const itemId = target.id;
-        
-        if (itemId) {
-            // Find all elements with the same itemid or id
-            const sameItems = document.querySelectorAll(`[itemid="${itemId}"], [id="${itemId.replace('#', '')}"]`);
-            
-            sameItems.forEach(itemElement => {
-                this.updatePropertyElements(itemElement, prop, value);
-            });
-        } else {
-            // For items without ID, update the original element
-            this.updatePropertyElements(target.element, prop, value);
-            
-            // Also try to find and update corresponding elements in other views
-            this.updateCorrespondingElements(target, prop, value);
+            // TODO: Handle case where no elements exist
+            // This would require creating new elements
         }
+        
+        return true;
     }
-
-    /**
-     * Update a single property element with a value
-     * @param {Element} element - The element to update
-     * @param {*} value - The value to set
-     */
-    updatePropertyElement(element, value) {
+    
+    _hasProperty(name) {
+        return this._getPropertyElements(name).length > 0;
+    }
+    
+    _getAllPropertyNames() {
+        const names = new Set();
+        
+        // Collect from main element and itemref elements
+        const searchRoots = [this._element, ...this._itemrefElements];
+        
+        for (const root of searchRoots) {
+            // Check if the root itself has itemprop (for itemref elements)
+            if (root !== this._element && root.hasAttribute('itemprop')) {
+                const itemprops = root.getAttribute('itemprop').trim().split(/\s+/);
+                itemprops.forEach(prop => names.add(prop));
+            }
+            
+            // Use TreeWalker to find all itemprop elements, excluding nested itemscopes
+            const walker = document.createTreeWalker(
+                root,
+                NodeFilter.SHOW_ELEMENT,
+                {
+                    acceptNode: (node) => {
+                        // Accept if it has itemprop
+                        if (node.hasAttribute('itemprop')) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        
+                        // Skip if we're inside a nested itemscope (unless it has itemprop)
+                        if (node !== root && node.hasAttribute('itemscope')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        
+                        return NodeFilter.FILTER_SKIP;
+                    }
+                }
+            );
+            
+            let node;
+            while (node = walker.nextNode()) {
+                const itemprops = node.getAttribute('itemprop').trim().split(/\s+/);
+                itemprops.forEach(prop => names.add(prop));
+            }
+        }
+        
+        return Array.from(names);
+    }
+    
+    _extractValue(element) {
+        // Handle nested microdata items
+        if (element.hasAttribute('itemscope')) {
+            return new MicrodataItem(element);
+        }
+        
+        // Handle various element types
         if (element.hasAttribute('content')) {
-            element.setAttribute('content', value);
-        } else {
-            element.textContent = value;
-        }
-    }
-
-    updatePropertyElements(container, prop, value) {
-        const propElements = container.querySelectorAll(`[itemprop="${prop}"]:not([itemscope])`);
-        propElements.forEach(el => this.updatePropertyElement(el, value));
-    }
-
-    async addItemFromData(data, parentType, propName, parentElement, insertBefore = null) {
-        const itemType = await this.determineItemType(parentType, propName);
-        
-        if (!itemType) return;
-        
-        const templates = this.getTemplatesForType(itemType);
-        
-        if (templates.length === 0) return;
-
-        // Generate a unique internal ID for this data item
-        const internalId = this.generateInternalId();
-
-        // Clone and populate template for each location
-        templates.forEach(template => {
-            const clone = template.content.cloneNode(true);
-            const itemElement = clone.querySelector('[itemscope]');
-            
-            if (itemElement) {
-                MicrodataAPI.populateTemplateElement(itemElement, data);
-                
-                const parent = template.parentElement;
-                if (insertBefore) {
-                    parent.insertBefore(clone, insertBefore);
-                } else {
-                    parent.appendChild(clone);
-                }
-                
-                // Register the newly created element with the internal ID
-                const insertedElement = parent.lastElementChild;
-                if (insertedElement && insertedElement.hasAttribute('itemscope')) {
-                    this.registerElementWithInternalId(insertedElement, internalId);
-                }
-            }
-        });
-    }
-
-    async determineItemType(parentType, propName) {
-        const parentSchema = await this.registry.loadSchema(parentType);
-        
-        if (parentSchema) {
-            const property = parentSchema.properties.find(p => p.name === propName);
-            if (property) {
-                return property.type;
-            }
+            return element.getAttribute('content');
         }
         
-        // Try to infer from templates
-        return this.inferItemTypeFromTemplates(propName);
-    }
-
-    inferItemTypeFromTemplates(propName) {
-        const templates = Array.from(this.templates.values()).flat();
-        for (const template of templates) {
-            const templateItem = template.content.querySelector('[itemscope]');
-            if (templateItem && templateItem.getAttribute('itemprop') === propName) {
-                return templateItem.getAttribute('itemtype');
-            }
-        }
-        return null;
-    }
-
-    getTemplatesForType(itemType) {
-        const normalizedType = this.normalizeSchemaUrl(itemType);
-        return this.templates.get(normalizedType) || this.templates.get(itemType) || [];
-    }
-
-
-    /**
-     * Validate a property value against its type constraints
-     * @param {Object} target - The target item
-     * @param {string} prop - The property name
-     * @param {*} value - The value to validate
-     * @returns {boolean} True if the value is valid
-     */
-    validatePropertyValue(target, prop, value) {
-        try {
-            // Look up the property type from our mapping
-            const mapKey = `${target.type}:${prop}`;
-            const propertyType = this.propertyTypeMap.get(mapKey);
-            
-            if (propertyType) {
-                // Check if we have a validator for this type
-                const validator = this.registry.typeValidators.get(propertyType);
-                if (validator) {
-                    return validator(value);
-                }
-            }
-            
-            // No type mapping or validator found, allow the value
-            return true;
-        } catch (error) {
-            console.warn(`Validation error for ${prop}:`, error);
-            return true; // On error, allow the value (fail-open)
-        }
-    }
-
-    /**
-     * Discover and register enumeration schemas in the current document
-     */
-    discoverEnumerations() {
-        // Find all itemscope elements that might be schema definitions
-        const schemaElements = document.querySelectorAll('[itemscope][itemtype]');
-        
-        schemaElements.forEach(element => {
-            const itemType = element.getAttribute('itemtype');
-            
-            // Check if this element defines an enumeration schema
-            const parentElement = element.querySelector('[itemprop="parent"]');
-            if (parentElement) {
-                const parent = parentElement.textContent.trim() || parentElement.getAttribute('content');
-                
-                // If parent is Enumeration, this is an enumeration schema
-                if (parent === 'https://schema.org/Enumeration' || 
-                    parent === 'https://organised.team/Enumerated') {
-                    
-                    // Extract enumeration values from the document
-                    const values = this.registry.extractEnumerationValues(document, itemType);
-                    
-                    if (values.length > 0) {
-                        this.registry.registerEnumerationValidator(itemType, values);
-                        console.log(`Discovered enumeration: ${itemType} with values:`, values);
-                    }
-                }
-            }
-            
-            // Also check if this element defines properties with enumeration types
-            const properties = element.querySelectorAll('[itemscope][itemtype="https://organised.team/Property"]');
-            properties.forEach(propElement => {
-                const propName = propElement.querySelector('[itemprop="name"]')?.textContent?.trim();
-                const propType = propElement.querySelector('[itemprop="type"]')?.textContent?.trim();
-                
-                if (propName && propType) {
-                    const mapKey = `${itemType}:${propName}`;
-                    this.propertyTypeMap.set(mapKey, propType);
-                    console.log(`Mapped property: ${mapKey} → ${propType}`);
-                }
-            });
-        });
-    }
-
-    /**
-     * Set up DOM observation to detect changes and update microdata
-     */
-    observeChanges() {
-        const observer = new MutationObserver((mutations) => {
-            const changes = this.determineRequiredChanges(mutations);
-            
-            if (changes.shouldRefresh) {
-                this.refresh();
-            } else if (changes.propertiesToUpdate.size > 0) {
-                this.updatePropertiesFromDOM(changes.propertiesToUpdate);
-            }
-        });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['itemscope', 'itemtype', 'itemprop', 'itemid', 'content'],
-            characterData: true,
-            characterDataOldValue: true
-        });
-    }
-
-    /**
-     * Determine what changes are needed based on DOM mutations
-     * @param {Array<MutationRecord>} mutations - The DOM mutations
-     * @returns {Object} Object with shouldRefresh and propertiesToUpdate
-     */
-    determineRequiredChanges(mutations) {
-        let shouldRefresh = false;
-        const propertiesToUpdate = new Map();
-        
-        mutations.forEach(mutation => {
-            if (mutation.type === 'childList') {
-                const result = this.analyzeChildListMutation(mutation);
-                shouldRefresh = shouldRefresh || result.shouldRefresh;
-                result.propertiesToUpdate.forEach((prop, el) => propertiesToUpdate.set(el, prop));
-            } else if (mutation.type === 'attributes') {
-                shouldRefresh = shouldRefresh || this.analyzeAttributeMutation(mutation, propertiesToUpdate);
-            } else if (mutation.type === 'characterData') {
-                this.analyzeCharacterDataMutation(mutation, propertiesToUpdate);
-            }
-        });
-        
-        return { shouldRefresh, propertiesToUpdate };
-    }
-
-    analyzeChildListMutation(mutation) {
-        let shouldRefresh = false;
-        const propertiesToUpdate = new Map();
-        
-        const checkNodesForMicrodataChanges = (nodes) => {
-            nodes.forEach(node => {
-                if (node.nodeType === MicrodataAPI.NODE_TYPE.ELEMENT) {
-                    if (node.hasAttribute('itemscope') || node.querySelector?.('[itemscope]')) {
-                        shouldRefresh = true;
-                    } else if (node.hasAttribute('itemprop')) {
-                        propertiesToUpdate.set(node, node.getAttribute('itemprop'));
-                    }
-                }
-            });
-        };
-        
-        checkNodesForMicrodataChanges(mutation.addedNodes);
-        checkNodesForMicrodataChanges(mutation.removedNodes);
-        
-        if (mutation.target.hasAttribute('itemprop')) {
-            propertiesToUpdate.set(mutation.target, mutation.target.getAttribute('itemprop'));
+        if (element.tagName === 'A' && element.hasAttribute('href')) {
+            return element.href;
         }
         
-        return { shouldRefresh, propertiesToUpdate };
-    }
-
-    analyzeAttributeMutation(mutation, propertiesToUpdate) {
-        if (['itemscope', 'itemtype', 'itemprop', 'itemid'].includes(mutation.attributeName)) {
-            return true;
-        } else if (mutation.attributeName === 'content' && mutation.target.hasAttribute('itemprop')) {
-            propertiesToUpdate.set(mutation.target, mutation.target.getAttribute('itemprop'));
-        }
-        return false;
-    }
-
-    analyzeCharacterDataMutation(mutation, propertiesToUpdate) {
-        let element = mutation.target.parentElement;
-        while (element && !element.hasAttribute('itemprop')) {
-            element = element.parentElement;
-        }
-        if (element) {
-            propertiesToUpdate.set(element, element.getAttribute('itemprop'));
-        }
-    }
-
-    updatePropertiesFromDOM(propertiesToUpdate) {
-        this.isUpdatingFromDOM = true;
-        
-        try {
-            const itemsToUpdate = this.findItemsToUpdate(propertiesToUpdate);
-            
-            for (const [itemProxy, propNames] of itemsToUpdate) {
-                const itemElement = itemProxy._element;
-                
-                for (const propName of propNames) {
-                    const propElements = itemElement.querySelectorAll(`[itemprop="${propName}"]:not([itemscope])`);
-                    if (propElements.length > 0) {
-                        const newValue = this.extractor.extractPropertyValue(propElements[0]);
-                        itemProxy[propName] = newValue;
-                    }
-                }
-            }
-        } finally {
-            this.isUpdatingFromDOM = false;
-        }
-    }
-
-    findItemsToUpdate(propertiesToUpdate) {
-        const itemsToUpdate = new Map();
-        
-        for (const [element, propName] of propertiesToUpdate) {
-            const itemElement = this.findParentItemElement(element);
-            
-            if (itemElement) {
-                const foundItem = this.findItemByElement(itemElement);
-                
-                if (foundItem) {
-                    if (!itemsToUpdate.has(foundItem)) {
-                        itemsToUpdate.set(foundItem, new Set());
-                    }
-                    itemsToUpdate.get(foundItem).add(propName);
-                }
-            }
+        if (element.tagName === 'IMG' && element.hasAttribute('src')) {
+            return element.src;
         }
         
-        return itemsToUpdate;
-    }
-
-    findParentItemElement(element) {
-        let current = element;
-        while (current && !current.hasAttribute('itemscope')) {
-            current = current.parentElement;
-        }
-        return current;
-    }
-
-    findItemByElement(itemElement) {
-        // Check items with IDs
-        for (const [id, itemProxy] of this.items) {
-            if (itemProxy._element === itemElement) {
-                return itemProxy;
-            }
+        if (element.tagName === 'TIME' && element.hasAttribute('datetime')) {
+            return element.getAttribute('datetime');
         }
         
-        // Check items without IDs
-        for (const itemProxy of this.itemsWithoutId) {
-            if (itemProxy._element === itemElement) {
-                return itemProxy;
-            }
-        }
-        
-        return null;
+        // Default to text content
+        return element.textContent.trim();
     }
-
-    /**
-     * Generate a unique internal ID for tracking elements
-     * @returns {string} A unique internal ID
-     */
-    generateInternalId() {
-        return `__microdata_internal_${++this.internalIdCounter}`;
-    }
-
-    /**
-     * Generate and register a new internal ID for an element
-     * @param {Element} element - The element to register
-     * @returns {string} The generated internal ID
-     */
-    generateAndRegisterInternalId(element) {
-        const internalId = this.generateInternalId();
-        this.registerElementWithInternalId(element, internalId);
-        return internalId;
-    }
-
-    /**
-     * Register an element with an internal ID for tracking
-     * @param {Element} element - The DOM element to track
-     * @param {string} internalId - The internal ID to associate
-     */
-    registerElementWithInternalId(element, internalId) {
-        // Store the ID on the element as a non-enumerable property
-        if (!element[MicrodataAPI.MICRODATA_PROP]) {
-            Object.defineProperty(element, MicrodataAPI.MICRODATA_PROP, {
-                enumerable: false,
-                configurable: true,
-                value: {}
-            });
-        }
-        element[MicrodataAPI.MICRODATA_PROP].internalId = internalId;
-        
-        // Track in our maps
-        this.elementToInternalId.set(element, internalId);
-        
-        if (!this.internalIdToElements.has(internalId)) {
-            this.internalIdToElements.set(internalId, new Set());
-        }
-        this.internalIdToElements.get(internalId).add(element);
-    }
-
-    /**
-     * Get all elements associated with an internal ID
-     * @param {string} internalId - The internal ID
-     * @returns {Set<Element>} Set of elements with this ID
-     */
-    getElementsWithInternalId(internalId) {
-        return this.internalIdToElements.get(internalId) || new Set();
-    }
-
-    /**
-     * Clean up tracking for removed elements
-     * @param {Element} element - The element being removed
-     */
-    unregisterElement(element) {
-        const internalId = this.elementToInternalId.get(element);
-        if (internalId) {
-            this.elementToInternalId.delete(element);
-            const elements = this.internalIdToElements.get(internalId);
-            if (elements) {
-                elements.delete(element);
-                if (elements.size === 0) {
-                    this.internalIdToElements.delete(internalId);
-                }
-            }
-        }
-    }
-
-    updateCorrespondingElements(target, prop, value) {
-        // Get the internal ID from the element
-        const internalId = this.elementToInternalId.get(target.element);
-        
-        if (!internalId) {
-            // If no internal ID, this element wasn't created via our tracking system
+    
+    _setValue(element, value) {
+        // Handle nested microdata items
+        if (element.hasAttribute('itemscope')) {
+            // Cannot directly set nested items
+            console.warn('Cannot directly set value on nested itemscope element');
             return;
         }
         
-        // Get all elements with the same internal ID
-        const correspondingElements = this.getElementsWithInternalId(internalId);
+        // Handle various element types
+        if (element.hasAttribute('content')) {
+            element.setAttribute('content', value);
+        } else if (element.tagName === 'A' && element.hasAttribute('href')) {
+            element.href = value;
+        } else if (element.tagName === 'IMG' && element.hasAttribute('src')) {
+            element.src = value;
+        } else if (element.tagName === 'TIME' && element.hasAttribute('datetime')) {
+            element.setAttribute('datetime', value);
+        } else {
+            // Default to text content
+            element.textContent = value;
+        }
+    }
+    
+    validate() {
+        // TODO: Implement validation once Schema class is ready
+        return true;
+    }
+    
+    toJSON() {
+        const json = {
+            '@type': this['@type'],
+            '@context': this['@context']
+        };
         
-        // Update all corresponding elements
-        correspondingElements.forEach(element => {
-            if (element !== target.element) {
-                this.updatePropertyElements(element, prop, value);
+        const id = this['@id'];
+        if (id) {
+            json['@id'] = id;
+        }
+        
+        // Add all properties
+        const props = this._getAllPropertyNames();
+        for (const prop of props) {
+            const value = this._getProperty(prop);
+            if (value !== undefined) {
+                json[prop] = Array.isArray(value) 
+                    ? value.map(v => v instanceof MicrodataItem ? v.toJSON() : v)
+                    : value instanceof MicrodataItem ? value.toJSON() : value;
+            }
+        }
+        
+        return json;
+    }
+}
+
+/**
+ * MicrodataCollection - Collection that supports both array and object access
+ */
+class MicrodataCollection extends Array {
+    constructor() {
+        super();
+        this._indexById = new Map();
+        
+        return new Proxy(this, {
+            get: (target, prop) => {
+                // Handle numeric indices and array methods
+                if (!isNaN(prop) || prop in Array.prototype || prop === 'length') {
+                    return target[prop];
+                }
+                
+                // Handle internal properties
+                if (prop.startsWith('_')) {
+                    return target[prop];
+                }
+                
+                // Handle named access
+                if (target._indexById.has(prop)) {
+                    return target._indexById.get(prop);
+                }
+                
+                // Handle special methods
+                if (typeof target[prop] === 'function') {
+                    return target[prop];
+                }
+                
+                return undefined;
+            },
+            
+            has: (target, prop) => {
+                return !isNaN(prop) || target._indexById.has(prop);
+            },
+            
+            ownKeys: (target) => {
+                // Include numeric indices and named keys
+                const numericKeys = Array.from({ length: target.length }, (_, i) => String(i));
+                const namedKeys = Array.from(target._indexById.keys());
+                return [...numericKeys, 'length', ...namedKeys];
+            },
+            
+            getOwnPropertyDescriptor: (target, prop) => {
+                if (!isNaN(prop) || prop === 'length') {
+                    return Object.getOwnPropertyDescriptor(target, prop);
+                }
+                
+                if (target._indexById.has(prop)) {
+                    return {
+                        enumerable: true,
+                        configurable: true,
+                        get: () => target._indexById.get(prop)
+                    };
+                }
+                
+                return undefined;
             }
         });
     }
-
-    findParentWithItemscope(element) {
+    
+    _addItem(item) {
+        // Only add top-level items (not nested within other itemscopes)
+        if (this._isTopLevel(item._element)) {
+            this.push(item);
+            
+            // Index by ID if available
+            const id = item._element.getAttribute('id');
+            if (id) {
+                this._indexById.set(id, item);
+            }
+        }
+    }
+    
+    _removeItem(item) {
+        const index = this.indexOf(item);
+        if (index !== -1) {
+            this.splice(index, 1);
+            
+            // Remove from index
+            const id = item._element.getAttribute('id');
+            if (id) {
+                this._indexById.delete(id);
+            }
+        }
+    }
+    
+    _isTopLevel(element) {
+        // Check if element is nested within another itemscope
         let parent = element.parentElement;
-        while (parent && !parent.hasAttribute('itemscope')) {
+        while (parent) {
+            if (parent.hasAttribute('itemscope')) {
+                return false;
+            }
             parent = parent.parentElement;
         }
-        return parent;
+        return true;
     }
-
-    /**
-     * Get the main microdata proxy object that provides access to all items
-     * @returns {Proxy} The document.microdata proxy object
-     */
-    get microdata() {
-        const self = this;
-        return new Proxy({}, {
-            get(target, prop) {
-                // Handle toJSON for serialization
-                if (prop === 'toJSON') {
-                    return () => self.serializeAll();
-                }
-                
-                // Handle numeric indices for items without IDs
-                if (MicrodataAPI.isNumericIndex(prop)) {
-                    const index = parseInt(prop, 10);
-                    if (index >= 0 && index < self.itemsWithoutId.length) {
-                        return self.itemsWithoutId[index];
-                    }
-                }
-                
-                // Handle Symbol.iterator to make it iterable
-                if (prop === Symbol.iterator) {
-                    return function* () {
-                        for (const item of self.itemsWithoutId) {
-                            yield item;
-                        }
-                        for (const [, item] of self.items) {
-                            yield item;
-                        }
-                    };
-                }
-                
-                // Handle forEach and other array methods
-                if (prop === 'forEach') {
-                    return function(callback, thisArg) {
-                        let index = 0;
-                        for (const item of self.itemsWithoutId) {
-                            callback.call(thisArg, item, index++, this);
-                        }
-                        for (const [key, item] of self.items) {
-                            callback.call(thisArg, item, key, this);
-                        }
-                    };
-                }
-                
-                // Handle length property
-                if (prop === 'length') {
-                    return self.itemsWithoutId.length + self.items.size;
-                }
-                
-                // Try ID first
-                if (self.items.has(prop)) {
-                    return self.items.get(prop);
-                }
-                
-                // Try #id
-                if (self.items.has('#' + prop)) {
-                    return self.items.get('#' + prop);
-                }
-                
-                return undefined;
-            },
-            
-            ownKeys() {
-                const keys = [];
-                for (let i = 0; i < self.itemsWithoutId.length; i++) {
-                    keys.push(String(i));
-                }
-                // Add keys from items map, removing # prefix if present
-                for (const key of self.items.keys()) {
-                    keys.push(key.startsWith('#') ? key.substring(1) : key);
-                }
-                return keys;
-            },
-            
-            has(target, prop) {
-                if (MicrodataAPI.isNumericIndex(prop)) {
-                    const index = parseInt(prop, 10);
-                    return index >= 0 && index < self.itemsWithoutId.length;
-                }
-                return self.items.has(prop) || self.items.has('#' + prop);
-            },
-            
-            getOwnPropertyDescriptor(target, prop) {
-                // Check if property exists
-                if (MicrodataAPI.isNumericIndex(prop)) {
-                    const index = parseInt(prop, 10);
-                    if (index >= 0 && index < self.itemsWithoutId.length) {
-                        return {
-                            configurable: true,
-                            enumerable: true,
-                            value: self.itemsWithoutId[index]
-                        };
-                    }
-                } else if (self.items.has(prop) || self.items.has('#' + prop)) {
-                    const value = self.items.has(prop) ? self.items.get(prop) : self.items.get('#' + prop);
-                    return {
-                        configurable: true,
-                        enumerable: true,
-                        value: value
-                    };
-                }
-                return undefined;
+    
+    _refreshIndex() {
+        this._indexById.clear();
+        for (const item of this) {
+            const id = item._element.getAttribute('id');
+            if (id) {
+                this._indexById.set(id, item);
             }
+        }
+    }
+    
+    // Support Object.keys() on the collection
+    static keys(collection) {
+        return Array.from(collection._indexById.keys());
+    }
+}
+
+/**
+ * MicrodataObserver - Handles DOM mutations and updates microdata collections
+ */
+class MicrodataObserver {
+    constructor(collection) {
+        this.collection = collection;
+        this.observer = null;
+        this.itemElementMap = new WeakMap();
+    }
+    
+    start() {
+        // Initial scan
+        this._scanDocument();
+        
+        // Set up mutation observer
+        this.observer = new MutationObserver((mutations) => {
+            this._handleMutations(mutations);
+        });
+        
+        this.observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['itemscope', 'itemtype', 'itemid', 'itemref', 'itemprop'],
+            attributeOldValue: true
         });
     }
+    
+    stop() {
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+    }
+    
+    _scanDocument() {
+        // Find all top-level microdata items
+        const items = document.querySelectorAll('[itemscope]');
+        
+        for (const element of items) {
+            if (this.collection._isTopLevel(element)) {
+                const item = new MicrodataItem(element);
+                this.collection._addItem(item);
+                this.itemElementMap.set(element, item);
+            }
+        }
+    }
+    
+    _handleMutations(mutations) {
+        const addedElements = new Set();
+        const removedElements = new Set();
+        const modifiedElements = new Set();
+        
+        for (const mutation of mutations) {
+            if (mutation.type === 'childList') {
+                // Handle added nodes
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        this._collectMicrodataElements(node, addedElements);
+                    }
+                }
+                
+                // Handle removed nodes
+                for (const node of mutation.removedNodes) {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        this._collectMicrodataElements(node, removedElements);
+                    }
+                }
+            } else if (mutation.type === 'attributes') {
+                if (mutation.target.hasAttribute('itemscope')) {
+                    modifiedElements.add(mutation.target);
+                }
+            }
+        }
+        
+        // Process removed elements first
+        for (const element of removedElements) {
+            const item = this.itemElementMap.get(element);
+            if (item) {
+                this.collection._removeItem(item);
+                this.itemElementMap.delete(element);
+            }
+        }
+        
+        // Process added elements
+        for (const element of addedElements) {
+            if (this.collection._isTopLevel(element) && !this.itemElementMap.has(element)) {
+                const item = new MicrodataItem(element);
+                this.collection._addItem(item);
+                this.itemElementMap.set(element, item);
+            }
+        }
+        
+        // Process modified elements
+        for (const element of modifiedElements) {
+            // Re-index if ID changed
+            if (element.hasAttribute('id')) {
+                this.collection._refreshIndex();
+            }
+        }
+    }
+    
+    _collectMicrodataElements(root, set) {
+        if (root.hasAttribute('itemscope')) {
+            set.add(root);
+        }
+        
+        const items = root.querySelectorAll('[itemscope]');
+        for (const item of items) {
+            set.add(item);
+        }
+    }
+}
 
-    serializeAll() {
-        // If we only have items without IDs, return an array
-        if (this.items.size === 0 && this.itemsWithoutId.length > 0) {
-            return this.itemsWithoutId.map(item => this.serializeIfPossible(item));
-        }
-        
-        // Otherwise return an object
-        const result = {};
-        
-        // Add items with IDs as properties
-        for (const [key, item] of this.items) {
-            const serialized = this.serializeIfPossible(item);
-            if (serialized !== item) { // Only add if it was actually serializable
-                const propKey = key.startsWith('#') ? key.substring(1) : key;
-                result[propKey] = serialized;
+/**
+ * Initialize microdata API on document
+ */
+function initializeMicrodataAPI() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+    
+    // Create the main collection
+    const microdataCollection = new MicrodataCollection();
+    
+    // Set up the observer
+    const observer = new MicrodataObserver(microdataCollection);
+    
+    // Add microdata property to document
+    Object.defineProperty(document, 'microdata', {
+        get() {
+            return microdataCollection;
+        },
+        configurable: true
+    });
+    
+    // Add microdata property to elements
+    Object.defineProperty(Element.prototype, 'microdata', {
+        get() {
+            if (this.hasAttribute('itemscope')) {
+                // Check if we already have a MicrodataItem for this element
+                const existingItem = observer.itemElementMap.get(this);
+                if (existingItem) {
+                    return existingItem;
+                }
+                // Create a new one if not
+                return new MicrodataItem(this);
             }
-        }
-        
-        // Add items without IDs with numeric indices
-        for (let i = 0; i < this.itemsWithoutId.length; i++) {
-            const serialized = this.serializeIfPossible(this.itemsWithoutId[i]);
-            if (serialized !== this.itemsWithoutId[i]) { // Only add if it was actually serializable
-                result[i] = serialized;
-            }
-        }
-        
-        return result;
+            return undefined;
+        },
+        configurable: true
+    });
+    
+    // Start observing when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            observer.start();
+        });
+    } else {
+        observer.start();
     }
 }
 
 // Initialize the API
-const api = new MicrodataAPI();
+initializeMicrodataAPI();
 
-/**
- * Define document.microdata as a getter that returns the live microdata proxy
- * 
- * This provides the main entry point for accessing microdata:
- * - document.microdata.itemId - Access items by ID
- * - document.microdata[0] - Access items without ID by index
- * - document.microdata.forEach() - Iterate over all items
- * - for (const item of document.microdata) - Use iterator protocol
- * - JSON.stringify(document.microdata) - Serialize to JSON-LD
- */
-Object.defineProperty(document, 'microdata', {
-    get() {
-        return api.microdata;
+// Main Microdata namespace
+const Microdata = {
+    MicrodataItem,
+    MicrodataCollection,
+    
+    // Placeholder for future additions
+    Schema: class Schema {
+        constructor(url) {
+            this.url = url;
+            // TODO: Implement in Phase 2
+        }
     },
-    configurable: true
-});
+    
+    Template: class Template {
+        constructor(element) {
+            this.element = element;
+            // TODO: Implement in Phase 3
+        }
+    },
+    
+    fetch: async function(url) {
+        // TODO: Implement in Phase 5
+        throw new Error('Microdata.fetch not yet implemented');
+    }
+};
 
-// Expose API to global scope for debugging and advanced usage
-window.microdataAPI = api;
+// Export for use
+export { Microdata, MicrodataItem, MicrodataCollection };
+export default Microdata;
 
-// Export for module usage
-export { SchemaRegistry, MicrodataExtractor, MicrodataAPI };
+// Set up globals
+if (typeof window !== 'undefined') {
+    window.Microdata = Microdata;
+    window.Microdata.Schema = Microdata.Schema;
+    window.Microdata.Template = Microdata.Template;
+}
