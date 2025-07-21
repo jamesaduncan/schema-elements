@@ -2376,14 +2376,14 @@ class Microdata {
      * const person = element.microdata; // Microdata for that element
      */
     static async fetch(url) {
-        // Parse URL to check for fragment
-        const urlObj = new URL(url);
+        // Parse URL to check for fragment - resolve relative URLs against document base
+        const urlObj = new URL(url, document.baseURI);
         const fragment = urlObj.hash ? urlObj.hash.slice(1) : null;
         
-        // Fetch the HTML content
-        const response = await fetch(url);
+        // Fetch the HTML content using the resolved URL
+        const response = await fetch(urlObj.toString());
         if (!response.ok) {
-            throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to fetch ${urlObj.toString()}: ${response.status} ${response.statusText}`);
         }
         
         const html = await response.text();
@@ -2393,7 +2393,7 @@ class Microdata {
         const doc = parser.parseFromString(html, 'text/html');
         
         // Create document wrapper
-        const docWrapper = new FetchedDocument(doc, url);
+        const docWrapper = new FetchedDocument(doc, urlObj.toString());
         
         // If fragment specified, return element wrapper
         if (fragment) {

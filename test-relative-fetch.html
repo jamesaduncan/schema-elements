@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Relative URL Fetch Test</title>
+</head>
+<body>
+    <h1>Relative URL Fetch Test</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { Microdata } from './index.mjs';
+        
+        const results = document.getElementById('results');
+        
+        async function testRelativeFetch() {
+            try {
+                results.innerHTML = '<p>Testing relative URL resolution...</p>';
+                
+                // Test different relative URL formats
+                const testUrls = [
+                    '/test-fetch-data.html',  // Absolute path
+                    './test-fetch-data.html', // Relative path  
+                    'test-fetch-data.html'    // Relative filename
+                ];
+                
+                for (const url of testUrls) {
+                    try {
+                        results.innerHTML += `<p>Testing: ${url}</p>`;
+                        
+                        // This should resolve the URL against document.baseURI
+                        const resolvedUrl = new URL(url, document.baseURI);
+                        results.innerHTML += `<p>Resolves to: ${resolvedUrl.toString()}</p>`;
+                        
+                        // Try to fetch it
+                        const doc = await Microdata.fetch(url);
+                        results.innerHTML += `<p style="color: green;">✓ Successfully fetched: ${url}</p>`;
+                        results.innerHTML += `<p>Document has ${doc.microdata.length} microdata items</p>`;
+                        
+                    } catch (error) {
+                        results.innerHTML += `<p style="color: red;">✗ Failed to fetch ${url}: ${error.message}</p>`;
+                    }
+                    
+                    results.innerHTML += '<hr>';
+                }
+                
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">Test error: ${error.message}</p>`;
+                console.error(error);
+            }
+        }
+        
+        // Run test
+        testRelativeFetch();
+    </script>
+</body>
+</html>
