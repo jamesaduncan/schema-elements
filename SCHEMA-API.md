@@ -172,7 +172,7 @@ HTML Forms can be validated too:
             const ok = await schema.load(); // returns true or false, depending on if it is fetched and processed from the internet or not
             if ( ok ) {
                 console.log( schema.validate( document.forms[0] ) );
-                // should be true
+                // should be true                
             }            
         })
     </script>

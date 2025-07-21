@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Schema Validate Return Test</title>
+</head>
+<body>
+    <h1>Schema Validate Return Test</h1>
+    
+    <form id="credential-form">
+        <label>Username: <input name="username" value="johndoe"></label><br>
+        <label>Password: <input type="password" name="password" value="secret"></label><br>
+        <label>Roles:</label><br>
+        <label><input type="checkbox" name="role" value="admin" checked> Admin</label><br>
+        <label><input type="checkbox" name="role" value="editor" checked> Editor</label><br>
+        <label><input type="checkbox" name="role" value="writer"> Writer</label><br>
+        <label>Encryption: <input name="encryption" value="plaintext"></label><br>
+    </form>
+    
+    <template id="credential-template" itemscope itemtype="https://rustybeam.net/schema/Credential">
+        <div class="credential">
+            <h3>Credential: <span itemprop="username"></span></h3>
+            <p>Password: <span itemprop="password"></span></p>
+            <p>Encryption: <span itemprop="encryption"></span></p>
+            <p>Roles:</p>
+            <ul>
+                <li itemprop="role[]"></li>
+            </ul>
+        </div>
+    </template>
+    
+    <div id="results"></div>
+    <div id="rendered"></div>
+    
+    <script type="module">
+        import { Microdata, Schema, Template } from './index.mjs';
+        
+        async function testValidateReturn() {
+            const results = document.getElementById('results');
+            
+            try {
+                // Test RustyBeam.net schema
+                const schema = new Schema('https://rustybeam.net/schema/Credential');
+                const ok = await schema.load();
+                
+                results.innerHTML += `<p>Schema loaded: ${ok}</p>`;
+                results.innerHTML += `<p>Schema type: ${schema.constructor.name}</p>`;
+                
+                if (ok) {
+                    // Get form data
+                    const form = document.getElementById('credential-form');
+                    
+                    // Validate form - should return microdata object
+                    const microdata = schema.validate(form);
+                    
+                    results.innerHTML += `<p>Validate returned: ${typeof microdata}</p>`;
+                    results.innerHTML += `<p>Microdata @type: ${microdata['@type']}</p>`;
+                    results.innerHTML += `<p>Microdata @context: ${microdata['@context']}</p>`;
+                    results.innerHTML += `<p>Microdata.role is array: ${Array.isArray(microdata.role)}</p>`;
+                    results.innerHTML += `<p>Microdata.role: ${JSON.stringify(microdata.role)}</p>`;
+                    results.innerHTML += `<p>Full microdata:</p>`;
+                    results.innerHTML += `<pre>${JSON.stringify(microdata, null, 2)}</pre>`;
+                    
+                    // Now render the microdata
+                    const rendered = Template.render(microdata, '#credential-template');
+                    document.getElementById('rendered').appendChild(rendered);
+                }
+                
+                // Test Schema.org schema too
+                const personSchema = new Schema('https://schema.org/Person');
+                await personSchema.load();
+                
+                const personData = {
+                    name: 'John Doe',
+                    email: 'john@example.com',
+                    jobTitle: 'Developer'
+                };
+                
+                const personMicrodata = personSchema.validate(personData);
+                results.innerHTML += `<h2>Schema.org Test</h2>`;
+                results.innerHTML += `<p>Person microdata:</p>`;
+                results.innerHTML += `<pre>${JSON.stringify(personMicrodata, null, 2)}</pre>`;
+                
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error(error);
+            }
+        }
+        
+        // Run test
+        testValidateReturn();
+    </script>
+</body>
+</html>

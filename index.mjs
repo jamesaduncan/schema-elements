@@ -977,16 +977,45 @@ class Schema {
     
     static _extractMicrodataFromDocument(doc) {
         // Extract microdata from the document
-        // This is a simplified version - would need full microdata parsing
         const items = doc.querySelectorAll('[itemscope]');
-        if (items.length > 0) {
-            // Return first schema definition found
-            // In real implementation, would fully parse the microdata
-            return {
-                '@type': 'Schema',
-                '@context': 'https://rustybeam.net/schema/',
-                properties: []
-            };
+        
+        // For RustyBeam.net schemas, we need to handle their specific structure
+        // Look for the main Schema item
+        let schemaItem = null;
+        for (const item of items) {
+            const itemtype = item.getAttribute('itemtype');
+            if (itemtype && itemtype.includes('/Schema')) {
+                schemaItem = item;
+                break;
+            }
+        }
+        
+        if (!schemaItem) {
+            // Fallback to first itemscope
+            schemaItem = items[0];
+        }
+        
+        if (schemaItem) {
+            // Create a temporary MicrodataItem to extract the data
+            const tempItem = new MicrodataItem(schemaItem);
+            const data = tempItem.toJSON();
+            
+            // For RustyBeam.net schemas, properties might be separate items
+            // Look for Property items that are children or siblings
+            const propertyItems = doc.querySelectorAll('[itemtype*="/Property"]');
+            if (propertyItems.length > 0 && (!data.properties || Object.keys(data.properties).length === 0)) {
+                data.properties = {};
+                
+                for (const propItem of propertyItems) {
+                    const propMicrodata = new MicrodataItem(propItem);
+                    const propData = propMicrodata.toJSON();
+                    if (propData.name) {
+                        data.properties[propData.name] = propData;
+                    }
+                }
+            }
+            
+            return data;
         }
         return {};
     }
@@ -1048,18 +1077,27 @@ class SchemaOrgSchema {
         // Extract data from object
         const data = this._extractData(obj);
         
-        // Schema.org validation only checks property existence
-        // All properties are optional by default
-        for (const prop of Object.keys(data)) {
+        // Create a schema-compliant microdata object
+        const microdata = {
+            '@type': this._getType(),
+            '@context': this.url.substring(0, this.url.lastIndexOf('/') + 1)
+        };
+        
+        // Schema.org validation is permissive - include all properties
+        for (const [prop, value] of Object.entries(data)) {
             if (prop.startsWith('@')) continue; // Skip JSON-LD properties
             
-            // Just check if property is defined in schema (if we have schema data)
-            if (this.properties.size > 0 && !this.properties.has(prop)) {
-                // Property not in schema but Schema.org is permissive - continue silently
-            }
+            // Include the property even if not in schema (Schema.org is permissive)
+            microdata[prop] = value;
         }
         
-        return true; // Schema.org schemas are permissive
+        return microdata;
+    }
+    
+    _getType() {
+        // Extract type from URL (e.g., "Person" from "https://schema.org/Person")
+        const parts = this.url.split('/');
+        return parts[parts.length - 1];
     }
     
     _extractData(obj) {
@@ -1122,23 +1160,57 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
     }
     
     _parseSchemaData(data) {
+        // Clear existing properties
+        this.properties.clear();
+        this.propertyDefinitions.clear();
+        
+        if (!data) return;
+        
         // Parse property definitions from rustybeam.net schema format
-        if (data.properties && Array.isArray(data.properties)) {
-            // Handle array format
-            for (const prop of data.properties) {
-                if (prop['@type'] === 'Property' && prop.name) {
-                    this.propertyDefinitions.set(prop.name, {
-                        name: prop.name,
-                        type: prop.type,
-                        cardinality: prop.cardinality || '0..n',
-                        description: prop.description
-                    });
+        let propsToProcess = null;
+        
+        // Check different possible locations for properties
+        if (data.properties) {
+            propsToProcess = data.properties;
+        } else if (data.property) {
+            propsToProcess = Array.isArray(data.property) ? data.property : [data.property];
+        }
+        
+        if (propsToProcess) {
+            if (Array.isArray(propsToProcess)) {
+                // Handle array format
+                for (const prop of propsToProcess) {
+                    if (prop['@type'] === 'Property' && prop.name) {
+                        this.propertyDefinitions.set(prop.name, {
+                            name: prop.name,
+                            type: prop.type,
+                            cardinality: prop.cardinality || '0..n',
+                            description: prop.description
+                        });
+                        // Also add to parent's properties Set
+                        this.properties.add(prop.name);
+                    }
+                }
+            } else if (typeof propsToProcess === 'object') {
+                // Handle object format where properties are defined as keys
+                for (const [key, value] of Object.entries(propsToProcess)) {
+                    if (value && value['@type'] === 'Property') {
+                        const propName = value.name || key;
+                        this.propertyDefinitions.set(propName, {
+                            name: propName,
+                            type: value.type,
+                            cardinality: value.cardinality || '0..n',
+                            description: value.description
+                        });
+                        // Also add to parent's properties Set
+                        this.properties.add(propName);
+                    }
                 }
             }
         } else {
-            // Handle object format where properties are defined as keys
+            // Fallback: Check if properties are direct children of the data object
             for (const [key, value] of Object.entries(data)) {
-                if (key.startsWith('@')) continue; // Skip metadata
+                if (key.startsWith('@') || key === 'id' || key === 'name' || key === 'description') continue;
                 if (value && value['@type'] === 'Property') {
                     this.propertyDefinitions.set(key, {
                         name: value.name || key,
@@ -1146,6 +1218,8 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
                         cardinality: value.cardinality || '0..n',
                         description: value.description
                     });
+                    // Also add to parent's properties Set
+                    this.properties.add(key);
                 }
             }
         }
@@ -1198,12 +1272,54 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
             }
         }
         
+        // Create a schema-compliant microdata object
+        const microdata = {
+            '@type': this._getType(),
+            '@context': this.url.substring(0, this.url.lastIndexOf('/') + 1)
+        };
+        
+        // Process each property according to schema definition
+        for (const [propName, propDef] of this.propertyDefinitions) {
+            const value = data[propName];
+            
+            // Transform value based on cardinality requirements
+            const transformedValue = this._transformValueForCardinality(value, propDef.cardinality);
+            
+            // Add to microdata object if value exists
+            if (transformedValue !== undefined) {
+                microdata[propName] = transformedValue;
+            } else if (propDef.cardinality === '1' || propDef.cardinality === '1..n') {
+                // Required property is missing - add empty value based on cardinality
+                microdata[propName] = propDef.cardinality === '1..n' ? [] : null;
+            }
+        }
+        
+        // Include any additional properties not in schema
+        for (const [prop, value] of Object.entries(data)) {
+            if (!microdata.hasOwnProperty(prop) && !prop.startsWith('@')) {
+                microdata[prop] = value;
+            }
+        }
+        
         // HTML5 form validation integration
-        if (obj instanceof HTMLFormElement && !isValid) {
+        if (obj instanceof HTMLFormElement && validationErrors.length > 0) {
             this._applyHTML5Validation(obj, validationErrors);
         }
         
-        return isValid;
+        // Fire validation event if there were errors
+        if (validationErrors.length > 0 && obj instanceof Element) {
+            const event = new CustomEvent('DOMSchemaInvalidData', {
+                detail: {
+                    schema: this.url,
+                    errors: validationErrors,
+                    microdata: microdata
+                },
+                bubbles: true
+            });
+            obj.dispatchEvent(event);
+        }
+        
+        return microdata;
     }
     
     _validateCardinality(value, cardinality) {
@@ -1253,6 +1369,26 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
         }
         
         return null;
+    }
+    
+    _transformValueForCardinality(value, cardinality) {
+        // Transform value based on cardinality requirements
+        if (cardinality === '1') {
+            // Single required value
+            return Array.isArray(value) ? value[0] : value;
+        } else if (cardinality === '0..1') {
+            // Optional single value
+            return Array.isArray(value) ? value[0] : value;
+        } else if (cardinality === '1..n' || cardinality === '0..n') {
+            // Multiple values - ensure array
+            if (value === undefined) {
+                return cardinality === '0..n' ? [] : undefined;
+            }
+            return Array.isArray(value) ? value : [value];
+        }
+        
+        // Default case
+        return value;
     }
     
     async _loadDataTypes() {

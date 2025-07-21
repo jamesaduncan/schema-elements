@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Schema Loading Test</title>
+</head>
+<body>
+    <h1>Schema Loading Test</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { Microdata, Schema } from './index.mjs';
+        
+        const results = document.getElementById('results');
+        
+        async function testSchemaLoading() {
+            try {
+                results.innerHTML = '<p>Testing RustyBeam.net schema loading...</p>';
+                
+                // Clear cache
+                Schema.clearCache();
+                
+                // Create and load schema
+                const cs = new Schema('https://rustybeam.net/schema/HostConfig');
+                console.log('Schema created:', cs);
+                console.log('Schema type:', cs.constructor.name);
+                
+                const loaded = await cs.load();
+                console.log('Load result:', loaded);
+                console.log('Schema data:', cs.data);
+                console.log('Schema properties:', cs.properties);
+                console.log('Schema propertyDefinitions:', cs.propertyDefinitions);
+                
+                results.innerHTML += `
+                    <p>Load result: ${loaded}</p>
+                    <p>Schema type: ${cs.constructor.name}</p>
+                    <p>Properties size: ${cs.properties.size}</p>
+                    <p>Properties: ${Array.from(cs.properties).join(', ')}</p>
+                    ${cs.propertyDefinitions ? 
+                        `<p>PropertyDefinitions size: ${cs.propertyDefinitions.size}</p>
+                         <p>PropertyDefinitions: ${Array.from(cs.propertyDefinitions.keys()).join(', ')}</p>` : 
+                        '<p>No propertyDefinitions</p>'}
+                    <p>Schema data: <pre>${JSON.stringify(cs.data, null, 2)}</pre></p>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                results.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run test
+        testSchemaLoading();
+    </script>
+</body>
+</html>
