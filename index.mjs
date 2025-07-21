@@ -366,6 +366,11 @@ class MicrodataCollection extends Array {
         
         return new Proxy(this, {
             get: (target, prop) => {
+                // Handle symbols (like Symbol.iterator)
+                if (typeof prop === 'symbol') {
+                    return target[prop];
+                }
+                
                 // Handle numeric indices and array methods
                 if (!isNaN(prop) || prop in Array.prototype || prop === 'length') {
                     return target[prop];
@@ -390,6 +395,9 @@ class MicrodataCollection extends Array {
             },
             
             has: (target, prop) => {
+                if (typeof prop === 'symbol') {
+                    return prop in target;
+                }
                 return !isNaN(prop) || target._indexById.has(prop);
             },
             
@@ -637,22 +645,6 @@ function initializeMicrodataAPI() {
 
 // Initialize the API
 initializeMicrodataAPI();
-
-// Main Microdata namespace
-const Microdata = {
-    MicrodataItem,
-    MicrodataCollection,
-    
-    // Schema classes will be defined below
-    Schema: null, // Will be set after class definitions
-    
-    Template: null, // Will be set after class definition
-    
-    fetch: async function(url) {
-        // TODO: Implement in Phase 5
-        throw new Error('Microdata.fetch not yet implemented');
-    }
-};
 
 /**
  * Schema Loading and Caching System
@@ -1163,9 +1155,6 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
     }
 }
 
-// Set the Schema class on Microdata
-Microdata.Schema = Schema;
-
 /**
  * Template Class - Handles rendering of microdata to templates
  */
@@ -1555,9 +1544,6 @@ class Template {
     }
 }
 
-// Set the Template class on Microdata
-Microdata.Template = Template;
-
 // Initialize schema loading on DOM ready
 let schemasLoading = false;
 
@@ -1782,6 +1768,180 @@ class TemplateSynchronizer {
 // Initialize template synchronizer
 const templateSynchronizer = new TemplateSynchronizer();
 
+/**
+ * FetchedDocument - Wrapper for fetched documents with microdata support
+ */
+class FetchedDocument {
+    constructor(document, url) {
+        this._document = document;
+        this._url = url;
+        this._microdata = null;
+        this._observer = null;
+    }
+    
+    get microdata() {
+        if (!this._microdata) {
+            // Create isolated microdata collection for this document
+            this._microdata = new MicrodataCollection();
+            this._observer = new FetchedDocumentObserver(this._microdata, this._document);
+            this._observer.start();
+        }
+        return this._microdata;
+    }
+    
+    getElementById(id) {
+        const element = this._document.getElementById(id);
+        return element ? new FetchedElement(element, this) : null;
+    }
+    
+    querySelector(selector) {
+        const element = this._document.querySelector(selector);
+        return element ? new FetchedElement(element, this) : null;
+    }
+    
+    querySelectorAll(selector) {
+        const elements = this._document.querySelectorAll(selector);
+        return Array.from(elements).map(el => new FetchedElement(el, this));
+    }
+}
+
+/**
+ * FetchedElement - Wrapper for elements from fetched documents
+ */
+class FetchedElement {
+    constructor(element, document) {
+        this._element = element;
+        this._document = document;
+        this._microdata = null;
+    }
+    
+    get microdata() {
+        if (!this._element.hasAttribute('itemscope')) {
+            return null;
+        }
+        
+        if (!this._microdata) {
+            this._microdata = new MicrodataItem(this._element);
+        }
+        return this._microdata;
+    }
+    
+    get id() {
+        return this._element.id;
+    }
+    
+    getAttribute(name) {
+        return this._element.getAttribute(name);
+    }
+    
+    querySelector(selector) {
+        const element = this._element.querySelector(selector);
+        return element ? new FetchedElement(element, this._document) : null;
+    }
+    
+    querySelectorAll(selector) {
+        const elements = this._element.querySelectorAll(selector);
+        return Array.from(elements).map(el => new FetchedElement(el, this._document));
+    }
+}
+
+/**
+ * FetchedDocumentObserver - Handles microdata for fetched documents
+ */
+class FetchedDocumentObserver extends MicrodataObserver {
+    constructor(collection, document) {
+        super(collection);
+        this.document = document;
+    }
+    
+    start() {
+        // Scan the fetched document
+        this._scanDocument();
+        
+        // Note: We don't set up mutation observers for fetched documents
+        // as they are static snapshots
+    }
+    
+    _scanDocument() {
+        // Find all itemscope elements in the fetched document
+        const items = this.document.querySelectorAll('[itemscope]');
+        
+        // Clear existing collection
+        this.collection.length = 0;
+        this.collection._refreshIndex();
+        
+        // Add only top-level items
+        for (const element of items) {
+            if (this._isTopLevel(element)) {
+                const item = new MicrodataItem(element);
+                this.collection._addItem(item);
+                this.itemElementMap.set(element, item);
+            }
+        }
+    }
+    
+    _isTopLevel(element) {
+        let parent = element.parentElement;
+        while (parent) {
+            if (parent.hasAttribute('itemscope')) {
+                return false;
+            }
+            parent = parent.parentElement;
+        }
+        return true;
+    }
+}
+
+/**
+ * Microdata namespace
+ */
+class Microdata {
+    constructor() {
+        throw new Error('Microdata is a static class and cannot be instantiated');
+    }
+    
+    /**
+     * Fetch microdata from a remote URL
+     * @param {string} url - The URL to fetch
+     * @returns {Promise<Object>} Document-like or element-like object with microdata
+     */
+    static async fetch(url) {
+        // Parse URL to check for fragment
+        const urlObj = new URL(url);
+        const fragment = urlObj.hash ? urlObj.hash.slice(1) : null;
+        
+        // Fetch the HTML content
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+        }
+        
+        const html = await response.text();
+        
+        // Parse HTML into a document
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Create document wrapper
+        const docWrapper = new FetchedDocument(doc, url);
+        
+        // If fragment specified, return element wrapper
+        if (fragment) {
+            const element = doc.getElementById(fragment);
+            if (!element) {
+                throw new Error(`Fragment #${fragment} not found in document`);
+            }
+            return new FetchedElement(element, docWrapper);
+        }
+        
+        return docWrapper;
+    }
+}
+
+// Set Microdata static properties
+Microdata.Schema = Schema;
+Microdata.Template = Template;
+
 // Start synchronizer when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -1799,5 +1959,5 @@ export default Microdata;
 if (typeof window !== 'undefined') {
     window.Microdata = Microdata;
     window.Microdata.Schema = Schema;
-    window.Microdata.Template = Microdata.Template;
+    window.Microdata.Template = Template;
 }

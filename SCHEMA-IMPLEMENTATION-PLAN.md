@@ -156,24 +156,24 @@ This document outlines the complete implementation plan for the Microdata API as
 - [x] Render to template
 - [x] Maintain form state in rendered output
 
-## Phase 5: Fetch API
+## Phase 5: Fetch API ✅
 
 ### 5.1 Microdata.fetch Implementation
-- [ ] Create static fetch method on Microdata class
-- [ ] Fetch HTML content from URL
-- [ ] Parse HTML into Document
-- [ ] Create document-like wrapper object
-- [ ] Add isolated microdata property
-- [ ] Support fragment identifiers (#id)
-- [ ] Extract specific element for fragments
-- [ ] Return element-like wrapper for fragments
+- [x] Create static fetch method on Microdata class
+- [x] Fetch HTML content from URL
+- [x] Parse HTML into Document
+- [x] Create document-like wrapper object
+- [x] Add isolated microdata property
+- [x] Support fragment identifiers (#id)
+- [x] Extract specific element for fragments
+- [x] Return element-like wrapper for fragments
 
 ### 5.2 Fetched Document Handling
-- [ ] Parse microdata in fetched document
-- [ ] Create separate MicrodataCollection
-- [ ] Ensure no cross-document itemref
-- [ ] Maintain isolation from main document
-- [ ] Support microdata operations on fetched content
+- [x] Parse microdata in fetched document
+- [x] Create separate MicrodataCollection
+- [x] Ensure no cross-document itemref
+- [x] Maintain isolation from main document
+- [x] Support microdata operations on fetched content
 
 ## Phase 6: Event System
 

@@ -22,7 +22,7 @@
         
         <!-- Person template from API doc -->
         <template id="person-template">
-            <div class="card" itemscope itemtype="http://schema.org/Person">
+            <div class="card" itemscope itemtype="https://schema.org/Person">
                 <h1 itemprop="name"></h1>
                 <dl>
                     <div>
@@ -195,7 +195,7 @@
                 const schemas = template.schemas;
                 assert(Array.isArray(schemas), 'schemas should be an array');
                 assert(schemas.length === 1, 'Should have one schema');
-                assert(schemas[0] === 'http://schema.org/Person', 'Should extract schema URL');
+                assert(schemas[0] === 'https://schema.org/Person', 'Should extract schema URL');
             });
             
             // Test validate method

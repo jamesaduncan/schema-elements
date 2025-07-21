@@ -270,7 +270,7 @@ Microdata Objects can be rendered to templates:
 
     ```html
     <template id="person-template">
-        <div class="card" itemscope itemtype="http://schema.org/Person">
+        <div class="card" itemscope itemtype="https://schema.org/Person">
             <h1 itemprop="name"></h1>
             <dl>
                 <div>
@@ -323,7 +323,7 @@ HTML Fragments, elements or documents containing microdata can also be rendered:
 
     ```html
     <template id="person-template">
-        <div class="card" itemscope itemtype="http://schema.org/Person">
+        <div class="card" itemscope itemtype="https://schema.org/Person">
             <h1 itemprop="name"></h1>
             <dl>
                 <div>

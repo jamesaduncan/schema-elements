@@ -136,7 +136,7 @@
         
         <!-- Person template -->
         <template id="person-template">
-            <div class="card" itemscope itemtype="http://schema.org/Person">
+            <div class="card" itemscope itemtype="https://schema.org/Person">
                 <h1 itemprop="name"></h1>
                 <p>Email: <span itemprop="email"></span></p>
                 <p>Birthday: <span itemprop="birthdate"></span></p>
@@ -206,7 +206,7 @@
             // Test 4.1: Form Data Extraction
             test('Extract basic form inputs', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(data.username === 'testuser', 'Should extract text input');
@@ -216,7 +216,7 @@
             
             test('Extract textarea', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(data.bio === 'This is my bio text.', 'Should extract textarea value');
@@ -224,7 +224,7 @@
             
             test('Extract select single', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(data.role === 'editor', 'Should extract selected option');
@@ -232,7 +232,7 @@
             
             test('Extract select multiple', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(Array.isArray(data.permissions), 'Should extract as array');
@@ -243,7 +243,7 @@
             
             test('Extract radio buttons', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(data.status === 'active', 'Should extract checked radio value');
@@ -251,7 +251,7 @@
             
             test('Extract checkbox arrays', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(Array.isArray(data.notifications), 'Should extract as array');
@@ -262,7 +262,7 @@
             
             test('Extract other input types', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(data.age === '25', 'Should extract number input');
@@ -359,7 +359,7 @@
                     <input type="checkbox" name="options" value="opt3" checked>
                 `;
                 
-                const schema = new SchemaOrgSchema('http://schema.org/Thing', {});
+                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
                 const data = schema._extractData(form);
                 
                 assert(data.agree === 'yes', 'Single checkbox should have value');

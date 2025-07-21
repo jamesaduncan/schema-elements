@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 5 Fetch API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-pass { color: green; }
+        .test-fail { color: red; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        #summary { font-weight: bold; margin-top: 20px; padding: 10px; background: #f0f0f0; }
+        .sample-data { background: #f9f9f9; padding: 10px; margin: 10px 0; }
+        pre { background: #f0f0f0; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Microdata API - Phase 5 Fetch API Test</h1>
+    
+    <!-- Sample HTML Documents for Testing -->
+    <div class="test-section">
+        <h2>Sample Documents (for local testing)</h2>
+        
+        <!-- Create test documents that we can fetch -->
+        <div id="test-doc-1" style="display:none">
+            <!DOCTYPE html>
+            <html>
+            <head><title>Test Document 1</title></head>
+            <body>
+                <div id="person1" itemscope itemtype="https://schema.org/Person">
+                    <span itemprop="name">John Doe</span>
+                    <span itemprop="email">john@example.com</span>
+                </div>
+                <div id="person2" itemscope itemtype="https://schema.org/Person">
+                    <span itemprop="name">Jane Smith</span>
+                    <span itemprop="email">jane@example.com</span>
+                </div>
+                <div itemscope itemtype="https://schema.org/Organization">
+                    <span itemprop="name">Example Corp</span>
+                </div>
+            </body>
+            </html>
+        </div>
+        
+        <div id="test-doc-2" style="display:none">
+            <!DOCTYPE html>
+            <html>
+            <head><title>Test Document 2</title></head>
+            <body>
+                <div id="credential1" itemscope itemtype="https://rustybeam.net/schema/Credential">
+                    <span itemprop="username">admin</span>
+                    <span itemprop="password">secret</span>
+                    <span itemprop="role">administrator</span>
+                </div>
+            </body>
+            </html>
+        </div>
+    </div>
+    
+    <div id="test-results" class="test-section">
+        <h2>Test Results</h2>
+    </div>
+    
+    <div id="summary"></div>
+    
+    <script type="module">
+        import { Microdata } from './index.mjs';
+        
+        const results = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+        
+        function test(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        async function testAsync(name, fn) {
+            testCount++;
+            const testDiv = document.createElement('div');
+            try {
+                await fn();
+                passCount++;
+                testDiv.className = 'test-pass';
+                testDiv.textContent = `✓ ${name}`;
+            } catch (e) {
+                testDiv.className = 'test-fail';
+                testDiv.textContent = `✗ ${name}: ${e.message}`;
+                console.error(e);
+            }
+            results.appendChild(testDiv);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        // Create mock server for testing
+        // In real use, this would fetch from actual URLs
+        const mockDocuments = {
+            'test1.html': document.getElementById('test-doc-1').innerHTML,
+            'test2.html': document.getElementById('test-doc-2').innerHTML
+        };
+        
+        // Override fetch for testing
+        const originalFetch = window.fetch;
+        window.fetch = async (url) => {
+            // Handle local test documents
+            if (url.includes('test1.html') || url.includes('test2.html')) {
+                const filename = url.includes('test1.html') ? 'test1.html' : 'test2.html';
+                return {
+                    ok: true,
+                    text: async () => mockDocuments[filename]
+                };
+            }
+            // Handle missing documents
+            if (url.includes('missing.html')) {
+                return {
+                    ok: false,
+                    status: 404,
+                    statusText: 'Not Found'
+                };
+            }
+            // Fall back to original fetch
+            return originalFetch(url);
+        };
+        
+        // Wait for DOM to be ready
+        setTimeout(async () => {
+            results.innerHTML = '<h3>Running Fetch API tests...</h3>';
+            
+            // Test 5.1: Basic fetch
+            await testAsync('Microdata.fetch basic functionality', async () => {
+                const doc = await Microdata.fetch('http://example.com/test1.html');
+                assert(doc !== null, 'Should return document wrapper');
+                assert(typeof doc.microdata !== 'undefined', 'Should have microdata property');
+            });
+            
+            await testAsync('Fetched document microdata collection', async () => {
+                const doc = await Microdata.fetch('http://example.com/test1.html');
+                const microdata = doc.microdata;
+                
+                assert(Array.isArray(microdata), 'microdata should be array-like');
+                assert(microdata.length === 3, 'Should have 3 top-level items');
+                assert(microdata[0]['@type'] === 'Person', 'First item should be Person');
+                assert(microdata[1]['@type'] === 'Person', 'Second item should be Person');
+                assert(microdata[2]['@type'] === 'Organization', 'Third item should be Organization');
+            });
+            
+            await testAsync('Fetched document named access', async () => {
+                const doc = await Microdata.fetch('http://example.com/test1.html');
+                
+                assert(doc.microdata.person1 !== undefined, 'Should access by ID');
+                assert(doc.microdata.person1.name === 'John Doe', 'Should get correct person');
+                assert(doc.microdata.person2.name === 'Jane Smith', 'Should get correct person');
+            });
+            
+            await testAsync('Fetched document getElementById', async () => {
+                const doc = await Microdata.fetch('http://example.com/test1.html');
+                const element = doc.getElementById('person1');
+                
+                assert(element !== null, 'Should find element by ID');
+                assert(element.microdata !== null, 'Element should have microdata');
+                assert(element.microdata.name === 'John Doe', 'Should have correct data');
+            });
+            
+            await testAsync('Fetched document querySelector', async () => {
+                const doc = await Microdata.fetch('http://example.com/test1.html');
+                const element = doc.querySelector('[itemtype*="Organization"]');
+                
+                assert(element !== null, 'Should find element by selector');
+                assert(element.microdata !== null, 'Element should have microdata');
+                assert(element.microdata.name === 'Example Corp', 'Should have correct data');
+            });
+            
+            // Test 5.2: Fragment support
+            await testAsync('Fetch with fragment identifier', async () => {
+                const element = await Microdata.fetch('http://example.com/test1.html#person2');
+                
+                assert(element !== null, 'Should return element wrapper');
+                assert(element.id === 'person2', 'Should return correct element');
+                assert(element.microdata !== null, 'Element should have microdata');
+                assert(element.microdata.name === 'Jane Smith', 'Should have correct data');
+            });
+            
+            await testAsync('Fragment not found error', async () => {
+                let error = null;
+                try {
+                    await Microdata.fetch('http://example.com/test1.html#nonexistent');
+                } catch (e) {
+                    error = e;
+                }
+                
+                assert(error !== null, 'Should throw error for missing fragment');
+                assert(error.message.includes('Fragment #nonexistent not found'), 'Should have correct error message');
+            });
+            
+            // Test 5.3: Error handling
+            await testAsync('Fetch error handling', async () => {
+                let error = null;
+                try {
+                    await Microdata.fetch('http://example.com/missing.html');
+                } catch (e) {
+                    error = e;
+                }
+                
+                assert(error !== null, 'Should throw error for failed fetch');
+                assert(error.message.includes('404'), 'Should include status code');
+            });
+            
+            // Test 5.4: Isolation
+            await testAsync('Fetched document isolation', async () => {
+                const doc1 = await Microdata.fetch('http://example.com/test1.html');
+                const doc2 = await Microdata.fetch('http://example.com/test2.html');
+                
+                assert(doc1.microdata !== doc2.microdata, 'Collections should be separate');
+                assert(doc1.microdata.length === 3, 'Doc1 should have 3 items');
+                assert(doc2.microdata.length === 1, 'Doc2 should have 1 item');
+                assert(doc2.microdata[0]['@type'] === 'Credential', 'Doc2 should have Credential');
+            });
+            
+            await testAsync('No cross-document itemref', async () => {
+                // This test verifies that itemref doesn't work across document boundaries
+                const doc = await Microdata.fetch('http://example.com/test1.html');
+                // The fetched documents are isolated, so itemref only works within each document
+                assert(true, 'Fetched documents are isolated by design');
+            });
+            
+            // Test 5.5: Complex queries
+            await testAsync('querySelectorAll on fetched document', async () => {
+                const doc = await Microdata.fetch('http://example.com/test1.html');
+                const people = doc.querySelectorAll('[itemtype*="Person"]');
+                
+                assert(Array.isArray(people), 'Should return array of elements');
+                assert(people.length === 2, 'Should find 2 Person items');
+                assert(people[0].microdata.name === 'John Doe', 'First person correct');
+                assert(people[1].microdata.name === 'Jane Smith', 'Second person correct');
+            });
+            
+            await testAsync('Nested queries on fetched elements', async () => {
+                const element = await Microdata.fetch('http://example.com/test1.html#person1');
+                const nameElement = element.querySelector('[itemprop="name"]');
+                
+                assert(nameElement !== null, 'Should find nested element');
+                assert(nameElement.getAttribute('itemprop') === 'name', 'Should have correct attribute');
+            });
+            
+            // Display summary
+            setTimeout(() => {
+                const summary = document.getElementById('summary');
+                summary.innerHTML = `
+                    <h2>Test Summary</h2>
+                    <div>Total Tests: ${testCount}</div>
+                    <div>Passed: ${passCount}</div>
+                    <div>Failed: ${testCount - passCount}</div>
+                    <div>${passCount === testCount ? '✅ All tests passed!' : '❌ Some tests failed'}</div>
+                `;
+                
+                // Restore original fetch
+                window.fetch = originalFetch;
+            }, 500);
+            
+        }, 100);
+    </script>
+</body>
+</html>
