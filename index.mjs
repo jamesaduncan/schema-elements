@@ -1657,8 +1657,16 @@ class Template {
             const value = data[propName];
             
             if (value === undefined || value === null) {
-                // Remove elements for missing properties
-                group.elements.forEach(el => el.remove());
+                // Clear the content but keep the element
+                group.elements.forEach(el => {
+                    if (el.hasAttribute('content')) {
+                        el.setAttribute('content', '');
+                    } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                        el.value = '';
+                    } else {
+                        el.textContent = '';
+                    }
+                });
                 continue;
             }
             

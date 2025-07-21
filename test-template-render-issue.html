@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Template Render Issue Test</title>
+</head>
+<body>
+    <h1>Template Render Issue Test</h1>
+    
+    <!-- Template -->
+    <template id="person-template">
+        <div itemscope itemtype="https://schema.org/Person">
+            <meta itemprop="email" content="">
+            <span itemprop="name"></span> (<button onclick="document.logout()">Log Out</button>)
+        </div>
+    </template>
+    
+    <!-- Source microdata -->
+    <div id="person-data" itemscope itemtype="https://schema.org/Person">
+        <span itemprop="email">jamesaduncan@mac.com</span>
+        <span itemprop="name">James A. Duncan</span>
+        <link itemprop="image" href="https://avatars.githubusercontent.com/u/17441?v=4">
+    </div>
+    
+    <div id="results"></div>
+    <div id="output"></div>
+    
+    <script type="module">
+        import { Microdata, Template } from './index.mjs';
+        
+        const results = document.getElementById('results');
+        const output = document.getElementById('output');
+        
+        try {
+            // Get the microdata
+            const userData = document.getElementById('person-data').microdata;
+            
+            results.innerHTML = '<h2>User Data:</h2>';
+            results.innerHTML += `<pre>${JSON.stringify(userData, null, 2)}</pre>`;
+            
+            // Log individual properties
+            results.innerHTML += '<h2>Individual Properties:</h2>';
+            results.innerHTML += `<p>userData.name = ${userData.name}</p>`;
+            results.innerHTML += `<p>userData.email = ${userData.email}</p>`;
+            results.innerHTML += `<p>userData.image = ${userData.image}</p>`;
+            results.innerHTML += `<p>userData['@type'] = ${userData['@type']}</p>`;
+            
+            // Test 1: Try static render (looks for template automatically)
+            results.innerHTML += '<h2>Test 1: Static render</h2>';
+            try {
+                const rendered1 = Template.render(userData);
+                output.appendChild(rendered1);
+                results.innerHTML += '<p style="color: green;">✓ Static render succeeded</p>';
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Static render failed: ${error.message}</p>`;
+            }
+            
+            // Test 2: Try with specific template
+            results.innerHTML += '<h2>Test 2: Render with specific template</h2>';
+            try {
+                const template = document.getElementById('person-template');
+                const rendered2 = Template.render(userData, template);
+                output.appendChild(rendered2);
+                results.innerHTML += '<p style="color: green;">✓ Specific template render succeeded</p>';
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Specific template render failed: ${error.message}</p>`;
+            }
+            
+            // Test 3: Direct template instance
+            results.innerHTML += '<h2>Test 3: Direct template instance</h2>';
+            try {
+                const template = document.getElementById('person-template');
+                const tmpl = new Template(template);
+                const rendered3 = tmpl.render(userData);
+                output.appendChild(rendered3);
+                results.innerHTML += '<p style="color: green;">✓ Direct instance render succeeded</p>';
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Direct instance render failed: ${error.message}</p>`;
+            }
+            
+        } catch (error) {
+            results.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            console.error(error);
+        }
+    </script>
+</body>
+</html>
