@@ -1492,8 +1492,11 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
  */
 class Template {
     constructor(element) {
-        if (!element || !(element instanceof HTMLTemplateElement)) {
-            throw new Error('Template requires an HTMLTemplateElement');
+        if (!element) {
+            throw new Error('Template element is null or undefined - make sure the template exists in the DOM');
+        }
+        if (!(element instanceof HTMLTemplateElement)) {
+            throw new Error(`Template requires an HTMLTemplateElement, got ${element.constructor.name}`);
         }
         
         this.element = element;
