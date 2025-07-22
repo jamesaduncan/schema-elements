@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TBody Rendering Trace</title>
+    <style>
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px; font-family: monospace; }
+        table { border-collapse: collapse; }
+        td { border: 1px solid #ddd; padding: 8px; }
+    </style>
+</head>
+<body>
+    <h1>TBody Template Rendering - Full Trace</h1>
+    
+    <div class="debug" id="debug"></div>
+    
+    <h2>Expected Output:</h2>
+    <table>
+        <tbody>
+            <tr>
+                <td>test1</td>
+                <td>Text</td>
+            </tr>
+            <tr>
+                <td>test2</td>
+                <td>URL</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <h2>Actual Output:</h2>
+    <div id="output"></div>
+    
+    <template id="test-template">
+        <tbody>
+            <tr itemprop="property[]" itemscope itemtype="https://organised.team/Property">
+                <td itemprop="name"></td>
+                <td itemprop="type"></td>
+            </tr>
+        </tbody>
+    </template>
+    
+    <script type="module">
+        import { Microdata, Template } from './index.mjs';
+        
+        const debug = document.getElementById('debug');
+        const output = document.getElementById('output');
+        
+        // Override some methods to trace execution
+        const originalRenderData = Template.prototype._renderData;
+        const originalRenderArray = Template.prototype._renderArrayProperty;
+        
+        let indent = 0;
+        function log(msg) {
+            debug.innerHTML += '  '.repeat(indent) + msg + '<br>';
+        }
+        
+        Template.prototype._renderData = function(element, data) {
+            indent++;
+            log(`_renderData called on <${element.tagName}> with data keys: ${Object.keys(data).join(', ')}`);
+            const result = originalRenderData.call(this, element, data);
+            indent--;
+            return result;
+        };
+        
+        Template.prototype._renderArrayProperty = function(propName, elements, value) {
+            indent++;
+            log(`_renderArrayProperty called: propName="${propName}", ${elements.length} elements, ${Array.isArray(value) ? value.length : 1} values`);
+            const result = originalRenderArray.call(this, propName, elements, value);
+            indent--;
+            return result;
+        };
+        
+        const props = {
+            property: [
+                {
+                    name: "test1",
+                    type: "Text"
+                },
+                {
+                    name: "test2", 
+                    type: "URL"
+                }
+            ]
+        };
+        
+        try {
+            log('Starting render...');
+            const templateEl = document.getElementById('test-template');
+            const template = new Template(templateEl);
+            const rendered = template.render(props);
+            
+            log(`Render complete. Result: <${rendered.tagName}> with ${rendered.children.length} children`);
+            
+            // Create a table to show the result
+            const table = document.createElement('table');
+            table.appendChild(rendered);
+            output.appendChild(table);
+            
+            // Also show the raw HTML
+            debug.innerHTML += '<br><strong>Raw HTML:</strong><br>';
+            debug.innerHTML += '<pre>' + rendered.outerHTML.replace(/</g, '&lt;') + '</pre>';
+            
+        } catch (error) {
+            log('Error: ' + error.message);
+            console.error(error);
+        }
+    </script>
+</body>
+</html>

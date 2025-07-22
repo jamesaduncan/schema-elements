@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TBody Array Rendering Test</title>
+    <style>
+        table { border-collapse: collapse; margin: 20px; }
+        td, th { border: 1px solid #ddd; padding: 8px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>TBody Array Rendering Test</h1>
+    
+    <div class="debug" id="debug"></div>
+    
+    <h2>Rendered Table:</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Cardinality</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody id="output"></tbody>
+    </table>
+    
+    <template>
+        <tbody>
+            <tr itemprop="property[]" itemscope itemtype="https://organised.team/Property">
+                <td itemprop="name"></td>
+                <td itemprop="type"></td>
+                <td itemprop="cardinality"></td>
+                <td itemprop="description"></td>
+            </tr>
+        </tbody>
+    </template>
+    
+    <script type="module">
+        import { Microdata, Template } from './index.mjs';
+        
+        const debug = document.getElementById('debug');
+        const output = document.getElementById('output');
+        
+        const props = {
+            property: [
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/Text",
+                    name: "name",
+                    cardinality: "1",
+                    description: "The name of the persona"
+                },
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/Text",
+                    name: "description",
+                    cardinality: "0..1",
+                    description: "A description of the persona"
+                },
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/URL",
+                    name: "framework",
+                    cardinality: "1",
+                    description: "Link to the SkillsFramework this role belongs to"
+                },
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/URL",
+                    name: "scope",
+                    cardinality: "0..n",
+                    description: "Scope of the role, indicating the areas it applies to by way of URLs"
+                },
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    name: "skill",
+                    type: "https://organised.team/Skill",
+                    cardinality: "0..n",
+                    description: "Skills the persona is required to have"
+                }
+            ]
+        };
+        
+        try {
+            debug.innerHTML = '<h3>Data to render:</h3>';
+            debug.innerHTML += `<pre>${JSON.stringify(props, null, 2)}</pre>`;
+            
+            const template = new Template(document.querySelector('template'));
+            const rendered = template.render(props);
+            
+            debug.innerHTML += '<h3>Rendered result:</h3>';
+            debug.innerHTML += `<p>Tag name: ${rendered.tagName}</p>`;
+            debug.innerHTML += `<p>Children: ${rendered.children.length}</p>`;
+            debug.innerHTML += `<p>HTML:</p><pre>${rendered.outerHTML.replace(/</g, '&lt;')}</pre>`;
+            
+            // Try to append just the rows instead of the tbody
+            const rows = rendered.querySelectorAll('tr');
+            debug.innerHTML += `<p>Found ${rows.length} rows</p>`;
+            
+            rows.forEach(row => {
+                output.appendChild(row);
+            });
+            
+        } catch (error) {
+            debug.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            console.error(error);
+        }
+    </script>
+</body>
+</html>

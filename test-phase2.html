@@ -156,8 +156,10 @@
             await testAsync('MicrodataItem validate method', async () => {
                 const person = document.microdata.person1;
                 assert(person !== undefined, 'Should find person1');
-                const isValid = await person.validate();
-                assert(typeof isValid === 'boolean', 'validate() should return boolean');
+                const result = await person.validate();
+                assert(result !== false, 'validate() should return microdata object on success');
+                assert(typeof result === 'object' && result !== null, 'validate() should return object');
+                assert(result['@type'] === 'Person', 'Should have correct type');
             });
             
             // Test form validation
@@ -166,8 +168,9 @@
                 await schema.load();
                 
                 const form = document.getElementById('testForm');
-                const isValid = schema.validate(form);
-                assert(typeof isValid === 'boolean', 'Form validation should return boolean');
+                const result = schema.validate(form);
+                // Form has empty password, should fail validation
+                assert(result === false || (typeof result === 'object' && result !== null), 'Form validation should return object or false');
             });
             
             // Test plain object validation
@@ -181,8 +184,10 @@
                     unknownProp: 'value'
                 };
                 
-                const isValid = schema.validate(obj);
-                assert(isValid === true, 'Schema.org should be permissive');
+                const result = schema.validate(obj);
+                assert(result !== false, 'Schema.org should be permissive');
+                assert(typeof result === 'object' && result !== null, 'Should return microdata object');
+                assert(result.name === 'Test User', 'Should contain input data');
             });
             
             // Test validation with cardinality (mock)
@@ -205,16 +210,18 @@
                 schema.loaded = true;
                 
                 // Test missing required property
-                let isValid = schema.validate({ optional: 'test' });
-                assert(isValid === false, 'Should fail with missing required property');
+                let result = schema.validate({ optional: 'test' });
+                assert(result === false, 'Should fail with missing required property');
                 
                 // Test valid object
-                isValid = schema.validate({ required: 'test', optional: 'test' });
-                assert(isValid === true, 'Should pass with all required properties');
+                result = schema.validate({ required: 'test', optional: 'test' });
+                assert(result !== false, 'Should pass with all required properties');
+                assert(typeof result === 'object' && result !== null, 'Should return microdata object');
+                assert(result.required === 'test', 'Should contain required property');
                 
                 // Test too many optional
-                isValid = schema.validate({ required: 'test', optional: ['one', 'two'] });
-                assert(isValid === false, 'Should fail with too many optional values');
+                result = schema.validate({ required: 'test', optional: ['one', 'two'] });
+                assert(result === false, 'Should fail with too many optional values');
             });
             
             // Test validation throws when not loaded

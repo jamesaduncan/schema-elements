@@ -351,6 +351,11 @@ class MicrodataItem {
             return element.getAttribute('datetime');
         }
         
+        // Handle form elements
+        if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT') {
+            return element.value;
+        }
+        
         // Default to text content
         return element.textContent.trim();
     }
@@ -371,6 +376,13 @@ class MicrodataItem {
             element.src = value;
         } else if (element.tagName === 'TIME' && element.hasAttribute('datetime')) {
             element.setAttribute('datetime', value);
+        } else if (element.tagName === 'INPUT') {
+            // Use setAttribute so MutationObserver can detect the change
+            element.setAttribute('value', value);
+            element.value = value; // Also set the property for immediate display
+        } else if (element.tagName === 'TEXTAREA' || element.tagName === 'SELECT') {
+            // For textarea and select, just set the value property
+            element.value = value;
         } else {
             // Default to text content
             element.textContent = value;
@@ -574,7 +586,7 @@ class MicrodataObserver {
             childList: true,
             subtree: true,
             attributes: true,
-            attributeFilter: ['itemscope', 'itemtype', 'itemid', 'itemref', 'itemprop'],
+            attributeFilter: ['itemscope', 'itemtype', 'itemid', 'itemref', 'itemprop', 'value'],
             attributeOldValue: true
         });
     }
@@ -1319,7 +1331,8 @@ class RustyBeamNetSchema extends SchemaOrgSchema {
             obj.dispatchEvent(event);
         }
         
-        return microdata;
+        // Return false if validation failed, otherwise return the microdata object
+        return isValid ? microdata : false;
     }
     
     _validateCardinality(value, cardinality) {
@@ -1509,10 +1522,17 @@ class Template {
         // Clone template content for parsing
         const content = this.element.content.cloneNode(true);
         
-        // Find all itemscope elements with itemtype
-        const schemaElements = content.querySelectorAll('[itemscope][itemtype]');
+        // Check if template element itself has itemscope/itemtype
         this._schemas = new Set();
+        if (this.element.hasAttribute('itemscope') && this.element.hasAttribute('itemtype')) {
+            const itemtype = this.element.getAttribute('itemtype');
+            if (itemtype) {
+                this._schemas.add(itemtype);
+            }
+        }
         
+        // Find all itemscope elements with itemtype inside the content
+        const schemaElements = content.querySelectorAll('[itemscope][itemtype]');
         schemaElements.forEach(el => {
             const itemtype = el.getAttribute('itemtype');
             if (itemtype) {
@@ -1596,6 +1616,14 @@ class Template {
             throw new Error('Template has no root element');
         }
         
+        // Transfer itemscope/itemtype from template element to root if present
+        if (this.element.hasAttribute('itemscope') && !root.hasAttribute('itemscope')) {
+            root.setAttribute('itemscope', '');
+            if (this.element.hasAttribute('itemtype')) {
+                root.setAttribute('itemtype', this.element.getAttribute('itemtype'));
+            }
+        }
+        
         // Render data to template
         this._renderData(root, data);
         
@@ -1620,13 +1648,13 @@ class Template {
             NodeFilter.SHOW_ELEMENT,
             {
                 acceptNode: (node) => {
-                    // Don't descend into nested itemscopes
-                    if (node !== element && node.hasAttribute('itemscope')) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-                    
                     if (node.hasAttribute('itemprop')) {
                         return NodeFilter.FILTER_ACCEPT;
+                    }
+                    
+                    // Don't descend into nested itemscopes that don't have itemprop
+                    if (node !== element && node.hasAttribute('itemscope')) {
+                        return NodeFilter.FILTER_REJECT;
                     }
                     
                     return NodeFilter.FILTER_SKIP;
@@ -1660,16 +1688,21 @@ class Template {
             const value = data[propName];
             
             if (value === undefined || value === null) {
-                // Clear the content but keep the element
-                group.elements.forEach(el => {
-                    if (el.hasAttribute('content')) {
-                        el.setAttribute('content', '');
-                    } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-                        el.value = '';
-                    } else {
-                        el.textContent = '';
-                    }
-                });
+                // For array properties, remove all elements
+                if (group.isArray) {
+                    group.elements.forEach(el => el.remove());
+                } else {
+                    // For single properties, clear the content but keep the element
+                    group.elements.forEach(el => {
+                        if (el.hasAttribute('content')) {
+                            el.setAttribute('content', '');
+                        } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                            el.value = '';
+                        } else {
+                            el.textContent = '';
+                        }
+                    });
+                }
                 continue;
             }
             
@@ -1693,6 +1726,11 @@ class Template {
         // Special handling for checkboxes - don't remove them, just update checked state
         if (elements.length > 0 && elements[0].type === 'checkbox') {
             elements.forEach(checkbox => {
+                // Remove [] suffix from itemprop attribute
+                const itemprop = checkbox.getAttribute('itemprop');
+                if (itemprop && itemprop.endsWith('[]')) {
+                    checkbox.setAttribute('itemprop', itemprop.slice(0, -2));
+                }
                 checkbox.checked = values.includes(checkbox.value);
             });
             return;
@@ -1707,16 +1745,27 @@ class Template {
         // Create new elements for each value
         values.forEach(val => {
             const newElement = template.cloneNode(true);
+            // Remove [] suffix from itemprop attribute in the cloned element
+            if (newElement.hasAttribute('itemprop')) {
+                const itemprop = newElement.getAttribute('itemprop');
+                if (itemprop.endsWith('[]')) {
+                    newElement.setAttribute('itemprop', itemprop.slice(0, -2));
+                }
+            }
             this._renderSingleProperty(propName, newElement, val);
             parent.appendChild(newElement);
         });
     }
     
     _renderSingleProperty(propName, element, value) {
-        if (value && typeof value === 'object' && value['@type']) {
-            // Nested microdata item
+        if (value && typeof value === 'object') {
+            // Object value - check if element expects nested microdata
             if (element.hasAttribute('itemscope')) {
+                // Render as nested microdata
                 this._renderData(element, value);
+            } else if (!Array.isArray(value)) {
+                // Object without itemscope - try to set as JSON string
+                this._setElementValue(element, JSON.stringify(value));
             }
         } else {
             // Simple value
@@ -1738,6 +1787,8 @@ class Template {
                     break;
                 default:
                     element.value = stringValue;
+                    // Also set the attribute for consistency with MicrodataItem
+                    element.setAttribute('value', stringValue);
                     break;
             }
         } else if (element.tagName === 'SELECT') {
@@ -1754,8 +1805,9 @@ class Template {
             element.value = stringValue;
         } else if (element.hasAttribute('content')) {
             element.setAttribute('content', stringValue);
-        } else if (element.tagName === 'A' && element.hasAttribute('href')) {
-            element.href = stringValue;
+        } else if (element.tagName === 'A') {
+            // For anchor tags with itemprop, set the text content
+            element.textContent = stringValue;
         } else if (element.tagName === 'IMG' && element.hasAttribute('src')) {
             element.src = stringValue;
         } else if (element.tagName === 'TIME' && element.hasAttribute('datetime')) {
@@ -1897,14 +1949,15 @@ if (document.readyState === 'loading') {
 MicrodataItem.prototype.validate = function() {
     const itemtype = this._element.getAttribute('itemtype');
     if (!itemtype) {
-        return true; // No schema to validate against
+        // No schema to validate against - return the microdata as-is
+        return extractMicrodataData(this);
     }
     
     // Get schema from cache
     const schema = schemaCache.get(itemtype);
     if (!schema || !schema.loaded) {
-        // Schema not loaded yet - be permissive
-        return true;
+        // Schema not loaded yet - be permissive and return the microdata as-is
+        return extractMicrodataData(this);
     }
     
     return schema.validate(this);
@@ -2011,7 +2064,7 @@ class TemplateSynchronizer {
             childList: true,
             subtree: true,
             attributes: true,
-            attributeFilter: ['data-contains', 'id'],
+            attributeFilter: ['data-contains', 'id', 'value'],
             characterData: true
         });
     }
@@ -2079,7 +2132,7 @@ class TemplateSynchronizer {
         // Add or update items
         items.forEach(itemElement => {
             const id = itemElement.id;
-            const item = new MicrodataItem(itemElement);
+            const item = itemElement.microdata;
             
             
             if (renderedItems.has(id)) {
@@ -2173,7 +2226,16 @@ class TemplateSynchronizer {
             }
             
             // Check for text/attribute changes within items with id
-            if (mutation.type === 'characterData') {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                // Value attribute changed on an element
+                const target = mutation.target;
+                if (target.hasAttribute('itemprop')) {
+                    const itemScope = target.closest('[itemscope][id]');
+                    if (itemScope) {
+                        modifiedItems.add(itemScope);
+                    }
+                }
+            } else if (mutation.type === 'characterData') {
                 // Check if mutation is within an itemscope with id
                 let target = mutation.target;
                 if (target.nodeType === Node.TEXT_NODE) {

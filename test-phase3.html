@@ -230,7 +230,7 @@
                 };
                 
                 const rendered = template.render(data);
-                const roles = rendered.querySelectorAll('[itemprop="role[]"]');
+                const roles = rendered.querySelectorAll('[itemprop="role"]');
                 assert(roles.length === 3, 'Should render 3 role elements');
                 assert(roles[0].textContent === 'admin', 'First role should be admin');
                 assert(roles[1].textContent === 'editor', 'Second role should be editor');
@@ -246,7 +246,7 @@
                 };
                 
                 const rendered = template.render(data);
-                const roles = rendered.querySelectorAll('[itemprop="role[]"]');
+                const roles = rendered.querySelectorAll('[itemprop="role"]');
                 assert(roles.length === 1, 'Should render 1 role element');
                 assert(roles[0].textContent === 'guest', 'Role should be guest');
             });
@@ -260,7 +260,7 @@
                 };
                 
                 const rendered = template.render(data);
-                const roles = rendered.querySelectorAll('[itemprop="role[]"]');
+                const roles = rendered.querySelectorAll('[itemprop="role"]');
                 assert(roles.length === 0, 'Should not render role elements');
             });
             
@@ -302,7 +302,7 @@
                 // Check first item
                 const first = renderedItems[0];
                 assert(first.querySelector('[itemprop="username"]').textContent === 'johndoe', 'First should be johndoe');
-                const roles = first.querySelectorAll('[itemprop="role[]"]');
+                const roles = first.querySelectorAll('[itemprop="role"]');
                 assert(roles.length === 2, 'johndoe should have 2 roles');
             });
             

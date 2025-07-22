@@ -163,12 +163,12 @@
                 const random = people[Math.floor(Math.random() * people.length)];
                 const nameInput = random.querySelector('[itemprop="name"]');
                 if (nameInput) {
-                    nameInput.value = `Updated ${Date.now()}`;
+                    const newValue = `Updated ${Date.now()}`;
+                    // Use setAttribute so MutationObserver can detect the change
+                    nameInput.setAttribute('value', newValue);
+                    nameInput.value = newValue; // Also update the property for display
                     nameInput.classList.add('highlight');
                     setTimeout(() => nameInput.classList.remove('highlight'), 1000);
-                    
-                    // Trigger change event for sync
-                    nameInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }
         };

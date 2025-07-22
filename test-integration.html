@@ -338,8 +338,9 @@
                 assert(schema.loaded === true, 'Schema should be loaded before validation');
                 
                 // Schema.org validation is permissive
-                const isValid = schema.validate(form);
-                assert(isValid === true, 'Form should validate against schema');
+                const result = schema.validate(form);
+                assert(result !== false, 'Form should validate against schema');
+                assert(typeof result === 'object' && result !== null, 'Should return microdata object');
             });
             
             // 9.2.5 Test fetch API

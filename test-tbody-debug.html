@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TBody Array Debug</title>
+    <style>
+        table { border-collapse: collapse; margin: 20px; }
+        td, th { border: 1px solid #ddd; padding: 8px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>TBody Array Debug</h1>
+    
+    <div class="debug" id="debug"></div>
+    
+    <template id="test-template">
+        <tbody>
+            <tr itemprop="property[]" itemscope itemtype="https://organised.team/Property">
+                <td itemprop="name"></td>
+                <td itemprop="type"></td>
+                <td itemprop="cardinality"></td>
+                <td itemprop="description"></td>
+            </tr>
+        </tbody>
+    </template>
+    
+    <script type="module">
+        import { Microdata, Template } from './index.mjs';
+        
+        const debug = document.getElementById('debug');
+        
+        // First, let's check if the template is being parsed correctly
+        const templateEl = document.getElementById('test-template');
+        debug.innerHTML = '<h3>Template content:</h3>';
+        debug.innerHTML += `<pre>${templateEl.innerHTML.replace(/</g, '&lt;')}</pre>`;
+        
+        // Create a simple test with minimal data
+        const simpleProps = {
+            property: [
+                { name: "test1", type: "Text" },
+                { name: "test2", type: "URL" }
+            ]
+        };
+        
+        debug.innerHTML += '<h3>Simple test data:</h3>';
+        debug.innerHTML += `<pre>${JSON.stringify(simpleProps, null, 2)}</pre>`;
+        
+        try {
+            const template = new Template(templateEl);
+            
+            // Let's manually check what the template sees
+            const content = templateEl.content;
+            const itemprops = content.querySelectorAll('[itemprop]');
+            debug.innerHTML += `<h3>Found ${itemprops.length} elements with itemprop:</h3>`;
+            itemprops.forEach(el => {
+                debug.innerHTML += `<p>- ${el.tagName} itemprop="${el.getAttribute('itemprop')}"</p>`;
+            });
+            
+            // Try rendering
+            debug.innerHTML += '<h3>Attempting render...</h3>';
+            const rendered = template.render(simpleProps);
+            
+            debug.innerHTML += '<h3>Rendered result:</h3>';
+            debug.innerHTML += `<pre>${rendered.outerHTML.replace(/</g, '&lt;')}</pre>`;
+            
+            // Check what's inside
+            const rows = rendered.querySelectorAll('tr');
+            debug.innerHTML += `<p>Found ${rows.length} TR elements</p>`;
+            
+            rows.forEach((row, i) => {
+                debug.innerHTML += `<h4>Row ${i}:</h4>`;
+                const cells = row.querySelectorAll('td');
+                cells.forEach((cell, j) => {
+                    debug.innerHTML += `<p>Cell ${j}: "${cell.textContent}" (itemprop="${cell.getAttribute('itemprop')}")</p>`;
+                });
+            });
+            
+        } catch (error) {
+            debug.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            debug.innerHTML += `<pre>${error.stack}</pre>`;
+        }
+        
+        // Also test with the complex data
+        debug.innerHTML += '<hr><h3>Testing with complex data...</h3>';
+        
+        const complexProps = {
+            property: [
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/Text",
+                    name: "name",
+                    cardinality: "1",
+                    description: "The name of the persona"
+                },
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/Text",
+                    name: "description",
+                    cardinality: "0..1",
+                    description: "A description of the persona"
+                }
+            ]
+        };
+        
+        try {
+            const template2 = new Template(templateEl);
+            const rendered2 = template2.render(complexProps);
+            debug.innerHTML += '<h3>Complex data rendered:</h3>';
+            debug.innerHTML += `<pre>${rendered2.outerHTML.replace(/</g, '&lt;')}</pre>`;
+        } catch (error) {
+            debug.innerHTML += `<p style="color: red;">Complex data error: ${error.message}</p>`;
+        }
+    </script>
+</body>
+</html>

@@ -241,8 +241,10 @@
             test('MicrodataItem validate method', () => {
                 const validItem = document.getElementById('person1').microdata;
                 const result = validItem.validate();
-                assert(typeof result === 'boolean', 'validate() should return boolean');
-                assert(result === true, 'Valid item should pass validation');
+                assert(result !== false, 'Valid item should pass validation');
+                assert(typeof result === 'object' && result !== null, 'validate() should return microdata object on success');
+                assert(result['@type'] === 'Person', 'Should have correct type');
+                assert(result.name === 'John Doe', 'Should contain the data');
             });
             
             // Test 6.4: DOMSchemaInvalidData events

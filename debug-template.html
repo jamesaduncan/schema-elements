@@ -1,0 +1,55 @@
+<\!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Template Rendering</title>
+</head>
+<body>
+    <div id="person1" itemscope itemtype="https://schema.org/Person">
+        <input itemprop="name" value="Test Person">
+        <input itemprop="email" value="test@example.com">
+    </div>
+    
+    <template id="test-template">
+        <div class="person-card">
+            <h4 itemprop="name"></h4>
+            <p itemprop="email"></p>
+        </div>
+    </template>
+    
+    <div id="output"></div>
+
+    <script type="module">
+        import { Template } from './index.mjs';
+        
+        setTimeout(() => {
+            const person = document.getElementById('person1').microdata;
+            console.log('Microdata proxy object:', person);
+            console.log('Name property:', person.name);
+            console.log('Email property:', person.email);
+            
+            // Check toJSON output
+            const jsonData = person.toJSON();
+            console.log('toJSON output:', jsonData);
+            
+            // Try direct rendering
+            const template = new Template(document.getElementById('test-template'));
+            console.log('Template schemas:', template.schemas);
+            
+            // Check what _extractData returns
+            const extractedData = template._extractData(person);
+            console.log('Extracted data:', extractedData);
+            
+            const rendered = template.render(person);
+            console.log('Rendered element:', rendered);
+            console.log('Rendered HTML:', rendered.outerHTML);
+            
+            // Check specific elements
+            const nameEl = rendered.querySelector('[itemprop="name"]');
+            console.log('Name element:', nameEl, 'textContent:', nameEl?.textContent);
+            
+            document.getElementById('output').appendChild(rendered);
+        }, 100);
+    </script>
+</body>
+</html>
+EOF < /dev/null

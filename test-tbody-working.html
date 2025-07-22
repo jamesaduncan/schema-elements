@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Working TBody Array Example</title>
+    <style>
+        table { border-collapse: collapse; margin: 20px; }
+        td, th { border: 1px solid #ddd; padding: 8px; }
+        .example { margin: 20px; padding: 20px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Working TBody Array Examples</h1>
+    
+    <div class="example">
+        <h2>Option 1: Wrapper approach (Recommended)</h2>
+        <p>Wrap the tbody in a div with itemscope to provide context</p>
+        
+        <template id="template1">
+            <div itemscope>
+                <table>
+                    <tbody>
+                        <tr itemprop="property[]" itemscope itemtype="https://organised.team/Property">
+                            <td itemprop="name"></td>
+                            <td itemprop="type"></td>
+                            <td itemprop="cardinality"></td>
+                            <td itemprop="description"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+        
+        <div id="output1"></div>
+    </div>
+    
+    <div class="example">
+        <h2>Option 2: Individual row rendering</h2>
+        <p>Render each property separately and build the table manually</p>
+        
+        <template id="template2">
+            <tr itemscope itemtype="https://organised.team/Property">
+                <td itemprop="name"></td>
+                <td itemprop="type"></td>
+                <td itemprop="cardinality"></td>
+                <td itemprop="description"></td>
+            </tr>
+        </template>
+        
+        <table>
+            <tbody id="output2"></tbody>
+        </table>
+    </div>
+    
+    <div class="example">
+        <h2>Option 3: Table as root with tbody child</h2>
+        <p>Use table as the template root</p>
+        
+        <template id="template3">
+            <table itemscope>
+                <tbody>
+                    <tr itemprop="property[]" itemscope itemtype="https://organised.team/Property">
+                        <td itemprop="name"></td>
+                        <td itemprop="type"></td>
+                        <td itemprop="cardinality"></td>
+                        <td itemprop="description"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </template>
+        
+        <div id="output3"></div>
+    </div>
+    
+    <script type="module">
+        import { Microdata, Template } from './index.mjs';
+        
+        const props = {
+            property: [
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/Text",
+                    name: "name",
+                    cardinality: "1",
+                    description: "The name of the persona"
+                },
+                {
+                    '@type': "Property",
+                    '@context': 'https://organised.team/',
+                    type: "https://schema.org/Text",
+                    name: "description",
+                    cardinality: "0..1",
+                    description: "A description of the persona"
+                }
+            ]
+        };
+        
+        // Option 1: Wrapper approach
+        try {
+            const template1 = new Template(document.getElementById('template1'));
+            const rendered1 = template1.render(props);
+            document.getElementById('output1').appendChild(rendered1);
+            console.log('Option 1 success');
+        } catch (e) {
+            console.error('Option 1 failed:', e);
+        }
+        
+        // Option 2: Individual rows
+        try {
+            const template2 = new Template(document.getElementById('template2'));
+            const tbody2 = document.getElementById('output2');
+            
+            props.property.forEach(prop => {
+                const row = template2.render(prop);
+                tbody2.appendChild(row);
+            });
+            console.log('Option 2 success');
+        } catch (e) {
+            console.error('Option 2 failed:', e);
+        }
+        
+        // Option 3: Table as root
+        try {
+            const template3 = new Template(document.getElementById('template3'));
+            const rendered3 = template3.render(props);
+            document.getElementById('output3').appendChild(rendered3);
+            console.log('Option 3 success');
+        } catch (e) {
+            console.error('Option 3 failed:', e);
+        }
+        
+        // Debug your original template
+        console.log('\nDebugging original template structure:');
+        const origTemplate = `<tbody>
+            <tr itemprop="property[]" itemscope itemtype="https://organised.team/Property">
+                <td itemprop="name"></td>
+                <td itemprop="type"></td>
+                <td itemprop="cardinality"></td>
+                <td itemprop="description"></td>
+            </tr>
+        </tbody>`;
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<template>${origTemplate}</template>`, 'text/html');
+        const templateEl = doc.querySelector('template');
+        
+        try {
+            const template = new Template(templateEl);
+            const rendered = template.render(props);
+            console.log('Original template rendered:', rendered);
+            console.log('TR elements found:', rendered.querySelectorAll('tr').length);
+        } catch (e) {
+            console.error('Original template failed:', e);
+        }
+    </script>
+</body>
+</html>

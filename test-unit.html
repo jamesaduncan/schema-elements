@@ -258,16 +258,21 @@
             
             test('Basic validation passes', () => {
                 const item = document.getElementById('simple-item').microdata;
-                const isValid = item.validate();
-                assert(isValid === true, 'Valid item should pass validation');
+                const result = item.validate();
+                assert(result !== false, 'Valid item should pass validation');
+                assert(typeof result === 'object' && result !== null, 'Should return microdata object');
+                assert(result['@type'] === 'Person', 'Should have correct type');
+                assert(result.name === 'John Doe', 'Should contain the data');
             });
             
             test('Validation without schema', () => {
                 const item = document.getElementById('simple-item').microdata;
                 // Clear schema cache to test unloaded schema
                 Schema.clearCache();
-                const isValid = item.validate();
-                assert(isValid === true, 'Should be permissive without schema');
+                const result = item.validate();
+                assert(result !== false, 'Should be permissive without schema');
+                assert(typeof result === 'object' && result !== null, 'Should return microdata object');
+                assert(result.name === 'John Doe', 'Should contain the original data');
             });
             
             // 9.1.5 Test template rendering

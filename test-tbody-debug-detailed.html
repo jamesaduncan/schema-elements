@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TBody Detailed Debug</title>
+    <style>
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px; font-family: monospace; }
+        .step { margin: 10px 0; padding: 10px; border-left: 3px solid #007bff; }
+    </style>
+</head>
+<body>
+    <h1>TBody Template Rendering - Detailed Debug</h1>
+    
+    <div class="debug" id="debug"></div>
+    
+    <template id="test-template">
+        <tbody>
+            <tr itemprop="property[]" itemscope itemtype="https://organised.team/Property">
+                <td itemprop="name"></td>
+                <td itemprop="type"></td>
+            </tr>
+        </tbody>
+    </template>
+    
+    <script type="module">
+        import { Microdata, Template } from './index.mjs';
+        
+        const debug = document.getElementById('debug');
+        
+        function log(msg, data) {
+            const div = document.createElement('div');
+            div.className = 'step';
+            div.innerHTML = `<strong>${msg}</strong>`;
+            if (data !== undefined) {
+                div.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            debug.appendChild(div);
+        }
+        
+        const props = {
+            property: [
+                { name: "test1", type: "Text" },
+                { name: "test2", type: "URL" }
+            ]
+        };
+        
+        log('Input data:', props);
+        
+        try {
+            const templateEl = document.getElementById('test-template');
+            const template = new Template(templateEl);
+            
+            // Let's manually trace what should happen
+            const content = templateEl.content;
+            const root = content.firstElementChild;
+            log('Template root element:', `<${root.tagName}>`);
+            
+            // Find elements with itemprop
+            const walker = document.createTreeWalker(
+                root,
+                NodeFilter.SHOW_ELEMENT,
+                {
+                    acceptNode: (node) => {
+                        if (node.hasAttribute('itemprop')) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        return NodeFilter.FILTER_SKIP;
+                    }
+                }
+            );
+            
+            const propElements = [];
+            let node;
+            while (node = walker.nextNode()) {
+                propElements.push(node);
+            }
+            
+            log(`Found ${propElements.length} elements with itemprop`);
+            
+            propElements.forEach((el, i) => {
+                const itemprop = el.getAttribute('itemprop');
+                log(`Element ${i}: <${el.tagName} itemprop="${itemprop}">`);
+                
+                if (itemprop.endsWith('[]')) {
+                    const propName = itemprop.slice(0, -2);
+                    log(`  - Array property: ${propName}`);
+                    log(`  - Data has this property: ${propName in props}`);
+                    if (propName in props) {
+                        log(`  - Value:`, props[propName]);
+                    }
+                }
+            });
+            
+            // Now actually render
+            log('Attempting to render...');
+            const rendered = template.render(props);
+            
+            log('Rendered result:', rendered.outerHTML);
+            
+            const rows = rendered.querySelectorAll('tr');
+            log(`Found ${rows.length} rows in rendered output`);
+            
+        } catch (error) {
+            log('Error:', error.message);
+            console.error(error);
+        }
+    </script>
+</body>
+</html>

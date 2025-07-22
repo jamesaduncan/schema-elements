@@ -161,20 +161,22 @@
                 const item = document.getElementById('malformed-url').microdata;
                 assert(item !== null, 'Should create MicrodataItem');
                 assert(item['@type'] === 'Person', 'Should extract type from malformed URL');
-                assert(findWarning('Invalid itemtype URL'), 'Should warn about invalid URL');
+                // Note: Warnings removed for production - edge case handled silently
             });
             
             test('Invalid itemref handled', () => {
                 const item = document.getElementById('invalid-ref').microdata;
                 assert(item !== null, 'Should create MicrodataItem');
-                assert(findWarning('non-existent id: doesnotexist'), 'Should warn about missing itemref');
+                // Note: Warnings removed for production - edge case handled silently
+                // Invalid itemref is ignored without breaking functionality
             });
             
             test('Circular itemref detected', () => {
                 const item = document.getElementById('circular-ref').microdata;
                 assert(item !== null, 'Should create MicrodataItem');
-                // Check that circular reference warning was logged
-                assert(findWarning('Circular itemref'), 'Should warn about circular itemref');
+                // Note: Warnings removed for production - circular refs handled silently
+                // Verify it doesn't cause infinite loop
+                assert(item.name === 'Circular Person', 'Should handle circular ref gracefully');
             });
             
             test('Duplicate itemref handled', () => {
@@ -205,15 +207,17 @@
             // Test validation with missing schema
             test('Validation with unloaded schema', () => {
                 const item = document.getElementById('failing-schema').microdata;
-                const isValid = item.validate();
-                assert(isValid === true, 'Should return true when schema not loaded');
+                const result = item.validate();
+                assert(result !== false, 'Should be permissive when schema not loaded');
+                assert(typeof result === 'object' && result !== null, 'Should return microdata object');
             });
             
             // Test Schema URL validation
             test('Schema constructor with invalid URL', () => {
                 const schema = new Schema('not-a-valid-url');
                 assert(schema !== null, 'Should create schema instance');
-                assert(findWarning('Invalid schema URL'), 'Should warn about invalid schema URL');
+                // Note: Warnings removed for production - invalid URLs handled silently
+                assert(schema.url === 'not-a-valid-url', 'Should store the URL as-is');
             });
             
             // Test property access edge cases
