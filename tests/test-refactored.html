@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Refactored Template</title>
+</head>
+<body>
+    <h1>Testing Refactored Template System</h1>
+    
+    <div id="person" itemscope itemtype="https://schema.org/Person">
+        <span itemprop="name">John Doe</span>
+        <span itemprop="email">john@example.com</span>
+    </div>
+    
+    <template id="person-template">
+        <div class="person-card">
+            <h3 itemprop="name"></h3>
+            <p>Email: <span itemprop="email"></span></p>
+        </div>
+    </template>
+    
+    <div id="output"></div>
+    
+    <script type="module">
+        import { Template } from '../index.mjs';
+        
+        setTimeout(() => {
+            try {
+                console.log('Testing refactored Template...');
+                
+                // Test 1: Create template instance
+                const template = new Template(document.getElementById('person-template'));
+                console.log('Template created:', template);
+                console.log('Template schemas:', template.schemas);
+                
+                // Test 2: Render from microdata
+                const person = document.getElementById('person').microdata;
+                console.log('Person microdata:', person);
+                
+                const rendered = template.render(person);
+                console.log('Rendered element:', rendered);
+                console.log('Rendered HTML:', rendered.outerHTML);
+                
+                document.getElementById('output').appendChild(rendered);
+                
+                // Test 3: Static render
+                const staticRendered = Template.render({
+                    '@type': 'Person',
+                    name: 'Jane Smith',
+                    email: 'jane@example.com'
+                });
+                console.log('Static rendered:', staticRendered.outerHTML);
+                document.getElementById('output').appendChild(staticRendered);
+                
+                console.log('✅ All tests passed!');
+            } catch (error) {
+                console.error('❌ Test failed:', error);
+            }
+        }, 100);
+    </script>
+</body>
+</html>

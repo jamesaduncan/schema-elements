@@ -266,7 +266,7 @@ If a microdata element is authoritative (that is, it has an id attribute), then
 
 ## Templates and rendering
 
-Microdata Objects can be rendered to templates:
+Microdata Objects can be rendered to templates using the integrated [html-template](https://jamesaduncan.github.io/html-template/) library:
 
     ```html
     <template id="person-template">
@@ -303,6 +303,8 @@ Microdata Objects can be rendered to templates:
         const shortformTemplate = Microdata.Template.render( person )
     </script>
     ```
+
+The Template class internally uses the [html-template](https://jamesaduncan.github.io/html-template/) library for rendering, which provides powerful templating capabilities including array support with `[]` syntax.
 
 Forms can also be rendered:
 

@@ -22,7 +22,7 @@ SchemaElements is a vanilla JavaScript library that transforms HTML microdata in
 Access and modify microdata through `document.microdata` with automatic DOM synchronization. Changes to JavaScript objects instantly update the DOM, and DOM mutations are reflected in the JavaScript layer.
 
 ### 📋 Template System
-Powerful template rendering with auto-synchronization. Templates automatically update when data changes, support array repetition with `[]` syntax, and can render from multiple data sources.
+Powerful template rendering with auto-synchronization using the [html-template](https://jamesaduncan.github.io/html-template/) library. Templates automatically update when data changes, support array repetition with `[]` syntax, and can render from multiple data sources.
 
 ### 🌐 Remote Data Fetching
 Fetch microdata from external URLs, supporting both JSON-LD and HTML with embedded microdata. Individual microdata items can fetch their referenced remote counterparts through the `fetch()` method.
@@ -44,6 +44,9 @@ Full array support with push, pop, splice operations. Iterator protocol support 
   import { Microdata, Schema, Template } from 'https://jamesaduncan.github.io/schema-elements/index.mjs';
 </script>
 ```
+
+### Dependencies
+The Template system uses the external [html-template](https://jamesaduncan.github.io/html-template/) library for rendering. This dependency is automatically imported when using the Template class.
 
 ### Local Installation
 ```html

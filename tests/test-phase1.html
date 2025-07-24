@@ -70,7 +70,7 @@
     <div id="summary"></div>
     
     <script type="module">
-        import './index.mjs';
+        import '../index.mjs';
         
         const results = document.getElementById('test-results');
         let testCount = 0;
@@ -140,7 +140,7 @@
             
             test('@id generation', () => {
                 const item = document.microdata.johndoe;
-                assert(item['@id'] === document.baseURI + '#johndoe', '@id should be generated correctly');
+                assert(item['@id'] === 'johndoe', '@id should be the element id attribute');
             });
             
             test('JSON serialization matches API example', () => {

@@ -23,5 +23,17 @@ SchemaElements is a vanilla JavaScript library for working with HTML Microdata e
 The API is documented in SCHEMA-API.md
 
 ## IMPLEMENTATION PLAN
-
+ 
 The Implementation Plan is documented in SCHEMA-IMPLEMENTATION-PLAN.md
+
+## Testing
+
+All tests should go in the test directory. The main test file that links to
+all the other tests is tests/index.html.
+
+Test files are written into the directory `/tests`
+
+```bash
+# run the web server, and open the test file
+npx http-server -o <FILEPATH>
+```

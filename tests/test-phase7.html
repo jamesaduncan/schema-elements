@@ -69,22 +69,18 @@
     
     <script type="module">
         // Test ES Module imports
-        import Microdata, { Microdata as NamedMicrodata, Schema, Template, MicrodataItem, MicrodataCollection } from './index.mjs';
+        import { Microdata, Schema, Template, MicrodataItem, MicrodataCollection } from '../index.mjs';
         
         // Run tests after module loads
         setTimeout(() => {
             results.innerHTML = '<h3>Running Module Structure tests...</h3>';
             
             // Test 7.1: ES Module Exports
-            test('Default export is Microdata', () => {
-                assert(Microdata !== undefined, 'Default export should exist');
-                assert(typeof Microdata === 'function', 'Microdata should be a constructor');
+            test('Named export Microdata exists', () => {
+                assert(Microdata !== undefined, 'Microdata export should exist');
+                assert(typeof Microdata === 'object', 'Microdata should be an object');
             });
             
-            test('Named export Microdata', () => {
-                assert(NamedMicrodata !== undefined, 'Named export should exist');
-                assert(NamedMicrodata === Microdata, 'Named and default exports should be the same');
-            });
             
             test('Named export Schema', () => {
                 assert(Schema !== undefined, 'Schema should be exported');
@@ -104,22 +100,6 @@
             test('Named export MicrodataCollection', () => {
                 assert(MicrodataCollection !== undefined, 'MicrodataCollection should be exported');
                 assert(typeof MicrodataCollection === 'function', 'MicrodataCollection should be a constructor');
-            });
-            
-            // Test window globals
-            test('window.Microdata global', () => {
-                assert(window.Microdata !== undefined, 'window.Microdata should exist');
-                assert(window.Microdata === Microdata, 'window.Microdata should match the export');
-            });
-            
-            test('window.Microdata.Schema global', () => {
-                assert(window.Microdata.Schema !== undefined, 'window.Microdata.Schema should exist');
-                assert(window.Microdata.Schema === Schema, 'window.Microdata.Schema should match the export');
-            });
-            
-            test('window.Microdata.Template global', () => {
-                assert(window.Microdata.Template !== undefined, 'window.Microdata.Template should exist');
-                assert(window.Microdata.Template === Template, 'window.Microdata.Template should match the export');
             });
             
             // Test 7.2: Static Methods
@@ -156,11 +136,11 @@
                 assert(true, 'clearCache should not throw');
             });
             
-            // Test Microdata is a static class
-            test('Microdata is a static class', () => {
-                assert(typeof Microdata === 'function', 'Microdata should be a constructor function');
+            // Test Microdata is a static object
+            test('Microdata is a static object', () => {
+                assert(typeof Microdata === 'object', 'Microdata should be an object');
                 assert(typeof Microdata.fetch === 'function', 'Should have static fetch method');
-                // Microdata is a static class and shouldn't be instantiated
+                assert(typeof Microdata.validate === 'function', 'Should have static validate method');
             });
             
             test('Can access document.microdata', () => {

@@ -82,8 +82,14 @@
             DOMSchemaInvalidData: []
         };
         
-        function logEvent(type, detail, target) {
+        let lastEventTime = {};
+        
+        function logEvent(type, detail, target, event) {
             console.log(`Event: ${type}`, detail); // Debug logging
+            
+            // Use currentTarget to identify where the listener caught the event
+            const listenerTarget = event ? event.currentTarget : target;
+            
             const item = document.createElement('div');
             item.className = 'event-item';
             
@@ -95,9 +101,9 @@
                 item.className += ' invalid';
             }
             
-            const targetInfo = target === document ? 'document' : 
-                             target.id ? `#${target.id}` : 
-                             target.tagName ? target.tagName.toLowerCase() : 'unknown';
+            const targetInfo = listenerTarget === document ? 'document' : 
+                             listenerTarget.id ? `#${listenerTarget.id}` : 
+                             listenerTarget.tagName ? listenerTarget.tagName.toLowerCase() : 'unknown';
             
             item.textContent = `${type} on ${targetInfo}: ${JSON.stringify(detail)}`;
             eventLog.appendChild(item);
@@ -107,27 +113,27 @@
         
         // Set up event listeners BEFORE loading the module
         document.addEventListener('DOMSchemasLoaded', (e) => {
-            logEvent('DOMSchemasLoaded', e.detail, e.target);
+            logEvent('DOMSchemasLoaded', e.detail, e.target, e);
         });
         
         document.addEventListener('DOMSchemaError', (e) => {
-            logEvent('DOMSchemaError', e.detail, e.target);
+            logEvent('DOMSchemaError', e.detail, e.target, e);
         });
         
         document.addEventListener('DOMSchemaInvalidData', (e) => {
-            logEvent('DOMSchemaInvalidData', e.detail, e.target);
+            logEvent('DOMSchemaInvalidData', e.detail, e.target, e);
         });
         
         // Also listen on specific elements
         document.querySelectorAll('[itemscope]').forEach(el => {
             el.addEventListener('DOMSchemaError', (e) => {
-                logEvent('DOMSchemaError', e.detail, e.target);
-                e.stopPropagation(); // Prevent double logging
+                logEvent('DOMSchemaError', e.detail, e.target, e);
+                // Don't stop propagation - we want to test bubbling
             });
             
             el.addEventListener('DOMSchemaInvalidData', (e) => {
-                logEvent('DOMSchemaInvalidData', e.detail, e.target);
-                e.stopPropagation(); // Prevent double logging
+                logEvent('DOMSchemaInvalidData', e.detail, e.target, e);
+                // Don't stop propagation - we want to test bubbling
             });
         });
         
@@ -178,7 +184,7 @@
     
     <script type="module">
         // Import module after event listeners are set up
-        import { Microdata, Schema, RustyBeamNetSchema } from './index.mjs';
+        import { Microdata, Schema, RustyBeamNetSchema } from '../index.mjs';
         
         // Make imports available globally for tests
         window.Microdata = Microdata;
@@ -271,9 +277,12 @@
                 });
                 schema.loaded = true;
                 
+                // Cache the schema so validation can find it
+                window.Schema.cache(schema);
+                
                 // Validate invalid item
                 const invalidItem = document.getElementById('credential2').microdata;
-                const isValid = schema.validate(invalidItem);
+                const isValid = invalidItem.validate();
                 
                 assert(isValid === false, 'Invalid item should fail validation');
                 

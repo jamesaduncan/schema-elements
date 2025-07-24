@@ -155,7 +155,7 @@
     <div id="summary"></div>
     
     <script type="module">
-        import { Microdata, Schema, Template } from './index.mjs';
+        import { Microdata, Schema, Template } from '../index.mjs';
         
         const results = document.getElementById('test-results');
         let testCount = 0;
@@ -206,8 +206,8 @@
             // Test 4.1: Form Data Extraction
             test('Extract basic form inputs', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(data.username === 'testuser', 'Should extract text input');
                 assert(data.password === 'secret123', 'Should extract password input');
@@ -216,24 +216,24 @@
             
             test('Extract textarea', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(data.bio === 'This is my bio text.', 'Should extract textarea value');
             });
             
             test('Extract select single', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(data.role === 'editor', 'Should extract selected option');
             });
             
             test('Extract select multiple', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(Array.isArray(data.permissions), 'Should extract as array');
                 assert(data.permissions.length === 2, 'Should have 2 selected options');
@@ -243,16 +243,16 @@
             
             test('Extract radio buttons', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(data.status === 'active', 'Should extract checked radio value');
             });
             
             test('Extract checkbox arrays', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(Array.isArray(data.notifications), 'Should extract as array');
                 assert(data.notifications.length === 2, 'Should have 2 checked boxes');
@@ -262,8 +262,8 @@
             
             test('Extract other input types', () => {
                 const form = document.getElementById('complete-form');
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(data.age === '25', 'Should extract number input');
                 assert(data.website === 'https://example.com', 'Should extract url input');
@@ -339,6 +339,7 @@
                 const roleSelect = rendered.querySelector('[itemprop="role"]');
                 assert(roleSelect.value === 'editor', 'Should preserve select value');
                 
+                // With the html-template bug fixed, checkboxes should have itemprop="notifications" (without [])
                 const emailCheckbox = rendered.querySelector('[itemprop="notifications"][value="email"]');
                 assert(emailCheckbox.checked === true, 'Should preserve checkbox state for email');
                 
@@ -361,8 +362,8 @@
                     <input type="checkbox" name="options" value="opt3" checked>
                 `;
                 
-                const schema = new SchemaOrgSchema('https://schema.org/Thing', {});
-                const data = schema._extractData(form);
+                const template = new Microdata.Template(document.createElement('template'));
+                const data = template._extractData(form);
                 
                 assert(data.agree === 'yes', 'Single checkbox should have value');
                 assert(Array.isArray(data.options), 'Multiple checkboxes should be array');
@@ -393,7 +394,7 @@
         });
         
         // Import SchemaOrgSchema for testing
-        const { SchemaOrgSchema } = await import('./index.mjs');
+        const { SchemaOrgSchema } = await import('../index.mjs');
     </script>
 </body>
 </html>

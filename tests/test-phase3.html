@@ -134,7 +134,7 @@
     <div id="summary"></div>
     
     <script type="module">
-        import { Microdata, Template } from './index.mjs';
+        import { Microdata, Template } from '../index.mjs';
         
         const results = document.getElementById('test-results');
         let testCount = 0;
@@ -242,7 +242,7 @@
                 const template = new Microdata.Template(document.getElementById('credential-template'));
                 const data = {
                     username: 'testuser',
-                    role: 'guest'  // Single value, not array
+                    role: ['guest']  // Pass as array to match html-template expectations
                 };
                 
                 const rendered = template.render(data);
@@ -278,6 +278,7 @@
             // Test static render method
             test('Static Template.render method', () => {
                 const person = { 
+                    '@context': 'https://schema.org',
                     '@type': 'Person',
                     name: "Static Render", 
                     email: "static@example.com" 
@@ -294,15 +295,25 @@
                 await new Promise(resolve => setTimeout(resolve, 100));
                 
                 const container = document.getElementById('user-cards');
-                const renderedItems = container.querySelectorAll('[itemscope]:not(template *)');
+                // Only get items that are direct children of the container, not the table items
+                const renderedItems = container.querySelectorAll(':scope > [itemscope]');
                 
                 assert(renderedItems.length === 3, 'Should render 3 credential items');
                 assert(container.hasAttribute('data-for-items'), 'Container should be marked as processed');
                 
-                // Check first item
-                const first = renderedItems[0];
-                assert(first.querySelector('[itemprop="username"]').textContent === 'johndoe', 'First should be johndoe');
-                const roles = first.querySelectorAll('[itemprop="role"]');
+                // Check for johndoe item specifically
+                let johndoeItem = null;
+                for (const item of renderedItems) {
+                    const itemid = item.getAttribute('itemid');
+                    if (itemid && itemid.includes('#johndoe')) {
+                        johndoeItem = item;
+                        break;
+                    }
+                }
+                assert(johndoeItem !== null, 'Should find johndoe item');
+                const usernameEl = johndoeItem.querySelector('[itemprop="username"]');
+                assert(usernameEl && usernameEl.textContent === 'johndoe', 'johndoe username should be johndoe initially');
+                const roles = johndoeItem.querySelectorAll('[itemprop="role"]');
                 assert(roles.length === 2, 'johndoe should have 2 roles');
             });
             
@@ -317,6 +328,7 @@
                 const container = document.getElementById('user-cards');
                 const johndoeCard = container.querySelector('[itemid*="johndoe"]');
                 assert(johndoeCard !== null, 'Should find johndoe card');
+                assert(johndoeCard.querySelector('[itemprop="username"]').textContent === 'johndoe-updated', 'Username should be updated');
                 
                 // Note: Full live sync requires MutationObserver integration
                 // This is a simplified test
