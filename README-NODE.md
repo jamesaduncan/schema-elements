@@ -60,7 +60,24 @@ The Node.js version:
 3. Extends JSDOM elements with microdata functionality
 4. Provides a `parseHTML()` helper to create microdata-enabled documents
 
-## Known Limitations
+## Document-Level Access
 
-- The `document.microdata` collection property is not yet working in parsed documents (use element.microdata instead)
-- Performance may be slower than native browser usage due to JSDOM overhead
+You can access all top-level microdata items through `document.microdata`:
+
+```javascript
+const doc = parseHTML(html);
+
+// Access collection
+console.log(doc.microdata.length);         // Number of top-level items
+console.log(doc.microdata[0]);            // First item
+console.log(doc.microdata.item1);         // Named access by ID
+
+// Iterate over items
+doc.microdata.forEach(item => {
+    console.log(item['@type'], item.name);
+});
+```
+
+## Performance Note
+
+Performance may be slower than native browser usage due to JSDOM overhead.

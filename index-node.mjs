@@ -95,10 +95,32 @@ export function parseHTML(html) {
         Object.defineProperty(newDom.window.HTMLBodyElement.prototype, 'microdata', bodyMicrodataDescriptor);
     }
     
-    // Ensure document.microdata works by directly defining it
+    // Create a custom microdata collection for this document
+    // Cache the collection to avoid recreating it
+    let cachedCollection = null;
+    
     Object.defineProperty(newDoc, 'microdata', {
         get() {
-            return this.body ? this.body.microdata : [];
+            if (cachedCollection) return cachedCollection;
+            
+            // Create a simple array-like object with named access
+            const items = Array.from(this.querySelectorAll('[itemscope]:not([itemprop])'))
+                .map(el => el.microdata)
+                .filter(item => item != null);
+            
+            // Create collection object
+            cachedCollection = Object.assign(items, {
+                // Add named access for elements with IDs
+                ...items.reduce((acc, item, index) => {
+                    const element = this.querySelectorAll('[itemscope]:not([itemprop])')[index];
+                    if (element.id) {
+                        acc[element.id] = item;
+                    }
+                    return acc;
+                }, {})
+            });
+            
+            return cachedCollection;
         },
         configurable: true
     });
