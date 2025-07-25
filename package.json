@@ -1,0 +1,47 @@
+{
+  "name": "schema-elements",
+  "version": "1.0.0",
+  "description": "A vanilla JavaScript library for working with HTML Microdata elements. Provides extraction, rendering, synchronization, and validation of schema data within the DOM.",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": {
+      "browser": "./index.mjs",
+      "node": "./index-node.mjs",
+      "default": "./index.mjs"
+    }
+  },
+  "scripts": {
+    "test": "npx http-server -o tests/index.html"
+  },
+  "keywords": [
+    "microdata",
+    "schema.org",
+    "html",
+    "dom",
+    "structured-data",
+    "vanilla-js",
+    "schema",
+    "validation",
+    "template"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "jsdom": "^25.0.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/schema-elements.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/schema-elements/issues"
+  },
+  "homepage": "https://github.com/yourusername/schema-elements#readme"
+}
